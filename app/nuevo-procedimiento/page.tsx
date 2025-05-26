@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,31 +10,19 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Plus, Minus, Save } from "lucide-react"
+import { ArrowLeft, Plus, Minus, Save, Loader2 } from "lucide-react"
 import Link from "next/link"
-
-// Datos de productos disponibles
-const availableProducts = [
-  { id: 1, name: "VAC Granufoam Small", code: "VGF-S", stock: 15 },
-  { id: 2, name: "VAC Granufoam Medium", code: "VGF-M", stock: 2 },
-  { id: 3, name: "VAC Granufoam Large", code: "VGF-L", stock: 8 },
-  { id: 4, name: "VAC WhiteFoam Small", code: "VWF-S", stock: 12 },
-  { id: 5, name: "VAC WhiteFoam Medium", code: "VWF-M", stock: 7 },
-  { id: 6, name: "VAC WhiteFoam Large", code: "VWF-L", stock: 5 },
-  { id: 7, name: "Canister 300ml", code: "CAN-300", stock: 3 },
-  { id: 8, name: "Canister 500ml", code: "CAN-500", stock: 8 },
-  { id: 9, name: "Tubing Set Standard", code: "TUB-STD", stock: 20 },
-  { id: 10, name: "Drape Kit", code: "DRP-KIT", stock: 25 },
-]
-
-const npwtMachines = [
-  { id: "NPWT-001", name: "VAC Therapy Unit 001", serial: "VTU001234" },
-  { id: "NPWT-002", name: "VAC Therapy Unit 002", serial: "VTU002345" },
-  { id: "NPWT-003", name: "VAC Therapy Unit 003", serial: "VTU003456" },
-]
+import { supabase, type Machine, type InventoryProduct } from "@/lib/supabase"
+import { useToast } from "@/hooks/use-toast"
+import { ProtectedRoute } from "@/components/auth/protected-route"
 
 export default function NuevoProcedimiento() {
-  const [selectedProducts, setSelectedProducts] = useState<{ [key: number]: number }>({})
+  const [selectedProducts, setSelectedProducts] = useState<{ [key: string]: number }>({})
+  const [machines, setMachines] = useState<Machine[]>([])
+  const [availableProducts, setAvailableProducts] = useState<InventoryProduct[]>([])
+  const [loading, setLoading] = useState(true)
+  const { toast } = useToast()
+  
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split("T")[0],
     startTime: "",
@@ -48,7 +36,38 @@ export default function NuevoProcedimiento() {
     machine: "",
   })
 
-  const handleProductQuantityChange = (productId: number, change: number) => {
+  // Cargar datos desde Supabase
+  const loadData = async () => {
+    try {
+      setLoading(true)
+      
+      const [machinesResult, productsResult] = await Promise.all([
+        supabase.from("machines").select("*").eq("status", "active").order("name", { ascending: true }),
+        supabase.from("inventory_products").select("*").order("name", { ascending: true })
+      ])
+
+      if (machinesResult.error) throw machinesResult.error
+      if (productsResult.error) throw productsResult.error
+
+      setMachines(machinesResult.data || [])
+      setAvailableProducts(productsResult.data || [])
+    } catch (error: any) {
+      console.error("Error loading data:", error)
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los datos",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  const handleProductQuantityChange = (productId: string, change: number) => {
     setSelectedProducts((prev) => {
       const newQuantity = (prev[productId] || 0) + change
       if (newQuantity <= 0) {
@@ -67,25 +86,31 @@ export default function NuevoProcedimiento() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="mb-6">
-          <div className="flex items-center gap-4 mb-4">
-            <Link href="/">
-              <Button variant="outline" size="sm">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Volver al Dashboard
-              </Button>
-            </Link>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Nuevo Procedimiento</h1>
-              <p className="text-gray-600">Registro de terapia de presión negativa</p>
+    <ProtectedRoute>
+      <div className="min-h-screen bg-gray-50 p-4">
+        <div className="max-w-4xl mx-auto">
+          {/* Header */}
+          <div className="mb-6">
+            <div className="flex items-center gap-4 mb-4">
+              <Link href="/">
+                <Button variant="outline" size="sm">
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Volver al Dashboard
+                </Button>
+              </Link>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">Nuevo Procedimiento</h1>
+                <p className="text-gray-600">Registro de terapia de presión negativa</p>
+              </div>
             </div>
           </div>
-        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+          {loading ? (
+            <div className="flex items-center justify-center h-64">
+              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-6">
           {/* Información del Procedimiento */}
           <Card>
             <CardHeader>
@@ -230,9 +255,9 @@ export default function NuevoProcedimiento() {
                     <SelectValue placeholder="Seleccionar máquina NPWT" />
                   </SelectTrigger>
                   <SelectContent>
-                    {npwtMachines.map((machine) => (
+                    {machines.map((machine) => (
                       <SelectItem key={machine.id} value={machine.id}>
-                        {machine.name} (Serial: {machine.serial})
+                        {machine.name} (Serial: {machine.serial_number})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -285,18 +310,20 @@ export default function NuevoProcedimiento() {
             </CardContent>
           </Card>
 
-          {/* Botones de Acción */}
-          <div className="flex gap-4 justify-end">
-            <Link href="/">
-              <Button variant="outline">Cancelar</Button>
-            </Link>
-            <Button type="submit" className="min-w-32">
-              <Save className="h-4 w-4 mr-2" />
-              Guardar Procedimiento
-            </Button>
-          </div>
-        </form>
+              {/* Botones de Acción */}
+              <div className="flex gap-4 justify-end">
+                <Link href="/">
+                  <Button variant="outline">Cancelar</Button>
+                </Link>
+                <Button type="submit" className="min-w-32">
+                  <Save className="h-4 w-4 mr-2" />
+                  Guardar Procedimiento
+                </Button>
+              </div>
+            </form>
+          )}
+        </div>
       </div>
-    </div>
+    </ProtectedRoute>
   )
 }

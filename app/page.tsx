@@ -10,7 +10,7 @@ import { ProtectedRoute } from "@/components/auth/protected-route"
 import { UserMenu } from "@/components/auth/user-menu"
 import { useAuth } from "@/components/auth/auth-provider"
 import { supabase } from "@/lib/supabase"
-import { Plus, Users, Package, Activity, AlertTriangle, Calendar, Clock, Loader2 } from "lucide-react"
+import { Plus, Users, Package, Activity, AlertTriangle, Calendar, Clock, Loader2, Settings } from "lucide-react"
 
 // Componente memoizado para evitar re-renders innecesarios
 const DashboardContent = memo(function DashboardContent() {
@@ -37,20 +37,27 @@ const DashboardContent = memo(function DashboardContent() {
           .from("procedures")
           .select("*", { count: "exact" })
           .eq("procedure_date", new Date().toISOString().split("T")[0]),
-        supabase.from("inventory_products").select("*").or(`stock.lte.minimum_stock`),
+        supabase.rpc("get_low_stock_products"),
       ])
 
       setActivePatients(patientsResult.count || 0)
       setTodayProcedures(proceduresResult.count || 0)
       setInventoryAlerts(inventoryResult.data?.length || 0)
-      setActiveMachines(2) // Por ahora hardcodeado
+      
+      // Cargar máquinas activas
+      const { data: machinesData } = await supabase
+        .from("machines")
+        .select("*", { count: "exact" })
+        .eq("status", "active")
+      
+      setActiveMachines(machinesData?.length || 0)
 
       // Cargar datos para las tabs
       if (patientsResult.data) setPatients(patientsResult.data)
       if (proceduresResult.data) setRecentProcedures(proceduresResult.data)
       if (inventoryResult.data) {
         setAlerts(
-          inventoryResult.data.map((item) => ({
+          inventoryResult.data.map((item: any) => ({
             product: item.name,
             stock: item.stock,
             minimum: item.minimum_stock,
@@ -125,6 +132,12 @@ const DashboardContent = memo(function DashboardContent() {
               <Button variant="outline" size="lg" className="h-12">
                 <Users className="mr-2 h-5 w-5" />
                 Pacientes
+              </Button>
+            </Link>
+            <Link href="/maquinas">
+              <Button variant="outline" size="lg" className="h-12">
+                <Settings className="mr-2 h-5 w-5" />
+                Máquinas
               </Button>
             </Link>
             <Link href="/inventario">
@@ -215,20 +228,20 @@ const DashboardContent = memo(function DashboardContent() {
                       <CardContent>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                           <div>
-                            <p className="font-medium text-gray-600">Máquina</p>
-                            <p>{patient.currentTreatment.machine}</p>
+                            <p className="font-medium text-gray-600">Estado</p>
+                            <p className="capitalize">{patient.status}</p>
                           </div>
                           <div>
-                            <p className="font-medium text-gray-600">Apósito</p>
-                            <p>{patient.currentTreatment.dressing}</p>
+                            <p className="font-medium text-gray-600">Edad</p>
+                            <p>{patient.age} años</p>
                           </div>
                           <div>
-                            <p className="font-medium text-gray-600">Último Procedimiento</p>
-                            <p>{patient.currentTreatment.lastProcedure}</p>
+                            <p className="font-medium text-gray-600">Identificación</p>
+                            <p>{patient.identification}</p>
                           </div>
                           <div>
-                            <p className="font-medium text-gray-600">Próximo Cambio</p>
-                            <p className="text-orange-600 font-medium">{patient.currentTreatment.nextChange}</p>
+                            <p className="font-medium text-gray-600">Creado</p>
+                            <p>{new Date(patient.created_at).toLocaleDateString()}</p>
                           </div>
                         </div>
                       </CardContent>

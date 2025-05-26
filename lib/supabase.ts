@@ -1,10 +1,11 @@
 import { createClient } from "@supabase/supabase-js"
+import { Database } from "./database.types"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 // Configuración para mejor persistencia de sesión
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
@@ -64,6 +65,19 @@ export interface InventoryProduct {
   stock: number
   minimum_stock: number
   unit_price: number
+  created_at: string
+  updated_at: string
+}
+
+export interface Machine {
+  id: string
+  name: string
+  serial_number: string
+  model: string
+  status: "active" | "maintenance" | "inactive"
+  location?: string
+  purchase_date?: string
+  last_maintenance?: string
   created_at: string
   updated_at: string
 }
