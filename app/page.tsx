@@ -21,7 +21,8 @@ const DashboardContent = memo(function DashboardContent() {
   const [todayProcedures, setTodayProcedures] = useState(0)
   const [inventoryAlerts, setInventoryAlerts] = useState(0)
   const [activeMachines, setActiveMachines] = useState(0)
-  const [recentProcedures, setRecentProcedures] = useState<any[]>([])
+  const [closedProcedures, setClosedProcedures] = useState<any[]>([])
+  const [activeProcedures, setActiveProcedures] = useState<any[]>([])
   const [patients, setPatients] = useState<any[]>([])
   const [alerts, setAlerts] = useState<any[]>([])
   const [loadingData, setLoadingData] = useState(true)
@@ -52,9 +53,33 @@ const DashboardContent = memo(function DashboardContent() {
       
       setActiveMachines(machinesData?.length || 0)
 
+      // Cargar procedimientos activos
+      const { data: activeProceduresData } = await supabase
+        .from("procedures")
+        .select(`
+          *,
+          patient:patients(name, identification),
+          machine:machines(model, lote)
+        `)
+        .eq("status", "active")
+        .order("created_at", { ascending: false })
+
+      // Cargar procedimientos cerrados
+      const { data: closedProceduresData } = await supabase
+        .from("procedures")
+        .select(`
+          *,
+          patient:patients(name, identification),
+          machine:machines(model, lote)
+        `)
+        .eq("status", "completed")
+        .order("updated_at", { ascending: false })
+        .limit(10)
+
       // Cargar datos para las tabs
       if (patientsResult.data) setPatients(patientsResult.data)
-      if (proceduresResult.data) setRecentProcedures(proceduresResult.data)
+      if (closedProceduresData) setClosedProcedures(closedProceduresData)
+      if (activeProceduresData) setActiveProcedures(activeProceduresData)
       if (inventoryResult.data) {
         setAlerts(
           inventoryResult.data.map((item: any) => ({
@@ -196,11 +221,57 @@ const DashboardContent = memo(function DashboardContent() {
           </Card>
         </div>
 
+        {/* Procedimientos Activos */}
+        {activeProcedures.length > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">Procedimientos Activos</h2>
+              <Badge variant="outline" className="bg-green-50 text-green-700">
+                {activeProcedures.length} activo{activeProcedures.length !== 1 ? 's' : ''}
+              </Badge>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {activeProcedures.map((procedure: any) => (
+                <Card key={procedure.id} className="hover:shadow-md transition-shadow">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg">{procedure.patient?.name || 'Sin nombre'}</CardTitle>
+                      <Badge className="bg-green-100 text-green-800">
+                        <Clock className="h-3 w-3 mr-1" />
+                        Activo
+                      </Badge>
+                    </div>
+                    <CardDescription>
+                      ID: {procedure.patient?.identification || 'Sin ID'}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div className="text-sm">
+                      <p><span className="font-medium">Cirujano:</span> {procedure.surgeon_name}</p>
+                      <p><span className="font-medium">Fecha:</span> {new Date(procedure.procedure_date).toLocaleDateString("es-ES")}</p>
+                      <p><span className="font-medium">Máquina:</span> {procedure.machine?.model || 'N/A'}</p>
+                      <p><span className="font-medium">Lote:</span> {procedure.machine?.lote || 'N/A'}</p>
+                    </div>
+                    <div className="pt-2">
+                      <Link href={`/procedimiento/${procedure.id}`}>
+                        <Button className="w-full" size="sm">
+                          <Activity className="h-4 w-4 mr-2" />
+                          Gestionar Procedimiento
+                        </Button>
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Main Content */}
         <Tabs defaultValue="pacientes" className="space-y-4">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="pacientes">Pacientes Activos</TabsTrigger>
-            <TabsTrigger value="procedimientos">Procedimientos Recientes</TabsTrigger>
+            <TabsTrigger value="procedimientos">Procedimientos Cerrados</TabsTrigger>
             <TabsTrigger value="alertas">Alertas</TabsTrigger>
           </TabsList>
 
@@ -252,33 +323,78 @@ const DashboardContent = memo(function DashboardContent() {
 
               <TabsContent value="procedimientos" className="space-y-4">
                 <div className="grid gap-4">
-                  {recentProcedures.map((procedure) => (
-                    <Card key={procedure.id}>
-                      <CardContent className="pt-6">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-4">
-                            <div className="bg-blue-100 p-2 rounded-full">
-                              <Activity className="h-4 w-4 text-blue-600" />
-                            </div>
-                            <div>
-                              <p className="font-medium">{procedure.patient}</p>
-                              <p className="text-sm text-gray-600">Dr. {procedure.surgeon}</p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="flex items-center text-sm text-gray-600 mb-1">
-                              <Calendar className="h-3 w-3 mr-1" />
-                              {procedure.date}
-                            </div>
-                            <div className="flex items-center text-sm text-gray-600">
-                              <Clock className="h-3 w-3 mr-1" />
-                              {procedure.time}
-                            </div>
-                          </div>
-                        </div>
+                  {closedProcedures.length === 0 ? (
+                    <Card>
+                      <CardContent className="pt-6 text-center">
+                        <Activity className="h-12 w-12 mx-auto text-gray-300 mb-4" />
+                        <p className="text-gray-500">No hay procedimientos cerrados</p>
                       </CardContent>
                     </Card>
-                  ))}
+                  ) : (
+                    closedProcedures.map((procedure: any) => (
+                      <Card key={procedure.id} className="hover:shadow-md transition-shadow">
+                        <CardContent className="pt-6">
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center space-x-4">
+                              <div className="bg-blue-100 p-2 rounded-full">
+                                <Activity className="h-4 w-4 text-blue-600" />
+                              </div>
+                              <div>
+                                <p className="font-medium">{procedure.patient?.name || 'Sin nombre'}</p>
+                                <p className="text-sm text-gray-600">
+                                  Dr. {procedure.surgeon_name} • ID: {procedure.patient?.identification || 'Sin ID'}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary" className="bg-gray-100 text-gray-800">
+                                Completado
+                              </Badge>
+                              <Link href={`/procedimiento/${procedure.id}`}>
+                                <Button variant="outline" size="sm">
+                                  Ver Historial
+                                </Button>
+                              </Link>
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                            <div>
+                              <p className="font-medium text-gray-600">Fecha</p>
+                              <div className="flex items-center text-gray-900">
+                                <Calendar className="h-3 w-3 mr-1" />
+                                {new Date(procedure.procedure_date).toLocaleDateString("es-ES")}
+                              </div>
+                            </div>
+                            <div>
+                              <p className="font-medium text-gray-600">Hora Inicio</p>
+                              <div className="flex items-center text-gray-900">
+                                <Clock className="h-3 w-3 mr-1" />
+                                {procedure.start_time}
+                              </div>
+                            </div>
+                            <div>
+                              <p className="font-medium text-gray-600">Máquina</p>
+                              <p className="text-gray-900">{procedure.machine?.model || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <p className="font-medium text-gray-600">Finalizado</p>
+                              <p className="text-gray-900">
+                                {procedure.updated_at ? new Date(procedure.updated_at).toLocaleDateString("es-ES") : 'N/A'}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          {procedure.diagnosis && (
+                            <div className="mt-3 pt-3 border-t">
+                              <p className="font-medium text-gray-600 text-sm">Diagnóstico</p>
+                              <p className="text-sm text-gray-900 mt-1">{procedure.diagnosis}</p>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
                 </div>
               </TabsContent>
 

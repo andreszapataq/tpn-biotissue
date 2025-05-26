@@ -30,7 +30,15 @@ export default function Pacientes() {
 
       if (error) throw error
 
-      setPatients(data || [])
+      // Filtrar y mapear datos para asegurar tipos correctos
+      const validPatients = (data || []).map(patient => ({
+        ...patient,
+        status: (patient.status as "active" | "completed" | "inactive") || "inactive",
+        created_at: patient.created_at || new Date().toISOString(),
+        updated_at: patient.updated_at || new Date().toISOString()
+      }))
+
+      setPatients(validPatients)
     } catch (error: any) {
       console.error("Error loading patients:", error)
       toast({
@@ -225,12 +233,12 @@ export default function Pacientes() {
                           <p>
                             <span className="font-medium">Edad:</span> {selectedPatient.age} años
                           </p>
-                          <p>
+                          <div className="flex items-center gap-2">
                             <span className="font-medium">Estado:</span>
-                            <Badge variant={selectedPatient.status === "active" ? "default" : "secondary"} className="ml-2">
+                            <Badge variant={selectedPatient.status === "active" ? "default" : "secondary"}>
                               {selectedPatient.status === "active" ? "Activo" : "Completado"}
                             </Badge>
-                          </p>
+                          </div>
                           <p>
                             <span className="font-medium">Creado:</span> {new Date(selectedPatient.created_at).toLocaleDateString()}
                           </p>

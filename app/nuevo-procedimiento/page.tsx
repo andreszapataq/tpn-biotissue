@@ -230,7 +230,7 @@ export default function NuevoProcedimiento() {
         start_time: formData.startTime,
         end_time: formData.endTime || null,
         diagnosis: formData.diagnosis,
-        status: "completed"
+        status: "active"
       }
       
       // Solo agregar created_by si tenemos un usuario válido
