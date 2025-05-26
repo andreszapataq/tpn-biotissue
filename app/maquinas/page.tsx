@@ -332,9 +332,9 @@ export default function Maquinas() {
                 <CardContent>
                   <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
                     <DialogTrigger asChild>
-                      <Button size="sm" className="w-full">
-                        <Plus className="h-4 w-4 mr-1" />
-                        Nueva Máquina
+                      <Button size="sm" className="w-full h-10 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium">
+                        <Plus className="h-4 w-4 flex-shrink-0" />
+                        <span className="whitespace-nowrap">Nueva Máquina</span>
                       </Button>
                     </DialogTrigger>
                     <DialogContent>
@@ -450,7 +450,6 @@ export default function Maquinas() {
                         <div className="flex items-center gap-3 mb-2">
                           <h3 className="text-lg font-semibold">{machine.model}</h3>
                           <Badge variant="outline">{machine.reference_code}</Badge>
-                          {getStatusBadge(machine.status)}
                           {getUsageBadge(machine.id, machine.status)}
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm text-gray-600">

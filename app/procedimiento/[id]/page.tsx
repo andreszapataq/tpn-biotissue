@@ -487,12 +487,28 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                   <div className="space-y-3 max-h-64 overflow-y-auto">
                     {productUsage.length > 0 ? (
                       productUsage.map((usage, index) => (
-                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                           <div className="flex-1">
-                            <p className="font-medium text-sm">{usage.product.name}</p>
-                            <p className="text-xs text-gray-500">{usage.product.code}</p>
+                            <div className="flex items-center justify-between mb-1">
+                              <p className="font-medium text-sm">{usage.product.name}</p>
+                              <Badge variant="outline" className="text-xs">
+                                Cantidad: {usage.quantity_used}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs text-gray-500">{usage.product.code}</p>
+                              <span className="text-xs text-gray-400">•</span>
+                              <p className="text-xs text-gray-500">
+                                Agregado: {usage.created_at ? new Date(usage.created_at).toLocaleDateString("es-ES", {
+                                  day: "2-digit",
+                                  month: "2-digit", 
+                                  year: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit"
+                                }) : "Fecha no disponible"}
+                              </p>
+                            </div>
                           </div>
-                          <Badge variant="outline">{usage.quantity_used}</Badge>
                         </div>
                       ))
                     ) : (

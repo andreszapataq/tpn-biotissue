@@ -352,9 +352,9 @@ export default function Inventario() {
                 <CardContent>
                   <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
                     <DialogTrigger asChild>
-                      <Button size="sm" className="w-full">
-                        <Plus className="h-4 w-4 mr-1" />
-                        Nuevo Producto
+                      <Button size="sm" className="w-full h-10 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium">
+                        <Plus className="h-4 w-4 flex-shrink-0" />
+                        <span className="whitespace-nowrap">Nuevo Producto</span>
                       </Button>
                     </DialogTrigger>
                     <DialogContent>
