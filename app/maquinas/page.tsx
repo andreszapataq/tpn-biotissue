@@ -23,6 +23,7 @@ import { supabase } from "@/lib/supabase"
 import { Tables } from "@/lib/database.types"
 import { useToast } from "@/hooks/use-toast"
 import { ProtectedRoute } from "@/components/auth/protected-route"
+import { usePermissions } from "@/hooks/use-permissions"
 
 type Machine = Tables<"machines">
 
@@ -37,6 +38,7 @@ export default function Maquinas() {
   const [isUpdating, setIsUpdating] = useState(false)
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null)
   const { toast } = useToast()
+  const permissions = usePermissions()
 
   // Modelos de máquinas NPWT disponibles con códigos de referencia
   const machineModels = [
@@ -330,13 +332,14 @@ export default function Maquinas() {
                   <Plus className="h-4 w-4 text-blue-500" />
                 </CardHeader>
                 <CardContent>
-                  <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button size="sm" className="w-full h-10 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium">
-                        <Plus className="h-4 w-4 flex-shrink-0" />
-                        <span className="whitespace-nowrap">Nueva Máquina</span>
-                      </Button>
-                    </DialogTrigger>
+                  {permissions.canEditMachines ? (
+                    <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button size="sm" className="w-full h-10 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium">
+                          <Plus className="h-4 w-4 flex-shrink-0" />
+                          <span className="whitespace-nowrap">Nueva Máquina</span>
+                        </Button>
+                      </DialogTrigger>
                     <DialogContent>
                       <DialogHeader>
                         <DialogTitle>Crear Nueva Máquina</DialogTitle>
@@ -408,6 +411,12 @@ export default function Maquinas() {
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>
+                  ) : (
+                    <div className="text-center py-2">
+                      <p className="text-sm text-gray-500">Solo administradores</p>
+                      <p className="text-xs text-gray-400">pueden crear máquinas</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -470,23 +479,27 @@ export default function Maquinas() {
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openEditDialog(machine)}
-                        >
-                          Editar
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDeleteMachine(machine.id)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
+                      {permissions.canEditMachines && (
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openEditDialog(machine)}
+                          >
+                            Editar
+                          </Button>
+                          {permissions.canDeleteMachines && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteMachine(machine.id)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

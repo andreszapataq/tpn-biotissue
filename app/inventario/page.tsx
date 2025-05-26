@@ -23,6 +23,7 @@ import { supabase } from "@/lib/supabase"
 import { Tables } from "@/lib/database.types"
 import { useToast } from "@/hooks/use-toast"
 import { ProtectedRoute } from "@/components/auth/protected-route"
+import { usePermissions } from "@/hooks/use-permissions"
 
 type InventoryProduct = Tables<"inventory_products">
 
@@ -40,6 +41,7 @@ export default function Inventario() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
   const [editingProduct, setEditingProduct] = useState<InventoryProduct | null>(null)
+  const permissions = usePermissions()
 
   // Formulario para nuevo producto
   const [newProduct, setNewProduct] = useState({
@@ -350,13 +352,14 @@ export default function Inventario() {
                   <Plus className="h-4 w-4 text-blue-500" />
                 </CardHeader>
                 <CardContent>
-                  <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button size="sm" className="w-full h-10 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium">
-                        <Plus className="h-4 w-4 flex-shrink-0" />
-                        <span className="whitespace-nowrap">Nuevo Producto</span>
-                      </Button>
-                    </DialogTrigger>
+                  {permissions.canEditInventory ? (
+                    <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button size="sm" className="w-full h-10 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium">
+                          <Plus className="h-4 w-4 flex-shrink-0" />
+                          <span className="whitespace-nowrap">Nuevo Producto</span>
+                        </Button>
+                      </DialogTrigger>
                     <DialogContent>
                       <DialogHeader>
                         <DialogTitle>Crear Nuevo Producto</DialogTitle>
@@ -468,6 +471,12 @@ export default function Inventario() {
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>
+                  ) : (
+                    <div className="text-center py-2">
+                      <p className="text-sm text-gray-500">Solo administradores</p>
+                      <p className="text-xs text-gray-400">pueden crear productos</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -544,26 +553,34 @@ export default function Inventario() {
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => openEditDialog(item)}
-                                  className="mr-2"
-                                >
-                                  Editar
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleStockAdjustment(item.id, -1)}
-                                  disabled={(item.stock || 0) === 0}
-                                >
-                                  <Minus className="h-3 w-3" />
-                                </Button>
-                                <span className="w-12 text-center font-medium">{item.stock || 0}</span>
-                                <Button variant="outline" size="sm" onClick={() => handleStockAdjustment(item.id, 1)}>
-                                  <Plus className="h-3 w-3" />
-                                </Button>
+                                {permissions.canEditInventory && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => openEditDialog(item)}
+                                    className="mr-2"
+                                  >
+                                    Editar
+                                  </Button>
+                                )}
+                                {permissions.canAdjustStock ? (
+                                  <>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleStockAdjustment(item.id, -1)}
+                                      disabled={(item.stock || 0) === 0}
+                                    >
+                                      <Minus className="h-3 w-3" />
+                                    </Button>
+                                    <span className="w-12 text-center font-medium">{item.stock || 0}</span>
+                                    <Button variant="outline" size="sm" onClick={() => handleStockAdjustment(item.id, 1)}>
+                                      <Plus className="h-3 w-3" />
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <span className="w-12 text-center font-medium">{item.stock || 0}</span>
+                                )}
                               </div>
                             </div>
                           </CardContent>
@@ -639,13 +656,19 @@ export default function Inventario() {
                                 </p>
                               </div>
                               <div className="flex items-center gap-2">
-                                <Button variant="outline" size="sm" onClick={() => handleStockAdjustment(item.id, -1)}>
-                                  <Minus className="h-3 w-3" />
-                                </Button>
-                                <span className="w-12 text-center font-medium">{item.stock}</span>
-                                <Button variant="outline" size="sm" onClick={() => handleStockAdjustment(item.id, 1)}>
-                                  <Plus className="h-3 w-3" />
-                                </Button>
+                                {permissions.canAdjustStock ? (
+                                  <>
+                                    <Button variant="outline" size="sm" onClick={() => handleStockAdjustment(item.id, -1)}>
+                                      <Minus className="h-3 w-3" />
+                                    </Button>
+                                    <span className="w-12 text-center font-medium">{item.stock}</span>
+                                    <Button variant="outline" size="sm" onClick={() => handleStockAdjustment(item.id, 1)}>
+                                      <Plus className="h-3 w-3" />
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <span className="w-12 text-center font-medium">{item.stock}</span>
+                                )}
                               </div>
                             </div>
                           </CardContent>

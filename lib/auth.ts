@@ -21,7 +21,7 @@ export class AuthService {
     password: string,
     userData: {
       name: string
-      role: "cirujano" | "enfermera" | "administrador"
+      role: "cirujano" | "soporte" | "administrador"
       phone?: string
       department?: string
       license_number?: string
@@ -82,17 +82,23 @@ export class AuthService {
         if (error || !profile) {
           console.warn("⚠️ Profile not found, creating...")
 
+          // Determinar el rol correcto (migrar 'enfermera' a 'soporte')
+          let userRole = user.user_metadata?.role || "soporte"
+          if (userRole === "enfermera") {
+            userRole = "soporte"
+          }
+
           // Crear perfil si no existe
           const { data: newProfile, error: insertError } = await supabase
             .from("users")
             .insert({
               auth_id: user.id,
-              email: user.email,
-              name: user.user_metadata?.name || user.email,
-              role: user.user_metadata?.role || "enfermera",
-              phone: user.user_metadata?.phone,
-              department: user.user_metadata?.department,
-              license_number: user.user_metadata?.license_number,
+              email: user.email || "",
+              name: user.user_metadata?.name || user.email || "",
+              role: userRole,
+              phone: user.user_metadata?.phone || null,
+              department: user.user_metadata?.department || null,
+              license_number: user.user_metadata?.license_number || null,
               is_active: true,
               mfa_enabled: false,
             })
@@ -111,19 +117,37 @@ export class AuthService {
               email: newProfile.email,
               name: newProfile.name,
               role: newProfile.role,
-              mfa_enabled: newProfile.mfa_enabled,
+              mfa_enabled: newProfile.mfa_enabled || false,
             }
           }
         }
 
         if (profile) {
+          // Migrar rol 'enfermera' a 'soporte' si es necesario
+          if (profile.role === "enfermera") {
+            console.log("🔄 Migrating role from 'enfermera' to 'soporte'")
+            const { data: updatedProfile, error: updateError } = await supabase
+              .from("users")
+              .update({ role: "soporte", updated_at: new Date().toISOString() })
+              .eq("id", profile.id)
+              .select()
+              .single()
+
+            if (updateError) {
+              console.error("❌ Error updating role:", updateError)
+            } else {
+              profile.role = "soporte"
+              console.log("✅ Role updated to 'soporte'")
+            }
+          }
+
           console.log("✅ Profile loaded:", profile.name)
           return {
             id: profile.id,
             email: profile.email,
             name: profile.name,
             role: profile.role,
-            mfa_enabled: profile.mfa_enabled,
+            mfa_enabled: profile.mfa_enabled || false,
           }
         }
 

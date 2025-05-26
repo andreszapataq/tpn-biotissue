@@ -20,7 +20,7 @@ export default function RegisterForm() {
     password: "",
     confirmPassword: "",
     name: "",
-    role: "" as "cirujano" | "enfermera" | "administrador" | "",
+    role: "" as "cirujano" | "soporte" | "administrador" | "",
     phone: "",
     department: "",
     license_number: "",
@@ -201,7 +201,7 @@ export default function RegisterForm() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="cirujano">Cirujano</SelectItem>
-                    <SelectItem value="enfermera">Enfermera</SelectItem>
+                    <SelectItem value="soporte">Soporte</SelectItem>
                     <SelectItem value="administrador">Administrador</SelectItem>
                   </SelectContent>
                 </Select>

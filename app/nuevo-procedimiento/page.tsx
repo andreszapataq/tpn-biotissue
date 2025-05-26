@@ -246,17 +246,47 @@ export default function NuevoProcedimiento() {
 
       // 2. Obtener el ID del usuario en la tabla users
       console.log("👤 Getting user profile for auth_id:", user.id)
-      const { data: userProfile, error: userError } = await supabase
-        .from("users")
-        .select("id")
-        .eq("auth_id", user.id)
-        .single()
+      let userProfile = null
+      
+      try {
+        const { data, error: userError } = await supabase
+          .from("users")
+          .select("id, role")
+          .eq("auth_id", user.id)
+          .single()
 
-      if (userError) {
-        console.error("❌ Error getting user profile:", JSON.stringify(userError, null, 2))
+        if (userError) {
+          console.warn("⚠️ User profile not found, attempting to create one...")
+          
+          // Intentar crear el perfil si no existe
+          const { data: newProfile, error: createError } = await supabase
+            .from("users")
+            .insert({
+              auth_id: user.id,
+              email: user.email,
+              name: user.name || user.email,
+              role: user.role || "soporte", // Usar el rol del contexto de auth
+              is_active: true,
+              mfa_enabled: false,
+            })
+            .select("id, role")
+            .single()
+
+          if (createError) {
+            console.error("❌ Error creating user profile:", createError)
+            console.log("⚠️ Continuing without user profile - will use null for created_by")
+          } else {
+            userProfile = newProfile
+            console.log("✅ User profile created:", userProfile.id)
+          }
+        } else {
+          userProfile = data
+          console.log("✅ User profile found:", userProfile.id)
+        }
+      } catch (error) {
+        console.error("❌ Unexpected error getting user profile:", error)
         console.log("⚠️ Continuing without user profile - will use null for created_by")
       }
-      console.log("✅ User profile:", userProfile?.id || "not found")
 
       // 3. Crear procedimiento
       const procedureData: any = {
