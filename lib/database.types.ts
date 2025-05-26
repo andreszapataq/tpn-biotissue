@@ -130,6 +130,7 @@ export type Database = {
           code: string
           created_at: string | null
           id: string
+          lote: string | null
           minimum_stock: number | null
           name: string
           stock: number | null
@@ -141,6 +142,7 @@ export type Database = {
           code: string
           created_at?: string | null
           id?: string
+          lote?: string | null
           minimum_stock?: number | null
           name: string
           stock?: number | null
@@ -152,6 +154,7 @@ export type Database = {
           code?: string
           created_at?: string | null
           id?: string
+          lote?: string | null
           minimum_stock?: number | null
           name?: string
           stock?: number | null
@@ -160,16 +163,42 @@ export type Database = {
         }
         Relationships: []
       }
+      login_attempts: {
+        Row: {
+          attempted_at: string | null
+          email: string
+          failure_reason: string | null
+          id: string
+          ip_address: unknown | null
+          success: boolean
+        }
+        Insert: {
+          attempted_at?: string | null
+          email: string
+          failure_reason?: string | null
+          id?: string
+          ip_address?: unknown | null
+          success: boolean
+        }
+        Update: {
+          attempted_at?: string | null
+          email?: string
+          failure_reason?: string | null
+          id?: string
+          ip_address?: unknown | null
+          success?: boolean
+        }
+        Relationships: []
+      }
       machines: {
         Row: {
           created_at: string | null
           id: string
           last_maintenance: string | null
-          location: string | null
+          lote: string
           model: string
-          name: string
-          purchase_date: string | null
-          serial_number: string
+          observations: string | null
+          reference_code: string
           status: string
           updated_at: string | null
         }
@@ -177,11 +206,10 @@ export type Database = {
           created_at?: string | null
           id?: string
           last_maintenance?: string | null
-          location?: string | null
+          lote: string
           model?: string
-          name: string
-          purchase_date?: string | null
-          serial_number: string
+          observations?: string | null
+          reference_code?: string
           status?: string
           updated_at?: string | null
         }
@@ -189,15 +217,49 @@ export type Database = {
           created_at?: string | null
           id?: string
           last_maintenance?: string | null
-          location?: string | null
+          lote?: string
           model?: string
-          name?: string
-          purchase_date?: string | null
-          serial_number?: string
+          observations?: string | null
+          reference_code?: string
           status?: string
           updated_at?: string | null
         }
         Relationships: []
+      }
+      password_reset_tokens: {
+        Row: {
+          created_at: string | null
+          expires_at: string
+          id: string
+          token: string
+          used: boolean | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          token: string
+          used?: boolean | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          token?: string
+          used?: boolean | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "password_reset_tokens_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       patients: {
         Row: {
@@ -228,6 +290,45 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      procedure_products: {
+        Row: {
+          created_at: string | null
+          id: string
+          procedure_id: string | null
+          product_id: string | null
+          quantity_used: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          procedure_id?: string | null
+          product_id?: string | null
+          quantity_used: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          procedure_id?: string | null
+          product_id?: string | null
+          quantity_used?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "procedure_products_procedure_id_fkey"
+            columns: ["procedure_id"]
+            isOneToOne: false
+            referencedRelation: "procedures"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "procedure_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_products"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       procedures: {
         Row: {
@@ -295,6 +396,44 @@ export type Database = {
             columns: ["patient_id"]
             isOneToOne: false
             referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_sessions: {
+        Row: {
+          created_at: string | null
+          device_info: string | null
+          expires_at: string
+          id: string
+          ip_address: unknown | null
+          session_token: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          device_info?: string | null
+          expires_at: string
+          id?: string
+          ip_address?: unknown | null
+          session_token: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          device_info?: string | null
+          expires_at?: string
+          id?: string
+          ip_address?: unknown | null
+          session_token?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_sessions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -403,4 +542,86 @@ export type Tables<
       }
       ? R
       : never
-    : never 
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof Database },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof Database
+  }
+    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
+  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof Database },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof Database
+  }
+    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
+  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof Database },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof Database
+  }
+    ? keyof Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends { schema: keyof Database }
+  ? Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof Database },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof Database
+  }
+    ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {},
+  },
+} as const 

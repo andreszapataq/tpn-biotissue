@@ -20,20 +20,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Search, Package, AlertTriangle, Plus, Minus, TrendingUp, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { supabase } from "@/lib/supabase"
+import { Tables } from "@/lib/database.types"
 import { useToast } from "@/hooks/use-toast"
 import { ProtectedRoute } from "@/components/auth/protected-route"
 
-interface InventoryProduct {
-  id: string
-  name: string
-  code: string
-  category: string
-  stock: number
-  minimum_stock: number
-  unit_price: number
-  created_at: string
-  updated_at: string
-}
+type InventoryProduct = Tables<"inventory_products">
 
 export default function Inventario() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -45,6 +36,11 @@ export default function Inventario() {
   const [adjustmentQuantity, setAdjustmentQuantity] = useState(0)
   const { toast } = useToast()
 
+  // Estados para edición
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isUpdating, setIsUpdating] = useState(false)
+  const [editingProduct, setEditingProduct] = useState<InventoryProduct | null>(null)
+
   // Formulario para nuevo producto
   const [newProduct, setNewProduct] = useState({
     name: "",
@@ -53,6 +49,18 @@ export default function Inventario() {
     stock: 0,
     minimum_stock: 5,
     unit_price: 0,
+    lote: "",
+  })
+
+  // Formulario para editar producto
+  const [editProduct, setEditProduct] = useState({
+    name: "",
+    code: "",
+    category: "Apósitos",
+    stock: 0,
+    minimum_stock: 5,
+    unit_price: 0,
+    lote: "",
   })
 
   // Cargar productos desde la base de datos
@@ -85,9 +93,37 @@ export default function Inventario() {
     try {
       setIsCreating(true)
 
-      const { data, error } = await supabase.from("inventory_products").insert([newProduct]).select().single()
+      // Validar campos requeridos
+      if (!newProduct.name.trim()) {
+        throw new Error("El nombre del producto es requerido")
+      }
+      if (!newProduct.code.trim()) {
+        throw new Error("El código del producto es requerido")
+      }
 
-      if (error) throw error
+      // Preparar datos con validación de tipos
+      const productData = {
+        name: newProduct.name.trim(),
+        code: newProduct.code.trim().toUpperCase(),
+        category: newProduct.category,
+        stock: Number(newProduct.stock) || 0,
+        minimum_stock: Number(newProduct.minimum_stock) || 5,
+        unit_price: Number(newProduct.unit_price) || 0,
+        lote: newProduct.lote.trim() || null,
+      }
+
+      console.log("Inserting product:", productData)
+
+      const { data, error } = await supabase
+        .from("inventory_products")
+        .insert([productData])
+        .select()
+        .single()
+
+      if (error) {
+        console.error("Supabase error:", error)
+        throw error
+      }
 
       toast({
         title: "Éxito",
@@ -103,6 +139,7 @@ export default function Inventario() {
         stock: 0,
         minimum_stock: 5,
         unit_price: 0,
+        lote: "",
       })
     } catch (error: any) {
       console.error("Error creating product:", error)
@@ -116,13 +153,98 @@ export default function Inventario() {
     }
   }
 
+  // Abrir diálogo de edición
+  const openEditDialog = (product: InventoryProduct) => {
+    setEditingProduct(product)
+    setEditProduct({
+      name: product.name,
+      code: product.code,
+      category: product.category,
+      stock: product.stock || 0,
+      minimum_stock: product.minimum_stock || 0,
+      unit_price: product.unit_price || 0,
+      lote: product.lote || "",
+    })
+    setIsEditDialogOpen(true)
+  }
+
+  // Actualizar producto
+  const handleUpdateProduct = async () => {
+    if (!editingProduct) return
+
+    try {
+      setIsUpdating(true)
+
+      // Validar campos requeridos
+      if (!editProduct.name.trim()) {
+        throw new Error("El nombre del producto es requerido")
+      }
+      if (!editProduct.code.trim()) {
+        throw new Error("El código del producto es requerido")
+      }
+
+      // Preparar datos con validación de tipos
+      const productData = {
+        name: editProduct.name.trim(),
+        code: editProduct.code.trim().toUpperCase(),
+        category: editProduct.category,
+        stock: Number(editProduct.stock) || 0,
+        minimum_stock: Number(editProduct.minimum_stock) || 5,
+        unit_price: Number(editProduct.unit_price) || 0,
+        lote: editProduct.lote.trim() || null,
+        updated_at: new Date().toISOString(),
+      }
+
+      console.log("Updating product:", productData)
+
+      const { data, error } = await supabase
+        .from("inventory_products")
+        .update(productData)
+        .eq("id", editingProduct.id)
+        .select()
+        .single()
+
+      if (error) {
+        console.error("Supabase error:", error)
+        throw error
+      }
+
+      toast({
+        title: "Éxito",
+        description: "Producto actualizado correctamente",
+      })
+
+      setInventory(inventory.map(item => item.id === editingProduct.id ? data : item))
+      setIsEditDialogOpen(false)
+      setEditingProduct(null)
+      setEditProduct({
+        name: "",
+        code: "",
+        category: "Apósitos",
+        stock: 0,
+        minimum_stock: 5,
+        unit_price: 0,
+        lote: "",
+      })
+    } catch (error: any) {
+      console.error("Error updating product:", error)
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo actualizar el producto",
+        variant: "destructive",
+      })
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
   // Actualizar stock
   const handleStockAdjustment = async (productId: string, adjustment: number) => {
     try {
       const product = inventory.find((p) => p.id === productId)
       if (!product) return
 
-      const newStock = Math.max(0, product.stock + adjustment)
+      const newStock = Math.max(0, (product.stock || 0) + adjustment)
 
       const { error } = await supabase
         .from("inventory_products")
@@ -154,8 +276,8 @@ export default function Inventario() {
       item.code.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
-  const lowStockItems = filteredInventory.filter((item) => item.stock <= item.minimum_stock)
-  const normalStockItems = filteredInventory.filter((item) => item.stock > item.minimum_stock)
+  const lowStockItems = filteredInventory.filter((item) => (item.stock || 0) <= (item.minimum_stock || 0))
+  const normalStockItems = filteredInventory.filter((item) => (item.stock || 0) > (item.minimum_stock || 0))
 
   const getStockStatus = (stock: number, minimum: number) => {
     if (stock === 0) return { variant: "destructive" as const, label: "Agotado" }
@@ -166,7 +288,7 @@ export default function Inventario() {
 
   const totalProducts = inventory.length
   const lowStockCount = lowStockItems.length
-  const totalValue = inventory.reduce((sum, item) => sum + item.stock * item.unit_price, 0)
+  const totalValue = inventory.reduce((sum, item) => sum + (item.stock || 0) * (item.unit_price || 0), 0)
 
   return (
     <ProtectedRoute>
@@ -247,7 +369,7 @@ export default function Inventario() {
                             id="name"
                             value={newProduct.name}
                             onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-                            placeholder="Ej: VAC Granufoam Medium"
+                            placeholder="Ej: Multidress"
                           />
                         </div>
                         <div>
@@ -256,7 +378,16 @@ export default function Inventario() {
                             id="code"
                             value={newProduct.code}
                             onChange={(e) => setNewProduct({ ...newProduct, code: e.target.value.toUpperCase() })}
-                            placeholder="Ej: VGF-M"
+                            placeholder="Ej: ATPV"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="lote">Lote</Label>
+                          <Input
+                            id="lote"
+                            value={newProduct.lote}
+                            onChange={(e) => setNewProduct({ ...newProduct, lote: e.target.value })}
+                            placeholder="Ej: 2024001"
                           />
                         </div>
                         <div>
@@ -381,7 +512,7 @@ export default function Inventario() {
                 ) : (
                   <div className="grid gap-4">
                     {filteredInventory.map((item) => {
-                      const status = getStockStatus(item.stock, item.minimum_stock)
+                      const status = getStockStatus(item.stock || 0, item.minimum_stock || 0)
                       return (
                         <Card key={item.id}>
                           <CardContent className="pt-6">
@@ -393,19 +524,22 @@ export default function Inventario() {
                                   <Badge variant={status.variant}>{status.label}</Badge>
                                   <Badge variant="secondary">{item.category}</Badge>
                                 </div>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600">
+                                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm text-gray-600">
                                   <div>
-                                    <span className="font-medium">Stock Actual:</span> {item.stock}
+                                    <span className="font-medium">Lote:</span> {item.lote || "N/A"}
                                   </div>
                                   <div>
-                                    <span className="font-medium">Stock Mínimo:</span> {item.minimum_stock}
+                                    <span className="font-medium">Stock Actual:</span> {item.stock || 0}
                                   </div>
                                   <div>
-                                    <span className="font-medium">Precio Unitario:</span> ${item.unit_price}
+                                    <span className="font-medium">Stock Mínimo:</span> {item.minimum_stock || 0}
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Precio Unitario:</span> ${item.unit_price || 0}
                                   </div>
                                   <div>
                                     <span className="font-medium">Valor Total:</span> $
-                                    {(item.stock * item.unit_price).toFixed(2)}
+                                    {((item.stock || 0) * (item.unit_price || 0)).toFixed(2)}
                                   </div>
                                 </div>
                               </div>
@@ -413,12 +547,20 @@ export default function Inventario() {
                                 <Button
                                   variant="outline"
                                   size="sm"
+                                  onClick={() => openEditDialog(item)}
+                                  className="mr-2"
+                                >
+                                  Editar
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
                                   onClick={() => handleStockAdjustment(item.id, -1)}
-                                  disabled={item.stock === 0}
+                                  disabled={(item.stock || 0) === 0}
                                 >
                                   <Minus className="h-3 w-3" />
                                 </Button>
-                                <span className="w-12 text-center font-medium">{item.stock}</span>
+                                <span className="w-12 text-center font-medium">{item.stock || 0}</span>
                                 <Button variant="outline" size="sm" onClick={() => handleStockAdjustment(item.id, 1)}>
                                   <Plus className="h-3 w-3" />
                                 </Button>
@@ -443,7 +585,7 @@ export default function Inventario() {
                 ) : (
                   <div className="grid gap-4">
                     {lowStockItems.map((item) => {
-                      const status = getStockStatus(item.stock, item.minimum_stock)
+                      const status = getStockStatus(item.stock || 0, item.minimum_stock || 0)
                       return (
                         <Card key={item.id} className="border-orange-200">
                           <CardContent className="pt-6">
@@ -456,8 +598,8 @@ export default function Inventario() {
                                   <Badge variant={status.variant}>{status.label}</Badge>
                                 </div>
                                 <p className="text-sm text-gray-600">
-                                  Stock actual: {item.stock} • Mínimo requerido: {item.minimum_stock} • Faltante:{" "}
-                                  {Math.max(0, item.minimum_stock - item.stock)}
+                                  Stock actual: {item.stock || 0} • Mínimo requerido: {item.minimum_stock || 0} • Faltante:{" "}
+                                  {Math.max(0, (item.minimum_stock || 0) - (item.stock || 0))}
                                 </p>
                               </div>
                               <Button variant="default">Solicitar Reposición</Button>
@@ -481,7 +623,7 @@ export default function Inventario() {
                 ) : (
                   <div className="grid gap-4">
                     {normalStockItems.map((item) => {
-                      const status = getStockStatus(item.stock, item.minimum_stock)
+                      const status = getStockStatus(item.stock || 0, item.minimum_stock || 0)
                       return (
                         <Card key={item.id}>
                           <CardContent className="pt-6">
@@ -515,6 +657,120 @@ export default function Inventario() {
               </TabsContent>
             </Tabs>
           )}
+
+          {/* Edit Product Dialog */}
+          <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Editar Producto</DialogTitle>
+                <DialogDescription>Actualizar información del producto</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="edit_name">Nombre del Producto</Label>
+                  <Input
+                    id="edit_name"
+                    value={editProduct.name}
+                    onChange={(e) => setEditProduct({ ...editProduct, name: e.target.value })}
+                    placeholder="Ej: VAC Granufoam Medium"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit_code">Código</Label>
+                  <Input
+                    id="edit_code"
+                    value={editProduct.code}
+                    onChange={(e) => setEditProduct({ ...editProduct, code: e.target.value.toUpperCase() })}
+                    placeholder="Ej: VGF-M"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit_lote">Lote</Label>
+                  <Input
+                    id="edit_lote"
+                    value={editProduct.lote}
+                    onChange={(e) => setEditProduct({ ...editProduct, lote: e.target.value })}
+                    placeholder="Ej: LOT2024001"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit_category">Categoría</Label>
+                  <Select
+                    value={editProduct.category}
+                    onValueChange={(value) => setEditProduct({ ...editProduct, category: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Apósitos">Apósitos</SelectItem>
+                      <SelectItem value="Accesorios">Accesorios</SelectItem>
+                      <SelectItem value="Canisters">Canisters</SelectItem>
+                      <SelectItem value="Tubos">Tubos</SelectItem>
+                      <SelectItem value="Otros">Otros</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="edit_stock">Stock Actual</Label>
+                    <Input
+                      id="edit_stock"
+                      type="number"
+                      value={editProduct.stock}
+                      onChange={(e) =>
+                        setEditProduct({ ...editProduct, stock: Number.parseInt(e.target.value) || 0 })
+                      }
+                      min="0"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit_minimum_stock">Stock Mínimo</Label>
+                    <Input
+                      id="edit_minimum_stock"
+                      type="number"
+                      value={editProduct.minimum_stock}
+                      onChange={(e) =>
+                        setEditProduct({ ...editProduct, minimum_stock: Number.parseInt(e.target.value) || 0 })
+                      }
+                      min="0"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="edit_unit_price">Precio Unitario ($)</Label>
+                  <Input
+                    id="edit_unit_price"
+                    type="number"
+                    step="0.01"
+                    value={editProduct.unit_price}
+                    onChange={(e) =>
+                      setEditProduct({ ...editProduct, unit_price: Number.parseFloat(e.target.value) || 0 })
+                    }
+                    min="0"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleUpdateProduct}
+                  disabled={isUpdating || !editProduct.name || !editProduct.code}
+                >
+                  {isUpdating ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Actualizando...
+                    </>
+                  ) : (
+                    "Actualizar Producto"
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     </ProtectedRoute>

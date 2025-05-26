@@ -16,24 +16,15 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import { ArrowLeft, Search, Settings, Plus, Edit, Trash2, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { supabase } from "@/lib/supabase"
+import { Tables } from "@/lib/database.types"
 import { useToast } from "@/hooks/use-toast"
 import { ProtectedRoute } from "@/components/auth/protected-route"
 
-interface Machine {
-  id: string
-  name: string
-  serial_number: string
-  model: string
-  status: "active" | "maintenance" | "inactive"
-  location?: string
-  purchase_date?: string
-  last_maintenance?: string
-  created_at: string
-  updated_at: string
-}
+type Machine = Tables<"machines">
 
 export default function Maquinas() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -46,14 +37,21 @@ export default function Maquinas() {
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null)
   const { toast } = useToast()
 
+  // Modelos de máquinas NPWT disponibles con códigos de referencia
+  const machineModels = [
+    { code: "12236", name: "TopiVac Hand T-NPWT Classic" },
+    { code: "12229", name: "TopiVac Hand T-NPWT Irrigation" }, 
+    { code: "13066", name: "TopiVac Handy Careoxi NPWT" },
+    { code: "12212", name: "TopiVac Medium Clinic V4" }
+  ]
+
   // Formulario para nueva máquina
   const [newMachine, setNewMachine] = useState({
-    name: "",
-    serial_number: "",
-    model: "VAC Therapy Unit",
+    lote: "",
+    reference_code: "12236",
+    model: "TopiVac Hand T-NPWT Classic",
     status: "active" as const,
-    location: "",
-    purchase_date: "",
+    observations: "",
   })
 
   // Formulario para editar máquina
@@ -66,7 +64,7 @@ export default function Maquinas() {
       const { data, error } = await supabase
         .from("machines")
         .select("*")
-        .order("name", { ascending: true })
+        .order("lote", { ascending: true })
 
       if (error) throw error
 
@@ -108,12 +106,11 @@ export default function Maquinas() {
       setMachines([...machines, data])
       setIsCreateDialogOpen(false)
       setNewMachine({
-        name: "",
-        serial_number: "",
-        model: "VAC Therapy Unit",
+        lote: "",
+        reference_code: "12236",
+        model: "TopiVac Hand T-NPWT Classic",
         status: "active",
-        location: "",
-        purchase_date: "",
+        observations: "",
       })
     } catch (error: any) {
       console.error("Error creating machine:", error)
@@ -197,9 +194,9 @@ export default function Maquinas() {
   // Filtrar máquinas
   const filteredMachines = machines.filter(
     (machine) =>
-      machine.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      machine.serial_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      machine.model.toLowerCase().includes(searchTerm.toLowerCase())
+      machine.lote.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      machine.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      machine.reference_code.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   const getStatusBadge = (status: string) => {
@@ -218,12 +215,11 @@ export default function Maquinas() {
   const openEditDialog = (machine: Machine) => {
     setSelectedMachine(machine)
     setEditMachine({
-      name: machine.name,
-      serial_number: machine.serial_number,
+      lote: machine.lote,
+      reference_code: machine.reference_code,
       model: machine.model,
       status: machine.status,
-      location: machine.location,
-      purchase_date: machine.purchase_date,
+      observations: machine.observations,
       last_maintenance: machine.last_maintenance,
     })
     setIsEditDialogOpen(true)
@@ -307,56 +303,47 @@ export default function Maquinas() {
                       </DialogHeader>
                       <div className="space-y-4">
                         <div>
-                          <Label htmlFor="name">Nombre de la Máquina</Label>
+                          <Label htmlFor="lote">Lote</Label>
                           <Input
-                            id="name"
-                            value={newMachine.name}
-                            onChange={(e) => setNewMachine({ ...newMachine, name: e.target.value })}
-                            placeholder="Ej: VAC Therapy Unit 001"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="serial_number">Número de Serie</Label>
-                          <Input
-                            id="serial_number"
-                            value={newMachine.serial_number}
-                            onChange={(e) => setNewMachine({ ...newMachine, serial_number: e.target.value.toUpperCase() })}
-                            placeholder="Ej: VTU001234"
+                            id="lote"
+                            value={newMachine.lote}
+                            onChange={(e) => setNewMachine({ ...newMachine, lote: e.target.value.toUpperCase() })}
+                            placeholder="Ej: 1221110001"
                           />
                         </div>
                         <div>
                           <Label htmlFor="model">Modelo</Label>
                           <Select
                             value={newMachine.model}
-                            onValueChange={(value) => setNewMachine({ ...newMachine, model: value })}
+                            onValueChange={(value) => {
+                              const selectedModel = machineModels.find(m => m.name === value)
+                              setNewMachine({ 
+                                ...newMachine, 
+                                model: value,
+                                reference_code: selectedModel?.code || ""
+                              })
+                            }}
                           >
                             <SelectTrigger>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="VAC Therapy Unit">VAC Therapy Unit</SelectItem>
-                              <SelectItem value="NPWT-1">NPWT-1</SelectItem>
-                              <SelectItem value="NPWT-2">NPWT-2</SelectItem>
-                              <SelectItem value="Otro">Otro</SelectItem>
+                              {machineModels.map((model) => (
+                                <SelectItem key={model.code} value={model.name}>
+                                  {model.code} - {model.name}
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         </div>
                         <div>
-                          <Label htmlFor="location">Ubicación</Label>
-                          <Input
-                            id="location"
-                            value={newMachine.location}
-                            onChange={(e) => setNewMachine({ ...newMachine, location: e.target.value })}
-                            placeholder="Ej: Quirófano 1, Sala de Cirugía"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="purchase_date">Fecha de Compra</Label>
-                          <Input
-                            id="purchase_date"
-                            type="date"
-                            value={newMachine.purchase_date}
-                            onChange={(e) => setNewMachine({ ...newMachine, purchase_date: e.target.value })}
+                          <Label htmlFor="observations">Observaciones</Label>
+                          <Textarea
+                            id="observations"
+                            value={newMachine.observations}
+                            onChange={(e) => setNewMachine({ ...newMachine, observations: e.target.value })}
+                            placeholder="Observaciones importantes sobre la máquina..."
+                            rows={3}
                           />
                         </div>
                       </div>
@@ -366,7 +353,7 @@ export default function Maquinas() {
                         </Button>
                         <Button
                           onClick={handleCreateMachine}
-                          disabled={isCreating || !newMachine.name || !newMachine.serial_number}
+                          disabled={isCreating || !newMachine.lote}
                         >
                           {isCreating ? (
                             <>
@@ -420,23 +407,25 @@ export default function Maquinas() {
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-lg font-semibold">{machine.name}</h3>
-                          <Badge variant="outline">{machine.serial_number}</Badge>
+                          <h3 className="text-lg font-semibold">{machine.model}</h3>
+                          <Badge variant="outline">{machine.reference_code}</Badge>
                           {getStatusBadge(machine.status)}
-                          <Badge variant="secondary">{machine.model}</Badge>
                         </div>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600">
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm text-gray-600">
                           <div>
-                            <span className="font-medium">Ubicación:</span> {machine.location || "No especificada"}
-                          </div>
-                          <div>
-                            <span className="font-medium">Fecha de Compra:</span> {machine.purchase_date || "No especificada"}
+                            <span className="font-medium">Lote:</span> {machine.lote}
                           </div>
                           <div>
                             <span className="font-medium">Último Mantenimiento:</span> {machine.last_maintenance || "No registrado"}
                           </div>
                           <div>
-                            <span className="font-medium">Creada:</span> {new Date(machine.created_at).toLocaleDateString()}
+                            <span className="font-medium">Observaciones:</span> {machine.observations || "Ninguna"}
+                          </div>
+                          <div>
+                            <span className="font-medium">Estado:</span> {machine.status === "active" ? "Activa" : machine.status === "maintenance" ? "Mantenimiento" : "Inactiva"}
+                          </div>
+                          <div>
+                            <span className="font-medium">Creada:</span> {machine.created_at ? new Date(machine.created_at).toLocaleDateString() : 'N/A'}
                           </div>
                         </div>
                       </div>
@@ -446,7 +435,6 @@ export default function Maquinas() {
                           size="sm"
                           onClick={() => openEditDialog(machine)}
                         >
-                          <Edit className="h-3 w-3 mr-1" />
                           Editar
                         </Button>
                         <Button
@@ -455,8 +443,7 @@ export default function Maquinas() {
                           onClick={() => handleDeleteMachine(machine.id)}
                           className="text-red-600 hover:text-red-700"
                         >
-                          <Trash2 className="h-3 w-3 mr-1" />
-                          Eliminar
+                          <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
                     </div>
@@ -475,22 +462,38 @@ export default function Maquinas() {
               </DialogHeader>
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="edit_name">Nombre de la Máquina</Label>
+                  <Label htmlFor="edit_lote">Lote</Label>
                   <Input
-                    id="edit_name"
-                    value={editMachine.name || ""}
-                    onChange={(e) => setEditMachine({ ...editMachine, name: e.target.value })}
-                    placeholder="Ej: VAC Therapy Unit 001"
+                    id="edit_lote"
+                    value={editMachine.lote || ""}
+                    onChange={(e) => setEditMachine({ ...editMachine, lote: e.target.value.toUpperCase() })}
+                    placeholder="Ej: 12236"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="edit_serial_number">Número de Serie</Label>
-                  <Input
-                    id="edit_serial_number"
-                    value={editMachine.serial_number || ""}
-                    onChange={(e) => setEditMachine({ ...editMachine, serial_number: e.target.value.toUpperCase() })}
-                    placeholder="Ej: VTU001234"
-                  />
+                  <Label htmlFor="edit_model">Modelo</Label>
+                  <Select
+                    value={editMachine.model || "TopiVac Hand T-NPWT Classic"}
+                    onValueChange={(value) => {
+                      const selectedModel = machineModels.find(m => m.name === value)
+                      setEditMachine({ 
+                        ...editMachine, 
+                        model: value,
+                        reference_code: selectedModel?.code || ""
+                      })
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {machineModels.map((model) => (
+                        <SelectItem key={model.code} value={model.name}>
+                          {model.code} - {model.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <Label htmlFor="edit_status">Estado</Label>
@@ -509,12 +512,13 @@ export default function Maquinas() {
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="edit_location">Ubicación</Label>
-                  <Input
-                    id="edit_location"
-                    value={editMachine.location || ""}
-                    onChange={(e) => setEditMachine({ ...editMachine, location: e.target.value })}
-                    placeholder="Ej: Quirófano 1, Sala de Cirugía"
+                  <Label htmlFor="edit_observations">Observaciones</Label>
+                  <Textarea
+                    id="edit_observations"
+                    value={editMachine.observations || ""}
+                    onChange={(e) => setEditMachine({ ...editMachine, observations: e.target.value })}
+                    placeholder="Observaciones importantes sobre la máquina..."
+                    rows={3}
                   />
                 </div>
                 <div>
@@ -533,7 +537,7 @@ export default function Maquinas() {
                 </Button>
                 <Button
                   onClick={handleUpdateMachine}
-                  disabled={isUpdating || !editMachine.name || !editMachine.serial_number}
+                  disabled={isUpdating || !editMachine.lote}
                 >
                   {isUpdating ? (
                     <>
