@@ -240,7 +240,8 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
     try {
       setClosing(true)
 
-      const { error } = await supabase
+      // Actualizar el procedimiento
+      const { error: procedureError } = await supabase
         .from("procedures")
         .update({ 
           status: "completed",
@@ -249,7 +250,20 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
         })
         .eq("id", procedure.id)
 
-      if (error) throw error
+      if (procedureError) throw procedureError
+
+      // Actualizar el estado del paciente a "completed"
+      if (procedure.patient_id) {
+        const { error: patientError } = await supabase
+          .from("patients")
+          .update({ 
+            status: "completed",
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", procedure.patient_id)
+
+        if (patientError) throw patientError
+      }
 
       toast({
         title: "Éxito",

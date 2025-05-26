@@ -47,20 +47,49 @@ export default function NuevoProcedimiento() {
     machine: "",
   })
 
+  // Función helper para obtener el badge de estado de la máquina
+  const getMachineStatusBadge = (isAvailable: boolean) => {
+    if (isAvailable) {
+      return (
+        <Badge variant="default" className="bg-green-100 text-green-800 text-xs">
+          Disponible
+        </Badge>
+      )
+    } else {
+      return (
+        <Badge variant="secondary" className="bg-orange-100 text-orange-800 text-xs">
+          En Uso
+        </Badge>
+      )
+    }
+  }
+
   // Cargar datos desde Supabase
   const loadData = async () => {
     try {
       setLoading(true)
       
-      const [machinesResult, productsResult] = await Promise.all([
+      const [machinesResult, productsResult, activeProceduresResult] = await Promise.all([
         supabase.from("machines").select("*").eq("status", "active").order("model", { ascending: true }),
-        supabase.from("inventory_products").select("*").order("name", { ascending: true })
+        supabase.from("inventory_products").select("*").order("name", { ascending: true }),
+        supabase.from("procedures").select("machine_id").eq("status", "active")
       ])
 
       if (machinesResult.error) throw machinesResult.error
       if (productsResult.error) throw productsResult.error
+      if (activeProceduresResult.error) throw activeProceduresResult.error
 
-      setMachines(machinesResult.data || [])
+      // Obtener IDs de máquinas que están siendo usadas en procedimientos activos
+      const usedMachineIds = new Set(
+        activeProceduresResult.data?.map(proc => proc.machine_id).filter(Boolean) || []
+      )
+
+      // Filtrar máquinas disponibles (no en uso)
+      const availableMachines = machinesResult.data?.filter(machine => 
+        !usedMachineIds.has(machine.id)
+      ) || []
+
+      setMachines(availableMachines)
       setAvailableProducts(productsResult.data || [])
     } catch (error: any) {
       console.error("Error loading data:", error)
@@ -102,6 +131,15 @@ export default function NuevoProcedimiento() {
     }
 
     // Validaciones básicas
+    if (machines.length === 0) {
+      toast({
+        title: "Error",
+        description: "No hay máquinas disponibles. Cierre un procedimiento activo para liberar una máquina.",
+        variant: "destructive",
+      })
+      return
+    }
+
     if (!formData.machine) {
       toast({
         title: "Error",
@@ -516,26 +554,47 @@ export default function NuevoProcedimiento() {
           <Card>
             <CardHeader>
               <CardTitle>Máquina NPWT</CardTitle>
-              <CardDescription>Seleccionar equipo utilizado</CardDescription>
+              <CardDescription>
+                Seleccionar equipo utilizado • {machines.length} máquina{machines.length !== 1 ? 's' : ''} disponible{machines.length !== 1 ? 's' : ''}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div>
                 <Label htmlFor="machine">Máquina Utilizada</Label>
-                <Select
-                  value={formData.machine}
-                  onValueChange={(value) => setFormData((prev) => ({ ...prev, machine: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar máquina NPWT" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {machines.map((machine) => (
-                      <SelectItem key={machine.id} value={machine.id}>
-                        {machine.model} (Lote: {machine.lote})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {machines.length === 0 ? (
+                  <div className="mt-2 p-4 border border-orange-200 rounded-lg bg-orange-50">
+                    <div className="flex items-center gap-2 text-orange-800">
+                      <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                      <span className="font-medium">No hay máquinas disponibles</span>
+                    </div>
+                    <p className="text-sm text-orange-700 mt-1">
+                      Todas las máquinas están siendo utilizadas en procedimientos activos. 
+                      Debe cerrar un procedimiento existente para liberar una máquina.
+                    </p>
+                  </div>
+                ) : (
+                  <Select
+                    value={formData.machine}
+                    onValueChange={(value) => setFormData((prev) => ({ ...prev, machine: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar máquina NPWT" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {machines.map((machine) => (
+                        <SelectItem key={machine.id} value={machine.id}>
+                          <div className="flex items-center gap-2">
+                            <span>{machine.model}</span>
+                            <Badge variant="outline" className="text-xs">
+                              Lote: {machine.lote}
+                            </Badge>
+                            {getMachineStatusBadge(true)}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -589,11 +648,20 @@ export default function NuevoProcedimiento() {
                 <Link href="/">
                   <Button variant="outline">Cancelar</Button>
                 </Link>
-                <Button type="submit" className="min-w-32" disabled={saving}>
+                <Button 
+                  type="submit" 
+                  className="min-w-32" 
+                  disabled={saving || machines.length === 0}
+                >
                   {saving ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       Guardando...
+                    </>
+                  ) : machines.length === 0 ? (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Sin Máquinas Disponibles
                     </>
                   ) : (
                     <>

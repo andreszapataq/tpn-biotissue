@@ -29,6 +29,7 @@ type Machine = Tables<"machines">
 export default function Maquinas() {
   const [searchTerm, setSearchTerm] = useState("")
   const [machines, setMachines] = useState<Machine[]>([])
+  const [machinesInUse, setMachinesInUse] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -61,14 +62,29 @@ export default function Maquinas() {
   const loadMachines = async () => {
     try {
       setLoading(true)
-      const { data, error } = await supabase
-        .from("machines")
-        .select("*")
-        .order("lote", { ascending: true })
+      
+      // Cargar máquinas y procedimientos activos en paralelo
+      const [machinesResult, activeProceduresResult] = await Promise.all([
+        supabase
+          .from("machines")
+          .select("*")
+          .order("lote", { ascending: true }),
+        supabase
+          .from("procedures")
+          .select("machine_id")
+          .eq("status", "active")
+      ])
 
-      if (error) throw error
+      if (machinesResult.error) throw machinesResult.error
+      if (activeProceduresResult.error) throw activeProceduresResult.error
 
-      setMachines(data || [])
+      // Crear set de máquinas en uso
+      const usedMachineIds = new Set(
+        activeProceduresResult.data?.map(proc => proc.machine_id).filter((id): id is string => Boolean(id)) || []
+      )
+
+      setMachines(machinesResult.data || [])
+      setMachinesInUse(usedMachineIds)
     } catch (error: any) {
       console.error("Error loading machines:", error)
       toast({
@@ -103,7 +119,8 @@ export default function Maquinas() {
         description: "Máquina creada correctamente",
       })
 
-      setMachines([...machines, data])
+      // Recargar datos para actualizar estados
+      await loadMachines()
       setIsCreateDialogOpen(false)
       setNewMachine({
         lote: "",
@@ -145,9 +162,8 @@ export default function Maquinas() {
         description: "Máquina actualizada correctamente",
       })
 
-      setMachines(machines.map((machine) => 
-        machine.id === selectedMachine.id ? data : machine
-      ))
+      // Recargar datos para actualizar estados
+      await loadMachines()
       setIsEditDialogOpen(false)
       setSelectedMachine(null)
       setEditMachine({})
@@ -180,7 +196,8 @@ export default function Maquinas() {
         description: "Máquina eliminada correctamente",
       })
 
-      setMachines(machines.filter((machine) => machine.id !== machineId))
+      // Recargar datos para actualizar estados
+      await loadMachines()
     } catch (error: any) {
       console.error("Error deleting machine:", error)
       toast({
@@ -209,6 +226,30 @@ export default function Maquinas() {
         return <Badge variant="destructive">Inactiva</Badge>
       default:
         return <Badge variant="outline">{status}</Badge>
+    }
+  }
+
+  // Nueva función para mostrar el estado de uso
+  const getUsageBadge = (machineId: string, machineStatus: string) => {
+    // Solo mostrar estado de uso si la máquina está activa
+    if (machineStatus !== "active") {
+      return null
+    }
+
+    const isInUse = machinesInUse.has(machineId)
+    
+    if (isInUse) {
+      return (
+        <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+          En Uso
+        </Badge>
+      )
+    } else {
+      return (
+        <Badge variant="default" className="bg-green-100 text-green-800">
+          Disponible
+        </Badge>
+      )
     }
   }
 
@@ -259,27 +300,27 @@ export default function Maquinas() {
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Activas</CardTitle>
+                  <CardTitle className="text-sm font-medium">Disponibles</CardTitle>
                   <Settings className="h-4 w-4 text-green-500" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-green-500">
-                    {machines.filter(m => m.status === "active").length}
+                    {machines.filter(m => m.status === "active" && !machinesInUse.has(m.id)).length}
                   </div>
-                  <p className="text-xs text-muted-foreground">En funcionamiento</p>
+                  <p className="text-xs text-muted-foreground">Listas para usar</p>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Mantenimiento</CardTitle>
+                  <CardTitle className="text-sm font-medium">En Uso</CardTitle>
                   <Settings className="h-4 w-4 text-orange-500" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-orange-500">
-                    {machines.filter(m => m.status === "maintenance").length}
+                    {machines.filter(m => m.status === "active" && machinesInUse.has(m.id)).length}
                   </div>
-                  <p className="text-xs text-muted-foreground">En mantenimiento</p>
+                  <p className="text-xs text-muted-foreground">En procedimientos</p>
                 </CardContent>
               </Card>
 
@@ -410,6 +451,7 @@ export default function Maquinas() {
                           <h3 className="text-lg font-semibold">{machine.model}</h3>
                           <Badge variant="outline">{machine.reference_code}</Badge>
                           {getStatusBadge(machine.status)}
+                          {getUsageBadge(machine.id, machine.status)}
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm text-gray-600">
                           <div>

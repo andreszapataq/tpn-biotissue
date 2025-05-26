@@ -41,6 +41,13 @@ const DashboardContent = memo(function DashboardContent() {
         supabase.rpc("get_low_stock_products"),
       ])
 
+      // Cargar últimos pacientes (todos los estados)
+      const { data: allPatientsData } = await supabase
+        .from("patients")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(10)
+
       setActivePatients(patientsResult.count || 0)
       setTodayProcedures(proceduresResult.count || 0)
       setInventoryAlerts(inventoryResult.data?.length || 0)
@@ -69,7 +76,7 @@ const DashboardContent = memo(function DashboardContent() {
         .from("procedures")
         .select(`
           *,
-          patient:patients(name, identification),
+          patient:patients(name, identification, status),
           machine:machines(model, lote)
         `)
         .eq("status", "completed")
@@ -77,7 +84,7 @@ const DashboardContent = memo(function DashboardContent() {
         .limit(10)
 
       // Cargar datos para las tabs
-      if (patientsResult.data) setPatients(patientsResult.data)
+      if (allPatientsData) setPatients(allPatientsData)
       if (closedProceduresData) setClosedProcedures(closedProceduresData)
       if (activeProceduresData) setActiveProcedures(activeProceduresData)
       if (inventoryResult.data) {
@@ -211,12 +218,12 @@ const DashboardContent = memo(function DashboardContent() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Máquinas Activas</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Máquinas Disponibles</CardTitle>
+              <Package className="h-4 w-4 text-green-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{activeMachines}</div>
-              <p className="text-xs text-muted-foreground">En uso actualmente</p>
+              <div className="text-2xl font-bold text-green-600">{activeMachines - activeProcedures.length}</div>
+              <p className="text-xs text-muted-foreground">Listas para usar</p>
             </CardContent>
           </Card>
         </div>
@@ -270,7 +277,7 @@ const DashboardContent = memo(function DashboardContent() {
         {/* Main Content */}
         <Tabs defaultValue="pacientes" className="space-y-4">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="pacientes">Pacientes Activos</TabsTrigger>
+            <TabsTrigger value="pacientes">Últimos Pacientes</TabsTrigger>
             <TabsTrigger value="procedimientos">Procedimientos Cerrados</TabsTrigger>
             <TabsTrigger value="alertas">Alertas</TabsTrigger>
           </TabsList>
@@ -283,41 +290,65 @@ const DashboardContent = memo(function DashboardContent() {
             <>
               <TabsContent value="pacientes" className="space-y-4">
                 <div className="grid gap-4">
-                  {patients.map((patient) => (
-                    <Card key={patient.id}>
-                      <CardHeader>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <CardTitle className="text-lg">{patient.name}</CardTitle>
-                            <CardDescription>
-                              ID: {patient.identification} • Edad: {patient.age} años
-                            </CardDescription>
-                          </div>
-                          <Badge variant="default">Activo</Badge>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                          <div>
-                            <p className="font-medium text-gray-600">Estado</p>
-                            <p className="capitalize">{patient.status}</p>
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-600">Edad</p>
-                            <p>{patient.age} años</p>
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-600">Identificación</p>
-                            <p>{patient.identification}</p>
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-600">Creado</p>
-                            <p>{new Date(patient.created_at).toLocaleDateString()}</p>
-                          </div>
-                        </div>
+                  {patients.length === 0 ? (
+                    <Card>
+                      <CardContent className="pt-6 text-center">
+                        <Users className="h-12 w-12 mx-auto text-gray-300 mb-4" />
+                        <p className="text-gray-500">No hay pacientes registrados</p>
                       </CardContent>
                     </Card>
-                  ))}
+                  ) : (
+                    patients.map((patient) => {
+                      const getPatientBadge = (status: string) => {
+                        switch (status) {
+                          case "active":
+                            return <Badge variant="default" className="bg-green-100 text-green-800">En Tratamiento</Badge>
+                          case "completed":
+                            return <Badge variant="secondary" className="bg-blue-100 text-blue-800">Tratamiento Completado</Badge>
+                          case "inactive":
+                            return <Badge variant="outline" className="bg-gray-100 text-gray-600">Inactivo</Badge>
+                          default:
+                            return <Badge variant="outline">{status}</Badge>
+                        }
+                      }
+
+                      return (
+                        <Card key={patient.id}>
+                          <CardHeader>
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <CardTitle className="text-lg">{patient.name}</CardTitle>
+                                <CardDescription>
+                                  ID: {patient.identification} • Edad: {patient.age} años
+                                </CardDescription>
+                              </div>
+                              {getPatientBadge(patient.status || "inactive")}
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                              <div>
+                                <p className="font-medium text-gray-600">Estado</p>
+                                <p className="capitalize">{patient.status === "active" ? "En tratamiento" : patient.status === "completed" ? "Completado" : "Inactivo"}</p>
+                              </div>
+                              <div>
+                                <p className="font-medium text-gray-600">Edad</p>
+                                <p>{patient.age} años</p>
+                              </div>
+                              <div>
+                                <p className="font-medium text-gray-600">Identificación</p>
+                                <p>{patient.identification}</p>
+                              </div>
+                              <div>
+                                <p className="font-medium text-gray-600">Registrado</p>
+                                <p>{new Date(patient.created_at).toLocaleDateString("es-ES")}</p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )
+                    })
+                  )}
                 </div>
               </TabsContent>
 
@@ -347,8 +378,8 @@ const DashboardContent = memo(function DashboardContent() {
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
-                              <Badge variant="secondary" className="bg-gray-100 text-gray-800">
-                                Completado
+                              <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                                Procedimiento Cerrado
                               </Badge>
                               <Link href={`/procedimiento/${procedure.id}`}>
                                 <Button variant="outline" size="sm">
