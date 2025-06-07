@@ -391,7 +391,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                   <CardTitle>Información General</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div>
                       <Label className="text-sm font-medium text-gray-500">Fecha del Procedimiento</Label>
                       <p className="text-lg font-semibold">{formatDateForColombia(procedure.procedure_date)}</p>
@@ -399,6 +399,10 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                     <div>
                       <Label className="text-sm font-medium text-gray-500">Hora de Inicio</Label>
                       <p className="text-lg font-semibold">{procedure.start_time}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">Ubicación</Label>
+                      <p className="text-lg font-semibold">{procedure.location || "No especificada"}</p>
                     </div>
                     <div>
                       <Label className="text-sm font-medium text-gray-500">Cirujano Líder</Label>

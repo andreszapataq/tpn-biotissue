@@ -51,6 +51,7 @@ export interface Procedure {
   start_time: string
   end_time?: string
   diagnosis: string
+  location?: string
   status: "active" | "completed" | "cancelled"
   created_by: string
   created_at: string

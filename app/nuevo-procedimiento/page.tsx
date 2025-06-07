@@ -45,6 +45,7 @@ export default function NuevoProcedimiento() {
     surgeon: "",
     assistant: "",
     diagnosis: "",
+    location: "",
     machine: "",
   })
 
@@ -299,6 +300,7 @@ export default function NuevoProcedimiento() {
         start_time: formData.startTime,
         end_time: formData.endTime || null,
         diagnosis: formData.diagnosis,
+        location: formData.location || null,
         status: "active"
       }
       
@@ -461,7 +463,7 @@ export default function NuevoProcedimiento() {
               <CardDescription>Fecha, hora y detalles básicos</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
                   <Label htmlFor="date">Fecha del Procedimiento</Label>
                   <Input
@@ -490,6 +492,15 @@ export default function NuevoProcedimiento() {
                     value={formData.endTime}
                     onChange={(e) => setFormData((prev) => ({ ...prev, endTime: e.target.value }))}
                     required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="location">Ubicación</Label>
+                  <Input
+                    id="location"
+                    value={formData.location}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, location: e.target.value }))}
+                    placeholder="UCI, Quirófano 3, Hab. 205..."
                   />
                 </div>
               </div>

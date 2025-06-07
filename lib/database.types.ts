@@ -212,6 +212,7 @@ export type Database = {
           diagnosis: string
           end_time: string | null
           id: string
+          location: string | null
           machine_id: string | null
           patient_id: string | null
           procedure_date: string
@@ -227,6 +228,7 @@ export type Database = {
           diagnosis: string
           end_time?: string | null
           id?: string
+          location?: string | null
           machine_id?: string | null
           patient_id?: string | null
           procedure_date: string
@@ -242,6 +244,7 @@ export type Database = {
           diagnosis?: string
           end_time?: string | null
           id?: string
+          location?: string | null
           machine_id?: string | null
           patient_id?: string | null
           procedure_date?: string

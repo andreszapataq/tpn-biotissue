@@ -257,6 +257,7 @@ const DashboardContent = memo(function DashboardContent() {
                     <div className="text-sm">
                       <p><span className="font-medium">Cirujano:</span> {procedure.surgeon_name}</p>
                       <p><span className="font-medium">Fecha:</span> {formatDateForColombia(procedure.procedure_date)}</p>
+                      <p><span className="font-medium">Ubicación:</span> {procedure.location || 'No especificada'}</p>
                       <p><span className="font-medium">Máquina:</span> {procedure.machine?.model || 'N/A'}</p>
                       <p><span className="font-medium">Lote:</span> {procedure.machine?.lote || 'N/A'}</p>
                     </div>
@@ -390,7 +391,7 @@ const DashboardContent = memo(function DashboardContent() {
                             </div>
                           </div>
                           
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
                             <div>
                               <p className="font-medium text-gray-600">Fecha</p>
                               <div className="flex items-center text-gray-900">
@@ -404,6 +405,10 @@ const DashboardContent = memo(function DashboardContent() {
                                 <Clock className="h-3 w-3 mr-1" />
                                 {procedure.start_time}
                               </div>
+                            </div>
+                            <div>
+                              <p className="font-medium text-gray-600">Ubicación</p>
+                              <p className="text-gray-900">{procedure.location || 'No especificada'}</p>
                             </div>
                             <div>
                               <p className="font-medium text-gray-600">Máquina</p>
