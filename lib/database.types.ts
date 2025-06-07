@@ -9,70 +9,6 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      active_treatments: {
-        Row: {
-          created_at: string | null
-          current_dressing: string | null
-          id: string
-          last_change_date: string | null
-          machine_id: string | null
-          next_change_date: string | null
-          patient_id: string | null
-          procedure_id: string | null
-          start_date: string
-          status: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          current_dressing?: string | null
-          id?: string
-          last_change_date?: string | null
-          machine_id?: string | null
-          next_change_date?: string | null
-          patient_id?: string | null
-          procedure_id?: string | null
-          start_date: string
-          status?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          current_dressing?: string | null
-          id?: string
-          last_change_date?: string | null
-          machine_id?: string | null
-          next_change_date?: string | null
-          patient_id?: string | null
-          procedure_id?: string | null
-          start_date?: string
-          status?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "active_treatments_machine_id_fkey"
-            columns: ["machine_id"]
-            isOneToOne: false
-            referencedRelation: "machines"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "active_treatments_patient_id_fkey"
-            columns: ["patient_id"]
-            isOneToOne: false
-            referencedRelation: "patients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "active_treatments_procedure_id_fkey"
-            columns: ["procedure_id"]
-            isOneToOne: false
-            referencedRelation: "procedures"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       inventory_movements: {
         Row: {
           created_at: string | null
@@ -163,33 +99,6 @@ export type Database = {
         }
         Relationships: []
       }
-      login_attempts: {
-        Row: {
-          attempted_at: string | null
-          email: string
-          failure_reason: string | null
-          id: string
-          ip_address: unknown | null
-          success: boolean
-        }
-        Insert: {
-          attempted_at?: string | null
-          email: string
-          failure_reason?: string | null
-          id?: string
-          ip_address?: unknown | null
-          success: boolean
-        }
-        Update: {
-          attempted_at?: string | null
-          email?: string
-          failure_reason?: string | null
-          id?: string
-          ip_address?: unknown | null
-          success?: boolean
-        }
-        Relationships: []
-      }
       machines: {
         Row: {
           created_at: string | null
@@ -225,41 +134,6 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
-      }
-      password_reset_tokens: {
-        Row: {
-          created_at: string | null
-          expires_at: string
-          id: string
-          token: string
-          used: boolean | null
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          expires_at: string
-          id?: string
-          token: string
-          used?: boolean | null
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          expires_at?: string
-          id?: string
-          token?: string
-          used?: boolean | null
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "password_reset_tokens_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       patients: {
         Row: {
@@ -400,44 +274,6 @@ export type Database = {
           },
         ]
       }
-      user_sessions: {
-        Row: {
-          created_at: string | null
-          device_info: string | null
-          expires_at: string
-          id: string
-          ip_address: unknown | null
-          session_token: string
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          device_info?: string | null
-          expires_at: string
-          id?: string
-          ip_address?: unknown | null
-          session_token: string
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          device_info?: string | null
-          expires_at?: string
-          id?: string
-          ip_address?: unknown | null
-          session_token?: string
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_sessions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       users: {
         Row: {
           auth_id: string | null
@@ -500,9 +336,6 @@ export type Database = {
           category: string
           stock: number
           minimum_stock: number
-          unit_price: number
-          created_at: string
-          updated_at: string
         }[]
       }
     }

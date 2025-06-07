@@ -21,6 +21,7 @@ import { ArrowLeft, Search, Settings, Plus, Edit, Trash2, Loader2 } from "lucide
 import Link from "next/link"
 import { supabase } from "@/lib/supabase"
 import { Tables } from "@/lib/database.types"
+import { formatTimestampForColombia } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { ProtectedRoute } from "@/components/auth/protected-route"
 import { usePermissions } from "@/hooks/use-permissions"
@@ -475,7 +476,7 @@ export default function Maquinas() {
                             <span className="font-medium">Estado:</span> {machine.status === "active" ? "Activa" : machine.status === "maintenance" ? "Mantenimiento" : "Inactiva"}
                           </div>
                           <div>
-                            <span className="font-medium">Creada:</span> {machine.created_at ? new Date(machine.created_at).toLocaleDateString() : 'N/A'}
+                            <span className="font-medium">Creada:</span> {machine.created_at ? formatTimestampForColombia(machine.created_at) : 'N/A'}
                           </div>
                         </div>
                       </div>

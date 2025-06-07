@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ArrowLeft, Search, Eye, Calendar, Activity, Loader2, Plus } from "lucide-react"
 import Link from "next/link"
 import { supabase, type Patient } from "@/lib/supabase"
+import { formatTimestampForColombia } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { ProtectedRoute } from "@/components/auth/protected-route"
 
@@ -157,7 +158,7 @@ export default function Pacientes() {
                               </div>
                               <div>
                                 <p className="font-medium text-gray-600">Creado</p>
-                                <p>{new Date(patient.created_at).toLocaleDateString()}</p>
+                                <p>{formatTimestampForColombia(patient.created_at)}</p>
                               </div>
                             </div>
                           </CardContent>
@@ -197,7 +198,7 @@ export default function Pacientes() {
                             <div className="grid grid-cols-2 gap-4 text-sm">
                               <div>
                                 <p className="font-medium text-gray-600">Finalizado</p>
-                                <p>{new Date(patient.updated_at).toLocaleDateString()}</p>
+                                <p>{formatTimestampForColombia(patient.updated_at)}</p>
                               </div>
                               <div>
                                 <p className="font-medium text-gray-600">Estado</p>
@@ -240,10 +241,10 @@ export default function Pacientes() {
                             </Badge>
                           </div>
                           <p>
-                            <span className="font-medium">Creado:</span> {new Date(selectedPatient.created_at).toLocaleDateString()}
+                            <span className="font-medium">Creado:</span> {formatTimestampForColombia(selectedPatient.created_at)}
                           </p>
                           <p>
-                            <span className="font-medium">Actualizado:</span> {new Date(selectedPatient.updated_at).toLocaleDateString()}
+                            <span className="font-medium">Actualizado:</span> {formatTimestampForColombia(selectedPatient.updated_at)}
                           </p>
                         </div>
                       </div>

@@ -12,6 +12,7 @@ import { ArrowLeft, Plus, Minus, Save, Loader2, CheckCircle, XCircle, Clock, Pac
 import Link from "next/link"
 import { supabase } from "@/lib/supabase"
 import { Tables } from "@/lib/database.types"
+import { formatDateForColombia, formatTimestampWithTimeForColombia } from "@/lib/utils"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { ProtectedRoute } from "@/components/auth/protected-route"
@@ -393,7 +394,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label className="text-sm font-medium text-gray-500">Fecha del Procedimiento</Label>
-                      <p className="text-lg font-semibold">{new Date(procedure.procedure_date).toLocaleDateString("es-ES")}</p>
+                      <p className="text-lg font-semibold">{formatDateForColombia(procedure.procedure_date)}</p>
                     </div>
                     <div>
                       <Label className="text-sm font-medium text-gray-500">Hora de Inicio</Label>
@@ -499,13 +500,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                               <p className="text-xs text-gray-500">{usage.product.code}</p>
                               <span className="text-xs text-gray-400">•</span>
                               <p className="text-xs text-gray-500">
-                                Agregado: {usage.created_at ? new Date(usage.created_at).toLocaleDateString("es-ES", {
-                                  day: "2-digit",
-                                  month: "2-digit", 
-                                  year: "numeric",
-                                  hour: "2-digit",
-                                  minute: "2-digit"
-                                }) : "Fecha no disponible"}
+                                Agregado: {usage.created_at ? formatTimestampWithTimeForColombia(usage.created_at) : "Fecha no disponible"}
                               </p>
                             </div>
                           </div>

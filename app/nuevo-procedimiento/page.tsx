@@ -23,6 +23,7 @@ type Procedure = Tables<"procedures">
 import { useToast } from "@/hooks/use-toast"
 import { ProtectedRoute } from "@/components/auth/protected-route"
 import { useAuth } from "@/components/auth/auth-provider"
+import { getCurrentDateInColombia } from "@/lib/utils"
 
 export default function NuevoProcedimiento() {
   const [selectedProducts, setSelectedProducts] = useState<{ [key: string]: number }>({})
@@ -35,7 +36,7 @@ export default function NuevoProcedimiento() {
   const router = useRouter()
   
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().split("T")[0],
+    date: getCurrentDateInColombia(),
     startTime: "",
     endTime: "",
     patientName: "",

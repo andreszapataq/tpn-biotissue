@@ -10,6 +10,7 @@ import { ProtectedRoute } from "@/components/auth/protected-route"
 import { UserMenu } from "@/components/auth/user-menu"
 import { useAuth } from "@/components/auth/auth-provider"
 import { supabase } from "@/lib/supabase"
+import { getCurrentDateInColombia, formatDateForColombia, formatTimestampForColombia } from "@/lib/utils"
 import { Plus, Users, Package, Activity, AlertTriangle, Calendar, Clock, Loader2, Settings } from "lucide-react"
 
 // Componente memoizado para evitar re-renders innecesarios
@@ -37,7 +38,7 @@ const DashboardContent = memo(function DashboardContent() {
         supabase
           .from("procedures")
           .select("*", { count: "exact" })
-          .eq("procedure_date", new Date().toISOString().split("T")[0]),
+          .eq("procedure_date", getCurrentDateInColombia()),
         supabase.rpc("get_low_stock_products"),
       ])
 
@@ -255,7 +256,7 @@ const DashboardContent = memo(function DashboardContent() {
                   <CardContent className="space-y-2">
                     <div className="text-sm">
                       <p><span className="font-medium">Cirujano:</span> {procedure.surgeon_name}</p>
-                      <p><span className="font-medium">Fecha:</span> {new Date(procedure.procedure_date).toLocaleDateString("es-ES")}</p>
+                      <p><span className="font-medium">Fecha:</span> {formatDateForColombia(procedure.procedure_date)}</p>
                       <p><span className="font-medium">Máquina:</span> {procedure.machine?.model || 'N/A'}</p>
                       <p><span className="font-medium">Lote:</span> {procedure.machine?.lote || 'N/A'}</p>
                     </div>
@@ -341,7 +342,7 @@ const DashboardContent = memo(function DashboardContent() {
                               </div>
                               <div>
                                 <p className="font-medium text-gray-600">Registrado</p>
-                                <p>{new Date(patient.created_at).toLocaleDateString("es-ES")}</p>
+                                <p>{formatTimestampForColombia(patient.created_at)}</p>
                               </div>
                             </div>
                           </CardContent>
@@ -394,7 +395,7 @@ const DashboardContent = memo(function DashboardContent() {
                               <p className="font-medium text-gray-600">Fecha</p>
                               <div className="flex items-center text-gray-900">
                                 <Calendar className="h-3 w-3 mr-1" />
-                                {new Date(procedure.procedure_date).toLocaleDateString("es-ES")}
+                                {formatDateForColombia(procedure.procedure_date)}
                               </div>
                             </div>
                             <div>
@@ -411,7 +412,7 @@ const DashboardContent = memo(function DashboardContent() {
                             <div>
                               <p className="font-medium text-gray-600">Finalizado</p>
                               <p className="text-gray-900">
-                                {procedure.updated_at ? new Date(procedure.updated_at).toLocaleDateString("es-ES") : 'N/A'}
+                                {procedure.updated_at ? formatTimestampForColombia(procedure.updated_at) : 'N/A'}
                               </p>
                             </div>
                           </div>

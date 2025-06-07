@@ -14,7 +14,7 @@ Migrar completamente la base de datos del sistema NPWT (Negative Pressure Wound 
 - `patients` - Gestión de pacientes
 - `procedures` - Procedimientos médicos
 - `procedure_products` - Relación procedimientos-productos
-- `active_treatments` - Tratamientos activos
+
 - `inventory_movements` - Movimientos de inventario
 
 ### 🔍 Tablas Opcionales (para auditoría):

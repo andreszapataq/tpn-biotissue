@@ -82,16 +82,4 @@ export interface Machine {
   updated_at: string
 }
 
-export interface ActiveTreatment {
-  id: string
-  patient_id: string
-  procedure_id: string
-  machine_id: string
-  current_dressing: string
-  start_date: string
-  last_change_date?: string
-  next_change_date?: string
-  status: "active" | "completed" | "paused"
-  created_at: string
-  updated_at: string
-}
+
