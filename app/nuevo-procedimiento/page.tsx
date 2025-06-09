@@ -372,10 +372,22 @@ export default function NuevoProcedimiento() {
         inventoryMovements.push(movementData)
       }
 
-      // Ejecutar todas las actualizaciones
+      // Ejecutar todas las actualizaciones de stock con manejo de errores
       console.log("📦 Updating product stocks...")
-      const updateResults = await Promise.all(productUpdates)
-      console.log("✅ Stock updates completed")
+      for (let i = 0; i < productUpdates.length; i++) {
+        try {
+          const result = await productUpdates[i]
+          if (result.error) {
+            console.error(`❌ Error updating stock for product ${i}:`, result.error)
+            throw result.error
+          }
+          console.log(`✅ Stock updated for product ${i}`)
+        } catch (error) {
+          console.error(`❌ Failed to update stock for product ${i}:`, error)
+          throw error
+        }
+      }
+      console.log("✅ All stock updates completed")
 
       // Insertar productos del procedimiento
       console.log("📋 Inserting procedure products...")

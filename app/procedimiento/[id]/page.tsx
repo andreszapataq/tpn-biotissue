@@ -197,8 +197,20 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
         inventoryMovements.push(movementData)
       }
 
-      // Ejecutar todas las actualizaciones
-      await Promise.all(productUpdates)
+      // Ejecutar todas las actualizaciones de stock con manejo de errores
+      for (let i = 0; i < productUpdates.length; i++) {
+        try {
+          const result = await productUpdates[i]
+          if (result.error) {
+            console.error(`❌ Error updating stock for product ${i}:`, result.error)
+            throw result.error
+          }
+          console.log(`✅ Stock updated for product ${i}`)
+        } catch (error) {
+          console.error(`❌ Failed to update stock for product ${i}:`, error)
+          throw error
+        }
+      }
 
       // Insertar productos del procedimiento
       const { error: procedureProductsError } = await supabase
