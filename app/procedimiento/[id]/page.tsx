@@ -12,7 +12,7 @@ import { ArrowLeft, Plus, Minus, Save, Loader2, CheckCircle, XCircle, Clock, Pac
 import Link from "next/link"
 import { supabase } from "@/lib/supabase"
 import { Tables } from "@/lib/database.types"
-import { formatDateForColombia, formatTimestampWithTimeForColombia } from "@/lib/utils"
+import { formatDateForColombia, formatTimestampWithTimeForColombia, getMachineDisplayName } from "@/lib/utils"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { ProtectedRoute } from "@/components/auth/protected-route"
@@ -45,6 +45,8 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
   const { toast } = useToast()
   const { user } = useAuth()
   const router = useRouter()
+
+
 
   // Cargar datos del procedimiento
   const loadProcedureData = async () => {
@@ -465,7 +467,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label className="text-sm font-medium text-gray-500">Modelo</Label>
-                      <p className="text-lg font-semibold">{procedure.machine.model}</p>
+                      <p className="text-lg font-semibold">{getMachineDisplayName(procedure.machine.model, procedure.machine.lote)}</p>
                     </div>
                     <div>
                       <Label className="text-sm font-medium text-gray-500">Lote</Label>

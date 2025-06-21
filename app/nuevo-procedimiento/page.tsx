@@ -15,15 +15,15 @@ import Link from "next/link"
 import { supabase } from "@/lib/supabase"
 import { Tables } from "@/lib/database.types"
 import { useRouter } from "next/navigation"
+import { useToast } from "@/hooks/use-toast"
+import { ProtectedRoute } from "@/components/auth/protected-route"
+import { useAuth } from "@/components/auth/auth-provider"
+import { getCurrentDateInColombia, getMachineDisplayName } from "@/lib/utils"
 
 type Machine = Tables<"machines">
 type InventoryProduct = Tables<"inventory_products">
 type Patient = Tables<"patients">
 type Procedure = Tables<"procedures">
-import { useToast } from "@/hooks/use-toast"
-import { ProtectedRoute } from "@/components/auth/protected-route"
-import { useAuth } from "@/components/auth/auth-provider"
-import { getCurrentDateInColombia } from "@/lib/utils"
 
 export default function NuevoProcedimiento() {
   const [selectedProducts, setSelectedProducts] = useState<{ [key: string]: number }>({})
@@ -48,6 +48,8 @@ export default function NuevoProcedimiento() {
     location: "",
     machine: "",
   })
+
+
 
   // Función helper para obtener el badge de estado de la máquina
   const getMachineStatusBadge = (isAvailable: boolean) => {
@@ -638,7 +640,7 @@ export default function NuevoProcedimiento() {
                       {machines.map((machine) => (
                         <SelectItem key={machine.id} value={machine.id}>
                           <div className="flex items-center gap-2">
-                            <span>{machine.model}</span>
+                            <span>{getMachineDisplayName(machine.model, machine.lote)}</span>
                             <Badge variant="outline" className="text-xs">
                               Lote: {machine.lote}
                             </Badge>

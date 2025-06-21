@@ -21,7 +21,7 @@ import { ArrowLeft, Search, Settings, Plus, Edit, Trash2, Loader2 } from "lucide
 import Link from "next/link"
 import { supabase } from "@/lib/supabase"
 import { Tables } from "@/lib/database.types"
-import { formatTimestampForColombia } from "@/lib/utils"
+import { formatTimestampForColombia, getMachineDisplayName } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { ProtectedRoute } from "@/components/auth/protected-route"
 import { usePermissions } from "@/hooks/use-permissions"
@@ -48,6 +48,8 @@ export default function Maquinas() {
     { code: "13066", name: "TopiVac Handy Careoxi NPWT" },
     { code: "12212", name: "TopiVac Medium Clinic V4" }
   ]
+
+
 
   // Formulario para nueva máquina
   const [newMachine, setNewMachine] = useState({
@@ -458,7 +460,7 @@ export default function Maquinas() {
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-lg font-semibold">{machine.model}</h3>
+                          <h3 className="text-lg font-semibold">{getMachineDisplayName(machine.model, machine.lote)}</h3>
                           <Badge variant="outline">{machine.reference_code}</Badge>
                           {getUsageBadge(machine.id, machine.status)}
                         </div>

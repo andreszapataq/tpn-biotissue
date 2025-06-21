@@ -10,7 +10,7 @@ import { ProtectedRoute } from "@/components/auth/protected-route"
 import { UserMenu } from "@/components/auth/user-menu"
 import { useAuth } from "@/components/auth/auth-provider"
 import { supabase } from "@/lib/supabase"
-import { getCurrentDateInColombia, formatDateForColombia, formatTimestampForColombia } from "@/lib/utils"
+import { getCurrentDateInColombia, formatDateForColombia, formatTimestampForColombia, getMachineDisplayName } from "@/lib/utils"
 import { Plus, Users, Package, Activity, AlertTriangle, Calendar, Clock, Loader2, Settings } from "lucide-react"
 
 // Componente memoizado para evitar re-renders innecesarios
@@ -27,6 +27,8 @@ const DashboardContent = memo(function DashboardContent() {
   const [patients, setPatients] = useState<any[]>([])
   const [alerts, setAlerts] = useState<any[]>([])
   const [loadingData, setLoadingData] = useState(true)
+
+
 
   const loadDashboardData = async () => {
     try {
@@ -258,8 +260,7 @@ const DashboardContent = memo(function DashboardContent() {
                       <p><span className="font-medium">Cirujano:</span> {procedure.surgeon_name}</p>
                       <p><span className="font-medium">Fecha:</span> {formatDateForColombia(procedure.procedure_date)}</p>
                       <p><span className="font-medium">Ubicación:</span> {procedure.location || 'No especificada'}</p>
-                      <p><span className="font-medium">Máquina:</span> {procedure.machine?.model || 'N/A'}</p>
-                      <p><span className="font-medium">Lote:</span> {procedure.machine?.lote || 'N/A'}</p>
+                      <p><span className="font-medium">Máquina:</span> {getMachineDisplayName(procedure.machine?.model || '', procedure.machine?.lote || '')}</p>
                     </div>
                     <div className="pt-2">
                       <Link href={`/procedimiento/${procedure.id}`}>
@@ -412,7 +413,7 @@ const DashboardContent = memo(function DashboardContent() {
                             </div>
                             <div>
                               <p className="font-medium text-gray-600">Máquina</p>
-                              <p className="text-gray-900">{procedure.machine?.model || 'N/A'}</p>
+                              <p className="text-gray-900">{getMachineDisplayName(procedure.machine?.model || '', procedure.machine?.lote || '')}</p>
                             </div>
                             <div>
                               <p className="font-medium text-gray-600">Finalizado</p>
