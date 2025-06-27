@@ -162,7 +162,7 @@ export default function Inventario() {
         throw error
       }
 
-      // 🔧 NUEVO: Si tiene stock inicial, registrar como entrada en el historial
+      // 🔧 REGISTRAR STOCK INICIAL EN HISTORIAL
       if (newProduct.stock > 0) {
         const movementData: any = {
           product_id: createdProduct.id,
@@ -170,7 +170,8 @@ export default function Inventario() {
           quantity: newProduct.stock,
           reference_type: "initial_stock",
           reference_id: null,
-          notes: `Stock inicial del producto: +${newProduct.stock} unidades`
+          notes: `Inventario inicial del sistema`,
+          created_at: new Date().toISOString()
         }
 
         if (userProfile?.id) {
@@ -183,11 +184,8 @@ export default function Inventario() {
 
         if (movementError) {
           console.error("Error registering initial stock movement:", movementError)
-          toast({
-            title: "Advertencia",
-            description: "Producto creado pero no se pudo registrar el stock inicial en el historial",
-            variant: "destructive",
-          })
+          // No mostrar error al usuario ya que el producto se creó correctamente
+          // Solo registrar en consola para debugging
         }
       }
 
