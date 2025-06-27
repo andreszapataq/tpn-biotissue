@@ -154,26 +154,30 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
         .eq("auth_id", user.id)
         .single()
 
-      const productUpdates = []
       const procedureProducts = []
       const inventoryMovements = []
 
+      // 🔧 FIX: Actualizar stocks uno por uno para garantizar consistencia
       for (const [productId, quantity] of Object.entries(selectedProducts)) {
         const product = availableProducts.find(p => p.id === productId)
         if (!product) continue
 
         const newStock = (product.stock || 0) - quantity
 
-        // Actualizar stock del producto
-        productUpdates.push(
-          supabase
-            .from("inventory_products")
-            .update({ 
-              stock: newStock,
-              updated_at: new Date().toISOString()
-            })
-            .eq("id", productId)
-        )
+        // 🔧 FIX: Actualizar stock inmediatamente, no en batch
+        const { error: stockError } = await supabase
+          .from("inventory_products")
+          .update({ 
+            stock: newStock,
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", productId)
+
+        if (stockError) {
+          console.error(`❌ Error updating stock for ${product.name}:`, stockError)
+          throw stockError
+        }
+        console.log(`✅ Stock updated for ${product.name}: ${newStock}`)
 
         // Registrar producto usado en procedimiento
         procedureProducts.push({
@@ -189,7 +193,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
           quantity: -quantity,
           reference_type: "procedure",
           reference_id: procedure.id,
-                     notes: `Insumo adicional - Paciente: ${procedure.patient?.name || 'Sin nombre'}`
+          notes: `Insumo adicional - Paciente: ${procedure.patient?.name || 'Sin nombre'}`
         }
         
         if (userProfile?.id) {
@@ -197,21 +201,6 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
         }
         
         inventoryMovements.push(movementData)
-      }
-
-      // Ejecutar todas las actualizaciones de stock con manejo de errores
-      for (let i = 0; i < productUpdates.length; i++) {
-        try {
-          const result = await productUpdates[i]
-          if (result.error) {
-            console.error(`❌ Error updating stock for product ${i}:`, result.error)
-            throw result.error
-          }
-          console.log(`✅ Stock updated for product ${i}`)
-        } catch (error) {
-          console.error(`❌ Failed to update stock for product ${i}:`, error)
-          throw error
-        }
       }
 
       // Insertar productos del procedimiento

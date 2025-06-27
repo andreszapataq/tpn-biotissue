@@ -24,10 +24,12 @@ import { Tables } from "@/lib/database.types"
 import { useToast } from "@/hooks/use-toast"
 import { ProtectedRoute } from "@/components/auth/protected-route"
 import { usePermissions } from "@/hooks/use-permissions"
+import { useAuth } from "@/components/auth/auth-provider"
 
 type InventoryProduct = Tables<"inventory_products">
 
 export default function Inventario() {
+  const { user } = useAuth()
   const [searchTerm, setSearchTerm] = useState("")
   const [inventory, setInventory] = useState<InventoryProduct[]>([])
   const [loading, setLoading] = useState(true)
@@ -64,6 +66,17 @@ export default function Inventario() {
     unit_price: 0,
     lote: "",
   })
+
+  // Estados para entrada de inventario
+  const [isStockEntryDialogOpen, setIsStockEntryDialogOpen] = useState(false)
+  const [isProcessingEntry, setIsProcessingEntry] = useState(false)
+  const [stockEntries, setStockEntries] = useState<{[key: string]: {quantity: number, reason: string}}>({})
+
+  // Estados para historial de movimientos
+  const [isMovementHistoryOpen, setIsMovementHistoryOpen] = useState(false)
+  const [selectedProductForHistory, setSelectedProductForHistory] = useState<InventoryProduct | null>(null)
+  const [movementHistory, setMovementHistory] = useState<any[]>([])
+  const [loadingHistory, setLoadingHistory] = useState(false)
 
   // Cargar productos desde la base de datos
   const loadInventory = async () => {
@@ -185,12 +198,16 @@ export default function Inventario() {
         throw new Error("El código del producto es requerido")
       }
 
+      const oldStock = editingProduct.stock || 0
+      const newStock = Number(editProduct.stock) || 0
+      const stockChange = newStock - oldStock
+
       // Preparar datos con validación de tipos
       const productData = {
         name: editProduct.name.trim(),
         code: editProduct.code.trim().toUpperCase(),
         category: editProduct.category,
-        stock: Number(editProduct.stock) || 0,
+        stock: newStock,
         minimum_stock: Number(editProduct.minimum_stock) || 5,
         unit_price: Number(editProduct.unit_price) || 0,
         lote: editProduct.lote.trim() || null,
@@ -211,9 +228,51 @@ export default function Inventario() {
         throw error
       }
 
+      // 🔧 NUEVO: Si cambió el stock, registrar movimiento
+      if (stockChange !== 0) {
+        // Obtener perfil del usuario
+        let userProfile = null
+        if (user?.id) {
+          const { data: userData } = await supabase
+            .from("users")
+            .select("id")
+            .eq("auth_id", user.id)
+            .single()
+          userProfile = userData
+        }
+
+        const movementData: any = {
+          product_id: editingProduct.id,
+          movement_type: stockChange > 0 ? "in" : "out",
+          quantity: Math.abs(stockChange),
+          reference_type: "manual_edit",
+          reference_id: null,
+          notes: `Edición manual: ${oldStock} → ${newStock} unidades (${stockChange >= 0 ? '+' : ''}${stockChange})`
+        }
+
+        if (userProfile?.id) {
+          movementData.created_by = userProfile.id
+        }
+
+        const { error: movementError } = await supabase
+          .from("inventory_movements")
+          .insert([movementData])
+
+        if (movementError) {
+          console.error("Error registering movement:", movementError)
+          toast({
+            title: "Advertencia",
+            description: "Producto actualizado pero no se pudo registrar el movimiento de stock",
+            variant: "destructive",
+          })
+        }
+      }
+
       toast({
         title: "Éxito",
-        description: "Producto actualizado correctamente",
+        description: stockChange !== 0 ? 
+          `Producto actualizado. Stock: ${oldStock} → ${newStock}` :
+          "Producto actualizado correctamente",
       })
 
       setInventory(inventory.map(item => item.id === editingProduct.id ? data : item))
@@ -240,27 +299,74 @@ export default function Inventario() {
     }
   }
 
-  // Actualizar stock
-  const handleStockAdjustment = async (productId: string, adjustment: number) => {
+  // 🔧 NUEVO: Actualizar stock con registro de movimientos
+  const handleStockAdjustment = async (productId: string, adjustment: number, reason?: string) => {
     try {
       const product = inventory.find((p) => p.id === productId)
       if (!product) return
 
-      const newStock = Math.max(0, (product.stock || 0) + adjustment)
+      const oldStock = product.stock || 0
+      const newStock = Math.max(0, oldStock + adjustment)
 
-      const { error } = await supabase
+      // Obtener perfil del usuario para registrar el movimiento
+      let userProfile = null
+      if (user?.id) {
+        const { data } = await supabase
+          .from("users")
+          .select("id")
+          .eq("auth_id", user.id)
+          .single()
+        userProfile = data
+      }
+
+      // Actualizar stock del producto
+      const { error: stockError } = await supabase
         .from("inventory_products")
-        .update({ stock: newStock, updated_at: new Date().toISOString() })
+        .update({ 
+          stock: newStock, 
+          updated_at: new Date().toISOString() 
+        })
         .eq("id", productId)
 
-      if (error) throw error
+      if (stockError) throw stockError
+
+      // Registrar movimiento de inventario
+      const movementData: any = {
+        product_id: productId,
+        movement_type: adjustment > 0 ? "in" : "out",
+        quantity: adjustment > 0 ? adjustment : Math.abs(adjustment),
+        reference_type: "manual_adjustment",
+        reference_id: null,
+        notes: reason || (adjustment > 0 ? 
+          `Ajuste manual: +${adjustment} unidades` : 
+          `Ajuste manual: ${adjustment} unidades`)
+      }
+
+      if (userProfile?.id) {
+        movementData.created_by = userProfile.id
+      }
+
+      const { error: movementError } = await supabase
+        .from("inventory_movements")
+        .insert([movementData])
+
+      if (movementError) {
+        console.error("Error registering movement:", movementError)
+        // No fallar por error de movimiento, pero alertar
+        toast({
+          title: "Advertencia",
+          description: "Stock actualizado pero no se pudo registrar el movimiento",
+          variant: "destructive",
+        })
+      }
 
       setInventory(inventory.map((item) => (item.id === productId ? { ...item, stock: newStock } : item)))
 
       toast({
         title: "Stock actualizado",
-        description: `${product.name}: ${newStock} unidades`,
+        description: `${product.name}: ${oldStock} → ${newStock} unidades`,
       })
+
     } catch (error: any) {
       console.error("Error updating stock:", error)
       toast({
@@ -291,6 +397,152 @@ export default function Inventario() {
   const totalProducts = inventory.length
   const lowStockCount = lowStockItems.length
   const totalValue = inventory.reduce((sum, item) => sum + (item.stock || 0) * (item.unit_price || 0), 0)
+
+  // 🔧 NUEVO: Función para entrada masiva de inventario
+  const handleBulkStockEntry = async () => {
+    try {
+      setIsProcessingEntry(true)
+
+      // Obtener perfil del usuario
+      let userProfile = null
+      if (user?.id) {
+        const { data: userData } = await supabase
+          .from("users")
+          .select("id")
+          .eq("auth_id", user.id)
+          .single()
+        userProfile = userData
+      }
+
+      const updates = []
+      const movements = []
+
+      for (const [productId, entry] of Object.entries(stockEntries)) {
+        if (entry.quantity <= 0) continue
+
+        const product = inventory.find(p => p.id === productId)
+        if (!product) continue
+
+        const oldStock = product.stock || 0
+        const newStock = oldStock + entry.quantity
+
+        // Actualización de stock
+        updates.push(
+          supabase
+            .from("inventory_products")
+            .update({ 
+              stock: newStock, 
+              updated_at: new Date().toISOString() 
+            })
+            .eq("id", productId)
+        )
+
+        // Movimiento de inventario
+        const movementData: any = {
+          product_id: productId,
+          movement_type: "in",
+          quantity: entry.quantity,
+          reference_type: "stock_entry",
+          reference_id: null,
+          notes: entry.reason || `Entrada de inventario: +${entry.quantity} unidades`
+        }
+
+        if (userProfile?.id) {
+          movementData.created_by = userProfile.id
+        }
+
+        movements.push(movementData)
+      }
+
+      // Ejecutar todas las actualizaciones
+      for (const update of updates) {
+        const { error } = await update
+        if (error) throw error
+      }
+
+      // Registrar todos los movimientos
+      if (movements.length > 0) {
+        const { error: movementError } = await supabase
+          .from("inventory_movements")
+          .insert(movements)
+
+        if (movementError) {
+          console.error("Error registering movements:", movementError)
+          toast({
+            title: "Advertencia",
+            description: "Stocks actualizados pero algunos movimientos no se registraron",
+            variant: "destructive",
+          })
+        }
+      }
+
+      // Actualizar inventario local
+      const updatedInventory = inventory.map(item => {
+        const entry = stockEntries[item.id]
+        if (entry && entry.quantity > 0) {
+          return { ...item, stock: (item.stock || 0) + entry.quantity }
+        }
+        return item
+      })
+
+      setInventory(updatedInventory)
+      setStockEntries({})
+      setIsStockEntryDialogOpen(false)
+
+      toast({
+        title: "Éxito",
+        description: `Entrada de inventario procesada. ${Object.keys(stockEntries).length} productos actualizados.`,
+      })
+
+    } catch (error: any) {
+      console.error("Error processing stock entry:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo procesar la entrada de inventario",
+        variant: "destructive",
+      })
+    } finally {
+      setIsProcessingEntry(false)
+    }
+  }
+
+  // 🔧 CORREGIDO: Función para cargar historial de movimientos
+  const loadMovementHistory = async (productId: string) => {
+    try {
+      setLoadingHistory(true)
+      
+      const { data, error } = await supabase
+        .from("inventory_movements")
+        .select("*")
+        .eq("product_id", productId)
+        .order("created_at", { ascending: false })
+        .limit(50)
+      
+      if (error) {
+        console.error("Supabase error:", error)
+        throw error
+      }
+      
+      console.log("Movement history loaded:", data)
+      setMovementHistory(data || [])
+    } catch (error) {
+      console.error("Error loading movement history:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo cargar el historial de movimientos",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingHistory(false)
+    }
+  }
+
+  // Función para abrir historial de un producto
+  const openMovementHistory = (product: InventoryProduct) => {
+    setSelectedProductForHistory(product)
+    setIsMovementHistoryOpen(true)
+    loadMovementHistory(product.id)
+  }
 
   return (
     <ProtectedRoute>
@@ -482,14 +734,112 @@ export default function Inventario() {
             </div>
 
             {/* Search */}
-            <div className="relative max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                placeholder="Buscar productos..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+            <div className="flex items-center justify-between gap-4">
+              <div className="relative max-w-md flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="Buscar productos..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              
+              {/* 🔧 NUEVO: Botón Entrada de Inventario */}
+              {permissions.canAdjustStock && (
+                <Dialog open={isStockEntryDialogOpen} onOpenChange={setIsStockEntryDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="default" className="whitespace-nowrap">
+                      <Package className="h-4 w-4 mr-2" />
+                      Entrada de Inventario
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>Entrada de Inventario</DialogTitle>
+                      <DialogDescription>
+                        Registrar nuevas existencias que llegan a la bodega
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div className="grid gap-4 max-h-96 overflow-y-auto">
+                        {inventory.map((product) => (
+                          <Card key={product.id} className="p-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="font-medium">{product.name}</span>
+                                  <Badge variant="outline">{product.code}</Badge>
+                                  <Badge variant="secondary">Stock actual: {product.stock || 0}</Badge>
+                                </div>
+                                <p className="text-sm text-gray-600">
+                                  Categoría: {product.category} • Lote: {product.lote || "N/A"}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  type="number"
+                                  placeholder="Cantidad"
+                                  min="0"
+                                  className="w-20"
+                                  value={stockEntries[product.id]?.quantity || ""}
+                                  onChange={(e) => {
+                                    const quantity = parseInt(e.target.value) || 0
+                                    setStockEntries(prev => ({
+                                      ...prev,
+                                      [product.id]: {
+                                        ...prev[product.id],
+                                        quantity,
+                                        reason: prev[product.id]?.reason || ""
+                                      }
+                                    }))
+                                  }}
+                                />
+                                <Input
+                                  placeholder="Motivo (opcional)"
+                                  className="w-48"
+                                  value={stockEntries[product.id]?.reason || ""}
+                                  onChange={(e) => {
+                                    setStockEntries(prev => ({
+                                      ...prev,
+                                      [product.id]: {
+                                        ...prev[product.id],
+                                        quantity: prev[product.id]?.quantity || 0,
+                                        reason: e.target.value
+                                      }
+                                    }))
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => {
+                        setIsStockEntryDialogOpen(false)
+                        setStockEntries({})
+                      }}>
+                        Cancelar
+                      </Button>
+                      <Button
+                        onClick={handleBulkStockEntry}
+                        disabled={isProcessingEntry || Object.values(stockEntries).every(entry => entry.quantity <= 0)}
+                      >
+                        {isProcessingEntry ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Procesando...
+                          </>
+                        ) : (
+                          "Procesar Entrada"
+                        )}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              )}
             </div>
           </div>
 
@@ -563,6 +913,15 @@ export default function Inventario() {
                                     Editar
                                   </Button>
                                 )}
+                                {/* 🔧 NUEVO: Botón de Historial */}
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openMovementHistory(item)}
+                                  className="mr-2"
+                                >
+                                  📊 Historial
+                                </Button>
                                 {permissions.canAdjustStock ? (
                                   <>
                                     <Button
@@ -790,6 +1149,109 @@ export default function Inventario() {
                   ) : (
                     "Actualizar Producto"
                   )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* 🔧 NUEVO: Historial de Movimientos Dialog */}
+          <Dialog open={isMovementHistoryOpen} onOpenChange={setIsMovementHistoryOpen}>
+            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>
+                  Historial de Movimientos - {selectedProductForHistory?.name}
+                </DialogTitle>
+                <DialogDescription>
+                  Registro completo de entradas y salidas del producto {selectedProductForHistory?.code}
+                </DialogDescription>
+              </DialogHeader>
+              
+              {loadingHistory ? (
+                <div className="flex items-center justify-center h-32">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                </div>
+              ) : movementHistory.length === 0 ? (
+                <div className="text-center py-8">
+                  <Package className="h-12 w-12 mx-auto text-gray-300 mb-4" />
+                  <p className="text-gray-500">No hay movimientos registrados para este producto</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Resumen */}
+                  <Card className="bg-blue-50">
+                    <CardContent className="pt-4">
+                      <div className="grid grid-cols-3 gap-4 text-center">
+                        <div>
+                          <div className="text-2xl font-bold text-green-600">
+                            +{movementHistory.filter(m => m.movement_type === 'in').reduce((sum, m) => sum + m.quantity, 0)}
+                          </div>
+                          <p className="text-sm text-gray-600">Total Entradas</p>
+                        </div>
+                        <div>
+                          <div className="text-2xl font-bold text-red-600">
+                            -{movementHistory.filter(m => m.movement_type === 'out').reduce((sum, m) => sum + Math.abs(m.quantity), 0)}
+                          </div>
+                          <p className="text-sm text-gray-600">Total Salidas</p>
+                        </div>
+                        <div>
+                          <div className="text-2xl font-bold text-blue-600">
+                            {selectedProductForHistory?.stock || 0}
+                          </div>
+                          <p className="text-sm text-gray-600">Stock Actual</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Lista de movimientos */}
+                  <div className="max-h-96 overflow-y-auto space-y-2">
+                    {movementHistory.map((movement, index) => (
+                      <Card key={movement.id} className={`border-l-4 ${
+                        movement.movement_type === 'in' ? 'border-l-green-500' : 'border-l-red-500'
+                      }`}>
+                        <CardContent className="pt-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-2">
+                                <Badge variant={movement.movement_type === 'in' ? 'default' : 'destructive'}>
+                                  {movement.movement_type === 'in' ? '📈 ENTRADA' : '📉 SALIDA'}
+                                </Badge>
+                                <Badge variant="outline">
+                                  {movement.movement_type === 'in' ? '+' : ''}{movement.quantity}
+                                </Badge>
+                                <Badge variant="secondary">
+                                  {movement.reference_type === 'procedure' ? '🏥 Procedimiento' :
+                                   movement.reference_type === 'manual_adjustment' ? '✋ Ajuste Manual' :
+                                   movement.reference_type === 'manual_edit' ? '✏️ Edición' :
+                                   movement.reference_type === 'stock_entry' ? '📦 Entrada Inventario' :
+                                   movement.reference_type === 'initial_stock' ? '🏁 Inventario Inicial' :
+                                   movement.reference_type}
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-gray-600 mb-1">
+                                <strong>Detalle:</strong> {movement.notes || 'Sin detalles'}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {new Date(movement.created_at).toLocaleString('es-ES', {
+                                  year: 'numeric',
+                                  month: 'long',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsMovementHistoryOpen(false)}>
+                  Cerrar
                 </Button>
               </DialogFooter>
             </DialogContent>
