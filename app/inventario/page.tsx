@@ -116,20 +116,42 @@ export default function Inventario() {
         throw new Error("El código del producto es requerido")
       }
 
-      // Preparar datos con validación de tipos
+      // Verificar que el código no existe
+      const { data: existingProduct } = await supabase
+        .from("inventory_products")
+        .select("id")
+        .eq("code", newProduct.code.toUpperCase())
+        .single()
+
+      if (existingProduct) {
+        throw new Error("Ya existe un producto con este código")
+      }
+
+      // Obtener perfil del usuario para registrar el movimiento
+      let userProfile = null
+      if (user?.id) {
+        const { data: userData } = await supabase
+          .from("users")
+          .select("id")
+          .eq("auth_id", user.id)
+          .single()
+        userProfile = userData
+      }
+
+      // Preparar datos del producto
       const productData = {
         name: newProduct.name.trim(),
         code: newProduct.code.trim().toUpperCase(),
         category: newProduct.category,
-        stock: Number(newProduct.stock) || 0,
-        minimum_stock: Number(newProduct.minimum_stock) || 5,
-        unit_price: Number(newProduct.unit_price) || 0,
+        stock: newProduct.stock,
+        minimum_stock: newProduct.minimum_stock,
+        unit_price: newProduct.unit_price,
         lote: newProduct.lote.trim() || null,
       }
 
-      console.log("Inserting product:", productData)
+      console.log("Creating product:", productData)
 
-      const { data, error } = await supabase
+      const { data: createdProduct, error } = await supabase
         .from("inventory_products")
         .insert([productData])
         .select()
@@ -140,12 +162,41 @@ export default function Inventario() {
         throw error
       }
 
+      // 🔧 NUEVO: Si tiene stock inicial, registrar como entrada en el historial
+      if (newProduct.stock > 0) {
+        const movementData: any = {
+          product_id: createdProduct.id,
+          movement_type: "in",
+          quantity: newProduct.stock,
+          reference_type: "initial_stock",
+          reference_id: null,
+          notes: `Stock inicial del producto: +${newProduct.stock} unidades`
+        }
+
+        if (userProfile?.id) {
+          movementData.created_by = userProfile.id
+        }
+
+        const { error: movementError } = await supabase
+          .from("inventory_movements")
+          .insert([movementData])
+
+        if (movementError) {
+          console.error("Error registering initial stock movement:", movementError)
+          toast({
+            title: "Advertencia",
+            description: "Producto creado pero no se pudo registrar el stock inicial en el historial",
+            variant: "destructive",
+          })
+        }
+      }
+
       toast({
         title: "Éxito",
-        description: "Producto creado correctamente",
+        description: `Producto "${createdProduct.name}" creado correctamente${newProduct.stock > 0 ? ` con stock inicial de ${newProduct.stock} unidades` : ''}`,
       })
 
-      setInventory([...inventory, data])
+      setInventory([...inventory, createdProduct])
       setIsCreateDialogOpen(false)
       setNewProduct({
         name: "",
@@ -299,83 +350,11 @@ export default function Inventario() {
     }
   }
 
-  // 🔧 NUEVO: Actualizar stock con registro de movimientos
-  const handleStockAdjustment = async (productId: string, adjustment: number, reason?: string) => {
-    try {
-      const product = inventory.find((p) => p.id === productId)
-      if (!product) return
-
-      const oldStock = product.stock || 0
-      const newStock = Math.max(0, oldStock + adjustment)
-
-      // Obtener perfil del usuario para registrar el movimiento
-      let userProfile = null
-      if (user?.id) {
-        const { data } = await supabase
-          .from("users")
-          .select("id")
-          .eq("auth_id", user.id)
-          .single()
-        userProfile = data
-      }
-
-      // Actualizar stock del producto
-      const { error: stockError } = await supabase
-        .from("inventory_products")
-        .update({ 
-          stock: newStock, 
-          updated_at: new Date().toISOString() 
-        })
-        .eq("id", productId)
-
-      if (stockError) throw stockError
-
-      // Registrar movimiento de inventario
-      const movementData: any = {
-        product_id: productId,
-        movement_type: adjustment > 0 ? "in" : "out",
-        quantity: adjustment > 0 ? adjustment : Math.abs(adjustment),
-        reference_type: "manual_adjustment",
-        reference_id: null,
-        notes: reason || (adjustment > 0 ? 
-          `Ajuste manual: +${adjustment} unidades` : 
-          `Ajuste manual: ${adjustment} unidades`)
-      }
-
-      if (userProfile?.id) {
-        movementData.created_by = userProfile.id
-      }
-
-      const { error: movementError } = await supabase
-        .from("inventory_movements")
-        .insert([movementData])
-
-      if (movementError) {
-        console.error("Error registering movement:", movementError)
-        // No fallar por error de movimiento, pero alertar
-        toast({
-          title: "Advertencia",
-          description: "Stock actualizado pero no se pudo registrar el movimiento",
-          variant: "destructive",
-        })
-      }
-
-      setInventory(inventory.map((item) => (item.id === productId ? { ...item, stock: newStock } : item)))
-
-      toast({
-        title: "Stock actualizado",
-        description: `${product.name}: ${oldStock} → ${newStock} unidades`,
-      })
-
-    } catch (error: any) {
-      console.error("Error updating stock:", error)
-      toast({
-        title: "Error",
-        description: "No se pudo actualizar el stock",
-        variant: "destructive",
-      })
-    }
-  }
+  // 🔧 ELIMINADO: handleStockAdjustment ya que se removieron botones +/- por seguridad  
+  // Los ajustes de stock ahora solo se pueden hacer a través de:
+  // 1. Edición del producto (con registro de movimiento)
+  // 2. Entrada de inventario masiva  
+  // 3. Uso en procedimientos (automático)
 
   // Filtrar inventario
   const filteredInventory = inventory.filter(
@@ -922,24 +901,7 @@ export default function Inventario() {
                                 >
                                   📊 Historial
                                 </Button>
-                                {permissions.canAdjustStock ? (
-                                  <>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => handleStockAdjustment(item.id, -1)}
-                                      disabled={(item.stock || 0) === 0}
-                                    >
-                                      <Minus className="h-3 w-3" />
-                                    </Button>
-                                    <span className="w-12 text-center font-medium">{item.stock || 0}</span>
-                                    <Button variant="outline" size="sm" onClick={() => handleStockAdjustment(item.id, 1)}>
-                                      <Plus className="h-3 w-3" />
-                                    </Button>
-                                  </>
-                                ) : (
-                                  <span className="w-12 text-center font-medium">{item.stock || 0}</span>
-                                )}
+                                <span className="w-12 text-center font-medium">{item.stock || 0}</span>
                               </div>
                             </div>
                           </CardContent>
@@ -1015,19 +977,7 @@ export default function Inventario() {
                                 </p>
                               </div>
                               <div className="flex items-center gap-2">
-                                {permissions.canAdjustStock ? (
-                                  <>
-                                    <Button variant="outline" size="sm" onClick={() => handleStockAdjustment(item.id, -1)}>
-                                      <Minus className="h-3 w-3" />
-                                    </Button>
-                                    <span className="w-12 text-center font-medium">{item.stock}</span>
-                                    <Button variant="outline" size="sm" onClick={() => handleStockAdjustment(item.id, 1)}>
-                                      <Plus className="h-3 w-3" />
-                                    </Button>
-                                  </>
-                                ) : (
-                                  <span className="w-12 text-center font-medium">{item.stock}</span>
-                                )}
+                                <span className="w-12 text-center font-medium">{item.stock || 0}</span>
                               </div>
                             </div>
                           </CardContent>
