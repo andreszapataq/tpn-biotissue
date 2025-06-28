@@ -165,19 +165,35 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
         const newStock = (product.stock || 0) - quantity
 
         // 🔧 FIX: Actualizar stock inmediatamente, no en batch
-        const { error: stockError } = await supabase
+        console.log(`🔄 Updating stock for ${product.name}: ${product.stock} -> ${newStock}`)
+        
+        const { data: updatedProduct, error: stockError } = await supabase
           .from("inventory_products")
           .update({ 
             stock: newStock,
             updated_at: new Date().toISOString()
           })
           .eq("id", productId)
+          .select("stock")
+          .single()
 
         if (stockError) {
-          console.error(`❌ Error updating stock for ${product.name}:`, stockError)
+          console.error(`❌ CRITICAL ERROR updating stock for ${product.name}:`, stockError)
+          toast({
+            title: "Error Crítico",
+            description: `No se pudo actualizar el stock de ${product.name}`,
+            variant: "destructive",
+          })
           throw stockError
         }
-        console.log(`✅ Stock updated for ${product.name}: ${newStock}`)
+        
+        console.log(`✅ Stock updated for ${product.name}: ${updatedProduct?.stock} (expected: ${newStock})`)
+        
+        // Verificar que el stock se actualizó correctamente
+        if (updatedProduct?.stock !== newStock) {
+          console.error(`❌ STOCK MISMATCH for ${product.name}: expected ${newStock}, got ${updatedProduct?.stock}`)
+          throw new Error(`Error de consistencia en stock de ${product.name}`)
+        }
 
         // Registrar producto usado en procedimiento
         procedureProducts.push({
