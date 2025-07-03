@@ -19,7 +19,7 @@ const DashboardContent = memo(function DashboardContent() {
   const { user } = useAuth()
 
   const [activePatients, setActivePatients] = useState(0)
-  const [todayProcedures, setTodayProcedures] = useState(0)
+  const [totalClosedProcedures, setTotalClosedProcedures] = useState(0)
   const [inventoryAlerts, setInventoryAlerts] = useState(0)
   const [activeMachines, setActiveMachines] = useState(0)
   const [closedProcedures, setClosedProcedures] = useState<any[]>([])
@@ -35,12 +35,12 @@ const DashboardContent = memo(function DashboardContent() {
       setLoadingData(true)
 
       // Cargar contadores
-      const [patientsResult, proceduresResult, inventoryResult] = await Promise.all([
+      const [patientsResult, closedProceduresResult, inventoryResult] = await Promise.all([
         supabase.from("patients").select("*", { count: "exact" }).eq("status", "active"),
         supabase
           .from("procedures")
           .select("*", { count: "exact" })
-          .eq("procedure_date", getCurrentDateInColombia()),
+          .eq("status", "completed"),
         supabase.rpc("get_low_stock_products"),
       ])
 
@@ -52,7 +52,7 @@ const DashboardContent = memo(function DashboardContent() {
         .limit(10)
 
       setActivePatients(patientsResult.count || 0)
-      setTodayProcedures(proceduresResult.count || 0)
+      setTotalClosedProcedures(closedProceduresResult.count || 0)
       setInventoryAlerts(inventoryResult.data?.length || 0)
       
       // Cargar máquinas activas
@@ -199,12 +199,12 @@ const DashboardContent = memo(function DashboardContent() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Procedimientos Hoy</CardTitle>
+              <CardTitle className="text-sm font-medium">Procedimientos Cerrados</CardTitle>
               <Activity className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{todayProcedures}</div>
-              <p className="text-xs text-muted-foreground">Realizados hoy</p>
+              <div className="text-2xl font-bold">{totalClosedProcedures}</div>
+              <p className="text-xs text-muted-foreground">Total completados</p>
             </CardContent>
           </Card>
 
