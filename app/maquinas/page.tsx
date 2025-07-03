@@ -17,7 +17,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowLeft, Search, Settings, Plus, Edit, Trash2, Loader2 } from "lucide-react"
+import { ArrowLeft, Search, Settings, Plus, Edit, Trash2, Loader2, Filter } from "lucide-react"
 import Link from "next/link"
 import { supabase } from "@/lib/supabase"
 import { Tables } from "@/lib/database.types"
@@ -30,6 +30,7 @@ type Machine = Tables<"machines">
 
 export default function Maquinas() {
   const [searchTerm, setSearchTerm] = useState("")
+  const [availabilityFilter, setAvailabilityFilter] = useState("all") // "all", "available", "in_use"
   const [machines, setMachines] = useState<Machine[]>([])
   const [machinesInUse, setMachinesInUse] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
@@ -215,10 +216,25 @@ export default function Maquinas() {
 
   // Filtrar máquinas
   const filteredMachines = machines.filter(
-    (machine) =>
-      machine.lote.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      machine.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      machine.reference_code.toLowerCase().includes(searchTerm.toLowerCase())
+    (machine) => {
+      // Filtro por texto de búsqueda
+      const matchesSearch = machine.lote.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        machine.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        machine.reference_code.toLowerCase().includes(searchTerm.toLowerCase())
+
+      // Filtro por disponibilidad
+      const isAvailable = machine.status === "active" && !machinesInUse.has(machine.id)
+      const isInUse = machine.status === "active" && machinesInUse.has(machine.id)
+      
+      let matchesAvailability = true
+      if (availabilityFilter === "available") {
+        matchesAvailability = isAvailable
+      } else if (availabilityFilter === "in_use") {
+        matchesAvailability = isInUse
+      }
+
+      return matchesSearch && matchesAvailability
+    }
   )
 
   const getStatusBadge = (status: string) => {
@@ -424,15 +440,30 @@ export default function Maquinas() {
               </Card>
             </div>
 
-            {/* Search */}
-            <div className="relative max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                placeholder="Buscar máquinas..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+            {/* Search and Filters */}
+            <div className="flex gap-4 max-w-2xl">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="Buscar máquinas..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <div className="relative">
+                <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 z-10" />
+                <Select value={availabilityFilter} onValueChange={setAvailabilityFilter}>
+                  <SelectTrigger className="w-48 pl-10">
+                    <SelectValue placeholder="Filtrar por estado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas las máquinas</SelectItem>
+                    <SelectItem value="available">Solo disponibles</SelectItem>
+                    <SelectItem value="in_use">Solo en uso</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 

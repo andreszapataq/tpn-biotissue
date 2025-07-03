@@ -8,8 +8,15 @@ export function cn(...inputs: ClassValue[]) {
 // Función para obtener la fecha actual en zona horaria de Colombia (UTC-5)
 export function getCurrentDateInColombia(): string {
   const now = new Date()
-  const colombiaTime = new Date(now.toLocaleString("en-US", { timeZone: "America/Bogota" }))
-  return colombiaTime.toISOString().split("T")[0]
+  // Convertir a fecha de Colombia usando Intl.DateTimeFormat
+  const colombiaDate = new Intl.DateTimeFormat('en-CA', { 
+    timeZone: 'America/Bogota',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(now)
+  
+  return colombiaDate // Ya retorna en formato YYYY-MM-DD
 }
 
 // Función para formatear fechas considerando zona horaria de Colombia
@@ -26,6 +33,7 @@ export function formatDateForColombia(dateString: string): string {
 // Función para formatear fechas con timestamp UTC a Colombia
 export function formatTimestampForColombia(timestamp: string): string {
   return new Date(timestamp).toLocaleDateString("es-ES", {
+    timeZone: "America/Bogota",
     year: "numeric",
     month: "short",
     day: "numeric",
