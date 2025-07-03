@@ -483,7 +483,7 @@ export default function Inventario() {
     }
   }
 
-  // 🔧 CORREGIDO: Función para cargar historial de movimientos
+  // 🔧 CORREGIDO: Función para cargar historial de movimientos con nombres actuales de pacientes
   const loadMovementHistory = async (productId: string) => {
     try {
       setLoadingHistory(true)
@@ -500,8 +500,42 @@ export default function Inventario() {
         throw error
       }
       
-      console.log("Movement history loaded:", data)
-      setMovementHistory(data || [])
+      // Procesar movimientos para obtener nombres actuales de pacientes
+      const processedMovements = await Promise.all((data || []).map(async (movement) => {
+        // Si es un movimiento de procedimiento, obtener el nombre actual del paciente
+        if (movement.reference_type === "procedure" && movement.reference_id) {
+          try {
+            const { data: procedureData } = await supabase
+              .from("procedures")
+              .select(`
+                id,
+                patient:patients(name)
+              `)
+              .eq("id", movement.reference_id)
+              .single()
+            
+            if (procedureData?.patient?.name) {
+              // Actualizar las notas con el nombre actual del paciente
+              const originalNotes = movement.notes || ""
+              
+              // Detectar si es "Usado en procedimiento" o "Insumo adicional"
+              if (originalNotes.includes("Usado en procedimiento")) {
+                movement.notes = `Usado en procedimiento - Paciente: ${procedureData.patient.name}`
+              } else if (originalNotes.includes("Insumo adicional")) {
+                movement.notes = `Insumo adicional - Paciente: ${procedureData.patient.name}`
+              }
+            }
+          } catch (procedureError) {
+            console.warn("Could not fetch procedure data for movement:", movement.id, procedureError)
+            // Mantener las notas originales si no se puede obtener el procedimiento
+          }
+        }
+        
+        return movement
+      }))
+      
+      console.log("Movement history loaded with updated patient names:", processedMovements)
+      setMovementHistory(processedMovements)
     } catch (error) {
       console.error("Error loading movement history:", error)
       toast({

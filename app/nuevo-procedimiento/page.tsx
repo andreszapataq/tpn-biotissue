@@ -739,7 +739,7 @@ export default function NuevoProcedimiento() {
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{product.name}</span>
                         <Badge variant="outline">{product.code}</Badge>
-                        <Badge variant={(product.stock || 0) < 5 ? "destructive" : "secondary"}>Stock: {product.stock || 0}</Badge>
+                        <Badge variant={(product.stock || 0) <= (product.minimum_stock || 0) ? "destructive" : "secondary"}>Stock: {product.stock || 0}</Badge>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">

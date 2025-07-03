@@ -791,7 +791,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                             <div className="flex items-center gap-1 mt-1">
                               <Badge variant="outline" className="text-xs">{product.code}</Badge>
                               <Badge 
-                                variant={(product.stock || 0) < 5 ? "destructive" : "secondary"}
+                                variant={(product.stock || 0) <= (product.minimum_stock || 0) ? "destructive" : "secondary"}
                                 className="text-xs"
                               >
                                 Stock: {product.stock || 0}
