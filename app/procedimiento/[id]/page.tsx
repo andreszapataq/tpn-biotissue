@@ -18,7 +18,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, Plus, Minus, Save, Loader2, CheckCircle, XCircle, Clock, Package, Settings } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
+import { ArrowLeft, Plus, Minus, Save, Loader2, CheckCircle, XCircle, Clock, Package, Settings, Edit } from "lucide-react"
 import Link from "next/link"
 import { supabase } from "@/lib/supabase"
 import { Tables } from "@/lib/database.types"
@@ -59,6 +60,26 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
   const [isChangeMachineDialogOpen, setIsChangeMachineDialogOpen] = useState(false)
   const [selectedNewMachine, setSelectedNewMachine] = useState("")
   const [changingMachine, setChangingMachine] = useState(false)
+
+  // Estados para edición de procedimiento
+  const [isEditGeneralDialogOpen, setIsEditGeneralDialogOpen] = useState(false)
+  const [isEditPatientDialogOpen, setIsEditPatientDialogOpen] = useState(false)
+  const [isUpdatingGeneral, setIsUpdatingGeneral] = useState(false)
+  const [isUpdatingPatient, setIsUpdatingPatient] = useState(false)
+  
+  // Estados para formularios de edición
+  const [editGeneralData, setEditGeneralData] = useState({
+    location: "",
+    surgeon_name: "",
+    assistant_name: "",
+    diagnosis: ""
+  })
+  
+  const [editPatientData, setEditPatientData] = useState({
+    name: "",
+    identification: "",
+    age: 0
+  })
   
   const { toast } = useToast()
   const { user } = useAuth()
@@ -212,6 +233,108 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
   useEffect(() => {
     loadProcedureData()
   }, [resolvedParams.id])
+
+  // Abrir diálogo de edición de información general
+  const openEditGeneralDialog = () => {
+    if (!procedure) return
+    setEditGeneralData({
+      location: procedure.location || "",
+      surgeon_name: procedure.surgeon_name || "",
+      assistant_name: procedure.assistant_name || "",
+      diagnosis: procedure.diagnosis || ""
+    })
+    setIsEditGeneralDialogOpen(true)
+  }
+
+  // Abrir diálogo de edición de datos del paciente
+  const openEditPatientDialog = () => {
+    if (!procedure?.patient) return
+    setEditPatientData({
+      name: procedure.patient.name || "",
+      identification: procedure.patient.identification || "",
+      age: procedure.patient.age || 0
+    })
+    setIsEditPatientDialogOpen(true)
+  }
+
+  // Actualizar información general del procedimiento
+  const handleUpdateGeneralInfo = async () => {
+    if (!procedure) return
+
+    try {
+      setIsUpdatingGeneral(true)
+
+      const { error } = await supabase
+        .from("procedures")
+        .update({
+          location: editGeneralData.location || null,
+          surgeon_name: editGeneralData.surgeon_name,
+          assistant_name: editGeneralData.assistant_name || null,
+          diagnosis: editGeneralData.diagnosis,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", procedure.id)
+
+      if (error) throw error
+
+      toast({
+        title: "Éxito",
+        description: "Información del procedimiento actualizada correctamente",
+      })
+
+      setIsEditGeneralDialogOpen(false)
+      await loadProcedureData()
+
+    } catch (error: any) {
+      console.error("Error updating procedure:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar la información del procedimiento",
+        variant: "destructive",
+      })
+    } finally {
+      setIsUpdatingGeneral(false)
+    }
+  }
+
+  // Actualizar datos del paciente
+  const handleUpdatePatientInfo = async () => {
+    if (!procedure?.patient) return
+
+    try {
+      setIsUpdatingPatient(true)
+
+      const { error } = await supabase
+        .from("patients")
+        .update({
+          name: editPatientData.name,
+          identification: editPatientData.identification,
+          age: editPatientData.age,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", procedure.patient.id)
+
+      if (error) throw error
+
+      toast({
+        title: "Éxito",
+        description: "Datos del paciente actualizados correctamente",
+      })
+
+      setIsEditPatientDialogOpen(false)
+      await loadProcedureData()
+
+    } catch (error: any) {
+      console.error("Error updating patient:", error)
+      toast({
+        title: "Error",
+        description: "No se pudieron actualizar los datos del paciente",
+        variant: "destructive",
+      })
+    } finally {
+      setIsUpdatingPatient(false)
+    }
+  }
 
   const handleProductQuantityChange = (productId: string, change: number) => {
     setSelectedProducts((prev) => {
@@ -548,7 +671,15 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
               {/* Datos Generales */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Información General</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>Información General</CardTitle>
+                    {procedure?.status === "active" && (
+                      <Button variant="outline" size="sm" onClick={openEditGeneralDialog}>
+                        <Edit className="h-4 w-4 mr-2" />
+                        Editar
+                      </Button>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -584,7 +715,15 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
               {/* Datos del Paciente */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Datos del Paciente</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>Datos del Paciente</CardTitle>
+                    {procedure?.status === "active" && permissions.isAdmin && (
+                      <Button variant="outline" size="sm" onClick={openEditPatientDialog}>
+                        <Edit className="h-4 w-4 mr-2" />
+                        Editar
+                      </Button>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -850,6 +989,158 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
             </div>
           </div>
         </div>
+
+        {/* Diálogo de Edición - Información General */}
+        <Dialog open={isEditGeneralDialogOpen} onOpenChange={setIsEditGeneralDialogOpen}>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>Editar Información General</DialogTitle>
+              <DialogDescription>
+                Modifica los datos generales del procedimiento.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-location">Ubicación</Label>
+                  <Input
+                    id="edit-location"
+                    value={editGeneralData.location}
+                    onChange={(e) => setEditGeneralData({...editGeneralData, location: e.target.value})}
+                    placeholder="Ej: Quirófano 1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-surgeon">Cirujano Líder</Label>
+                  <Input
+                    id="edit-surgeon"
+                    value={editGeneralData.surgeon_name}
+                    onChange={(e) => setEditGeneralData({...editGeneralData, surgeon_name: e.target.value})}
+                    placeholder="Nombre del cirujano"
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="edit-assistant">Asistente</Label>
+                <Input
+                  id="edit-assistant"
+                  value={editGeneralData.assistant_name}
+                  onChange={(e) => setEditGeneralData({...editGeneralData, assistant_name: e.target.value})}
+                  placeholder="Nombre del asistente"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-diagnosis">Diagnóstico Preoperatorio</Label>
+                <Textarea
+                  id="edit-diagnosis"
+                  value={editGeneralData.diagnosis}
+                  onChange={(e) => setEditGeneralData({...editGeneralData, diagnosis: e.target.value})}
+                  placeholder="Descripción del diagnóstico"
+                  rows={3}
+                  required
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsEditGeneralDialogOpen(false)}
+                disabled={isUpdatingGeneral}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleUpdateGeneralInfo}
+                disabled={isUpdatingGeneral || !editGeneralData.surgeon_name || !editGeneralData.diagnosis}
+              >
+                {isUpdatingGeneral ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Guardar Cambios
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Diálogo de Edición - Datos del Paciente */}
+        <Dialog open={isEditPatientDialogOpen} onOpenChange={setIsEditPatientDialogOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Editar Datos del Paciente</DialogTitle>
+              <DialogDescription>
+                Modifica los datos del paciente. Solo administradores pueden realizar esta acción.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div>
+                <Label htmlFor="edit-patient-name">Nombre Completo</Label>
+                <Input
+                  id="edit-patient-name"
+                  value={editPatientData.name}
+                  onChange={(e) => setEditPatientData({...editPatientData, name: e.target.value})}
+                  placeholder="Nombre completo del paciente"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-patient-id">Identificación</Label>
+                <Input
+                  id="edit-patient-id"
+                  value={editPatientData.identification}
+                  onChange={(e) => setEditPatientData({...editPatientData, identification: e.target.value})}
+                  placeholder="Número de identificación"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-patient-age">Edad</Label>
+                <Input
+                  id="edit-patient-age"
+                  type="number"
+                  value={editPatientData.age || ""}
+                  onChange={(e) => setEditPatientData({...editPatientData, age: parseInt(e.target.value) || 0})}
+                  placeholder="Edad en años"
+                  min="0"
+                  max="120"
+                  required
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsEditPatientDialogOpen(false)}
+                disabled={isUpdatingPatient}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleUpdatePatientInfo}
+                disabled={isUpdatingPatient || !editPatientData.name || !editPatientData.identification || !editPatientData.age}
+              >
+                {isUpdatingPatient ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Guardar Cambios
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </ProtectedRoute>
   )

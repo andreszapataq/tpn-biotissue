@@ -6,6 +6,7 @@ export interface UserPermissions {
   canEditInventory: boolean
   canAdjustStock: boolean
   canViewAll: boolean
+  isAdmin: boolean
 }
 
 export function usePermissions(): UserPermissions {
@@ -18,6 +19,7 @@ export function usePermissions(): UserPermissions {
       canEditInventory: false,
       canAdjustStock: false,
       canViewAll: false,
+      isAdmin: false,
     }
   }
 
@@ -30,5 +32,6 @@ export function usePermissions(): UserPermissions {
     canEditInventory: isAdmin,
     canAdjustStock: isAdmin,
     canViewAll: true, // Todos pueden ver la información
+    isAdmin: isAdmin,
   }
 } 
