@@ -10,6 +10,7 @@ interface AuthContextType {
   user: AuthUser | null
   loading: boolean
   signOut: () => Promise<void>
+  refreshUser: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -34,7 +35,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push("/auth/login")
   }
 
-  // Inicialización simple - solo una vez
+  const refreshUser = async () => {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      if (session?.user) {
+        console.log("🔄 Refrescando datos del usuario...")
+        const authUser = await createAuthUser(session.user)
+        if (authUser) {
+          console.log("✅ Usuario actualizado:", authUser.name, "- Rol:", authUser.role)
+          setUser(authUser)
+        }
+      }
+    } catch (error) {
+      console.error("❌ Error refreshing user:", error)
+    }
+  }
+
+  // 🔄 Función para crear usuario con datos actuales de BD
+  const createAuthUser = async (sessionUser: any): Promise<AuthUser | null> => {
+    try {
+      // 1️⃣ Obtener datos actuales del usuario desde la tabla users
+      const { data: userProfile, error } = await supabase
+        .from("users")
+        .select("role, mfa_enabled, name")
+        .eq("auth_id", sessionUser.id)
+        .single()
+
+      if (error) {
+        console.warn("⚠️ User profile not found, using session data")
+        // Fallback a datos de sesión si no hay perfil
+        return {
+          id: sessionUser.id,
+          email: sessionUser.email || "",
+          name: sessionUser.user_metadata?.name || sessionUser.email || "",
+          role: sessionUser.user_metadata?.role || "soporte",
+          mfa_enabled: false,
+        }
+      }
+
+      // 2️⃣ Crear usuario con datos actuales de BD
+      return {
+        id: sessionUser.id,
+        email: sessionUser.email || "",
+        name: userProfile.name || sessionUser.user_metadata?.name || sessionUser.email || "",
+        role: userProfile.role, // 🎯 ROL ACTUAL desde BD, no cacheado
+        mfa_enabled: userProfile.mfa_enabled || false,
+      }
+    } catch (error) {
+      console.error("❌ Error getting user profile:", error)
+      return null
+    }
+  }
+
+  // Inicialización - obtener datos actuales
   useEffect(() => {
     const initAuth = async () => {
       try {
@@ -43,15 +99,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } = await supabase.auth.getSession()
 
         if (session?.user) {
-          // Crear usuario simple desde la sesión
-          const authUser: AuthUser = {
-            id: session.user.id,
-            email: session.user.email || "",
-            name: session.user.user_metadata?.name || session.user.email || "",
-            role: session.user.user_metadata?.role || "enfermera",
-            mfa_enabled: false,
+          console.log("🔄 Inicializando auth con datos actuales de BD...")
+          const authUser = await createAuthUser(session.user)
+          if (authUser) {
+            console.log("✅ Usuario cargado:", authUser.name, "- Rol:", authUser.role)
+            setUser(authUser)
           }
-          setUser(authUser)
         }
       } catch (error) {
         console.error("Auth error:", error)
@@ -60,20 +113,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     initAuth()
 
-    // Listener simple para cambios de auth
+    // Listener para cambios de auth - usar datos actuales de BD
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === "SIGNED_IN" && session?.user) {
-        const authUser: AuthUser = {
-          id: session.user.id,
-          email: session.user.email || "",
-          name: session.user.user_metadata?.name || session.user.email || "",
-          role: session.user.user_metadata?.role || "enfermera",
-          mfa_enabled: false,
+        console.log("🔄 Login detectado, obteniendo datos actuales...")
+        const authUser = await createAuthUser(session.user)
+        if (authUser) {
+          console.log("✅ Usuario autenticado:", authUser.name, "- Rol:", authUser.role)
+          setUser(authUser)
         }
-        setUser(authUser)
       } else if (event === "SIGNED_OUT") {
+        console.log("👋 Usuario desconectado")
         setUser(null)
       }
     })
@@ -92,5 +144,5 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user, pathname, router])
 
-  return <AuthContext.Provider value={{ user, loading, signOut }}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={{ user, loading, signOut, refreshUser }}>{children}</AuthContext.Provider>
 }

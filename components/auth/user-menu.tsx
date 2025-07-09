@@ -10,11 +10,11 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { User, Settings, Shield, LogOut, Key } from "lucide-react"
+import { User, Settings, Shield, LogOut, Key, RefreshCw } from "lucide-react"
 import { useAuth } from "./auth-provider"
 
 export function UserMenu() {
-  const { user, signOut } = useAuth()
+  const { user, signOut, refreshUser } = useAuth()
 
   if (!user) return null
 
@@ -32,6 +32,7 @@ export function UserMenu() {
       case "cirujano":
         return "bg-blue-100 text-blue-800"
       case "enfermera":
+      case "soporte":
         return "bg-green-100 text-green-800"
       case "administrador":
         return "bg-purple-100 text-purple-800"
@@ -46,6 +47,8 @@ export function UserMenu() {
         return "Cirujano"
       case "enfermera":
         return "Enfermera"
+      case "soporte":
+        return "Soporte"
       case "administrador":
         return "Administrador"
       default:
@@ -67,7 +70,7 @@ export function UserMenu() {
           <div className="flex flex-col space-y-2">
             <div className="flex items-center gap-2">
               <p className="text-sm font-medium leading-none">{user.name}</p>
-              {user.mfa_enabled && <Shield className="h-3 w-3 text-green-600" title="MFA Habilitado" />}
+              {user.mfa_enabled && <Shield className="h-3 w-3 text-green-600" />}
             </div>
             <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
             <Badge className={getRoleColor(user.role)} variant="secondary">
@@ -94,6 +97,11 @@ export function UserMenu() {
             <span>Habilitar MFA</span>
           </DropdownMenuItem>
         )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={refreshUser}>
+          <RefreshCw className="mr-2 h-4 w-4" />
+          <span>Actualizar Permisos</span>
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={signOut} className="text-red-600">
           <LogOut className="mr-2 h-4 w-4" />
