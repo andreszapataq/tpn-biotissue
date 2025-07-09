@@ -4,6 +4,23 @@ import { Database } from "./database.types"
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
+// 📱 Detectar si estamos en dispositivo móvil
+const isMobile = typeof window !== "undefined" && 
+  (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent))
+
+// 📱 Configuración optimizada para dispositivos móviles  
+const mobileConfig = {
+  // Timeouts más largos para conexiones móviles lentas
+  fetch: {
+    timeout: 30000, // 30 segundos en lugar de 10
+  },
+  // Configuración de reconexión más agresiva
+  realtime: {
+    heartbeatIntervalMs: 15000, // 15 segundos
+    reconnectAfterMs: () => [1000, 2000, 5000, 10000], // Reintentos escalados
+  }
+}
+
 // Configuración para mejor persistencia de sesión
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
@@ -12,7 +29,43 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: true,
     storage: typeof window !== "undefined" ? window.localStorage : undefined,
   },
+  // 📱 Aplicar configuración móvil si es necesario
+  ...(isMobile ? mobileConfig : {}),
+  // Configuración adicional para conexiones inestables
+  global: {
+    headers: {
+      'X-Client-Info': isMobile ? 'mobile-app' : 'web-app',
+    },
+  },
 })
+
+// 📱 Función helper para operaciones críticas con reintentos automáticos
+export const executeWithRetry = async <T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<T> => {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation()
+    } catch (error: any) {
+      const isNetworkError = error.message?.includes('network') || 
+                           error.message?.includes('connection') ||
+                           error.message?.includes('timeout') ||
+                           error.code === 'PGRST301' ||
+                           error.code === 'ECONNABORTED'
+      
+      if (isNetworkError && attempt < maxRetries) {
+        const delay = baseDelay * Math.pow(2, attempt - 1) // Backoff exponencial
+        console.warn(`⚠️ Operación falló (intento ${attempt}/${maxRetries}), reintentando en ${delay}ms...`)
+        await new Promise(resolve => setTimeout(resolve, delay))
+        continue
+      }
+      throw error
+    }
+  }
+  throw new Error("Max retries exceeded")
+}
 
 // Tipos simplificados
 export interface User {

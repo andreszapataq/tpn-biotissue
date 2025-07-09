@@ -385,56 +385,96 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
 
     try {
       setSaving(true)
+      console.log("📱 Iniciando agregado de insumos para conexión móvil")
 
-      // Obtener perfil del usuario
-      const { data: userProfile } = await supabase
-        .from("users")
-        .select("id")
-        .eq("auth_id", user.id)
-        .single()
+      // 🔄 Función de reintento para conexiones móviles inestables
+      const retryOperation = async (operation: () => Promise<any>, maxRetries: number = 3): Promise<any> => {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            return await operation()
+          } catch (error: any) {
+            const isNetworkError = error.message?.includes('network') || 
+                                 error.message?.includes('connection') ||
+                                 error.message?.includes('timeout') ||
+                                 error.code === 'PGRST301'
+            
+            if (isNetworkError && attempt < maxRetries) {
+              console.warn(`⚠️ Intento ${attempt} falló, reintentando en 2 segundos...`)
+              await new Promise(resolve => setTimeout(resolve, 2000))
+              continue
+            }
+            throw error
+          }
+        }
+        throw new Error("Max retries exceeded")
+      }
 
-      const procedureProducts = []
-      const inventoryMovements = []
+      // 1️⃣ Obtener perfil del usuario con reintentos
+      console.log("👤 Obteniendo perfil de usuario...")
+      const { data: userProfile } = await retryOperation(async () => {
+        const result = await supabase
+          .from("users")
+          .select("id")
+          .eq("auth_id", user.id)
+          .single()
+        return result
+      })
 
-      // 🔧 FIX: Actualizar stocks uno por uno para garantizar consistencia
+      const procedureProducts: Array<{
+        procedure_id: string
+        product_id: string
+        quantity_used: number
+      }> = []
+      
+      const inventoryMovements: Array<{
+        product_id: string
+        movement_type: string
+        quantity: number
+        reference_type: string
+        reference_id: string
+        notes: string
+        created_by?: string
+      }> = []
+      const productCount = Object.keys(selectedProducts).length
+      let currentProduct = 0
+
+      // 2️⃣ Actualizar stocks con progreso detallado
       for (const [productId, quantity] of Object.entries(selectedProducts)) {
+        currentProduct++
         const product = availableProducts.find(p => p.id === productId)
         if (!product) continue
 
+        console.log(`📦 Procesando producto ${currentProduct}/${productCount}: ${product.name}`)
+        
+        // Mostrar progreso específico para iPad
+        toast({
+          title: "Procesando...",
+          description: `Agregando ${product.name} (${currentProduct}/${productCount})`,
+        })
+
         const newStock = (product.stock || 0) - quantity
 
-        // 🔧 FIX: Actualizar stock inmediatamente, no en batch
-        console.log(`🔄 Updating stock for ${product.name}: ${product.stock} -> ${newStock}`)
+        // 3️⃣ Actualizar stock con reintentos
+        console.log(`🔄 Actualizando stock: ${product.stock} -> ${newStock}`)
         
-        const { data: updatedProduct, error: stockError } = await supabase
-          .from("inventory_products")
-          .update({ 
-            stock: newStock,
-            updated_at: new Date().toISOString()
-          })
-          .eq("id", productId)
-          .select("stock")
-          .single()
+        const { data: updatedProduct, error: stockError } = await retryOperation(async () => {
+          return await supabase
+            .from("inventory_products")
+            .update({ 
+              stock: newStock,
+              updated_at: new Date().toISOString()
+            })
+            .eq("id", productId)
+            .select("stock")
+            .single()
+        })
 
         if (stockError) {
-          console.error(`❌ CRITICAL ERROR updating stock for ${product.name}:`, stockError)
-          toast({
-            title: "Error Crítico",
-            description: `No se pudo actualizar el stock de ${product.name}`,
-            variant: "destructive",
-          })
+          console.error(`❌ Error actualizando stock para ${product.name}:`, stockError)
           throw stockError
         }
         
-        console.log(`✅ Stock updated for ${product.name}: ${updatedProduct?.stock} (expected: ${newStock})`)
-        
-        // 📊 Log verificación de consistencia (sin lanzar error)
-        if (updatedProduct?.stock !== newStock) {
-          console.warn(`⚠️ STOCK INCONSISTENCY for ${product.name}: expected ${newStock}, got ${updatedProduct?.stock}`)
-          console.warn(`⚠️ This might be due to concurrent operations, but update was successful`)
-        } else {
-          console.log(`✅ Stock consistency verified for ${product.name}`)
-        }
+        console.log(`✅ Stock actualizado para ${product.name}: ${updatedProduct?.stock}`)
 
         // Registrar producto usado en procedimiento
         procedureProducts.push({
@@ -460,23 +500,29 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
         inventoryMovements.push(movementData)
       }
 
-      // Insertar productos del procedimiento
-      const { error: procedureProductsError } = await supabase
-        .from("procedure_products")
-        .insert(procedureProducts)
+      // 4️⃣ Insertar productos del procedimiento con reintentos
+      console.log("📋 Registrando productos del procedimiento...")
+      const { error: procedureProductsError } = await retryOperation(async () => {
+        return await supabase
+          .from("procedure_products")
+          .insert(procedureProducts)
+      })
 
       if (procedureProductsError) throw procedureProductsError
 
-      // Insertar movimientos de inventario
-      const { error: movementsError } = await supabase
-        .from("inventory_movements")
-        .insert(inventoryMovements)
+      // 5️⃣ Insertar movimientos de inventario con reintentos
+      console.log("📊 Registrando movimientos de inventario...")
+      const { error: movementsError } = await retryOperation(async () => {
+        return await supabase
+          .from("inventory_movements")
+          .insert(inventoryMovements)
+      })
 
       if (movementsError) throw movementsError
 
       toast({
-        title: "Éxito",
-        description: "Insumos agregados correctamente",
+        title: "✅ Éxito",
+        description: `${productCount} insumo${productCount > 1 ? 's' : ''} agregado${productCount > 1 ? 's' : ''} correctamente`,
       })
 
       // Limpiar selección y recargar datos
@@ -915,7 +961,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
               </Card>
 
               {/* Agregar Insumos (solo si está activo) */}
-              {procedure.status === "active" && (
+              {procedure.status === "active" && permissions.canAddProcedureSupplies && (
                 <Card>
                   <CardHeader>
                     <CardTitle>Agregar Insumos</CardTitle>
