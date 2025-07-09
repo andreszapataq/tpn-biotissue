@@ -222,15 +222,18 @@ export default function Maquinas() {
         machine.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
         machine.reference_code.toLowerCase().includes(searchTerm.toLowerCase())
 
-      // Filtro por disponibilidad
+      // Filtro por disponibilidad/estado
       const isAvailable = machine.status === "active" && !machinesInUse.has(machine.id)
       const isInUse = machine.status === "active" && machinesInUse.has(machine.id)
+      const isInMaintenance = machine.status === "maintenance"
       
       let matchesAvailability = true
       if (availabilityFilter === "available") {
         matchesAvailability = isAvailable
       } else if (availabilityFilter === "in_use") {
         matchesAvailability = isInUse
+      } else if (availabilityFilter === "maintenance") {
+        matchesAvailability = isInMaintenance
       }
 
       return matchesSearch && matchesAvailability
@@ -307,7 +310,7 @@ export default function Maquinas() {
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Total Máquinas</CardTitle>
@@ -342,6 +345,19 @@ export default function Maquinas() {
                     {machines.filter(m => m.status === "active" && machinesInUse.has(m.id)).length}
                   </div>
                   <p className="text-xs text-muted-foreground">En procedimientos</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Mantenimiento</CardTitle>
+                  <Settings className="h-4 w-4 text-yellow-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-yellow-500">
+                    {machines.filter(m => m.status === "maintenance").length}
+                  </div>
+                  <p className="text-xs text-muted-foreground">En mantenimiento</p>
                 </CardContent>
               </Card>
 
@@ -461,6 +477,7 @@ export default function Maquinas() {
                     <SelectItem value="all">Todas las máquinas</SelectItem>
                     <SelectItem value="available">Solo disponibles</SelectItem>
                     <SelectItem value="in_use">Solo en uso</SelectItem>
+                    <SelectItem value="maintenance">En mantenimiento</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
