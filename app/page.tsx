@@ -12,7 +12,8 @@ import { useAuth } from "@/components/auth/auth-provider"
 import { usePermissions } from "@/hooks/use-permissions"
 import { supabase } from "@/lib/supabase"
 import { getCurrentDateInColombia, formatDateForColombia, formatTimestampForColombia, getMachineDisplayName } from "@/lib/utils"
-import { Plus, Users, Package, Activity, AlertTriangle, Calendar, Clock, Loader2, Settings, FileText } from "lucide-react"
+import { Plus, Users, Package, Activity, AlertTriangle, Calendar, Clock, Loader2, Settings, FileText, Search } from "lucide-react"
+import { Input } from "@/components/ui/input"
 
 // Componente memoizado para evitar re-renders innecesarios
 const DashboardContent = memo(function DashboardContent() {
@@ -29,7 +30,43 @@ const DashboardContent = memo(function DashboardContent() {
   const [patients, setPatients] = useState<any[]>([])
   const [alerts, setAlerts] = useState<any[]>([])
   const [loadingData, setLoadingData] = useState(true)
+  
+  // 🔍 Nuevo estado para el buscador
+  const [searchTerm, setSearchTerm] = useState("")
 
+  // 🔍 Funciones de filtrado
+  const filteredPatients = patients.filter(patient => {
+    if (!searchTerm) return true
+    const term = searchTerm.toLowerCase()
+    return (
+      patient.name?.toLowerCase().includes(term) ||
+      patient.identification?.toLowerCase().includes(term) ||
+      patient.status?.toLowerCase().includes(term) ||
+      (patient.status === "active" && "en tratamiento".includes(term)) ||
+      (patient.status === "completed" && ("completado".includes(term) || "cerrado".includes(term))) ||
+      (patient.status === "inactive" && "inactivo".includes(term))
+    )
+  })
+
+  const filteredClosedProcedures = closedProcedures.filter(procedure => {
+    if (!searchTerm) return true
+    const term = searchTerm.toLowerCase()
+    return (
+      procedure.patient?.name?.toLowerCase().includes(term) ||
+      procedure.patient?.identification?.toLowerCase().includes(term) ||
+      procedure.surgeon_name?.toLowerCase().includes(term) ||
+      procedure.diagnosis?.toLowerCase().includes(term) ||
+      procedure.location?.toLowerCase().includes(term) ||
+      procedure.machine?.model?.toLowerCase().includes(term) ||
+      procedure.machine?.lote?.toLowerCase().includes(term)
+    )
+  })
+
+  const filteredAlerts = alerts.filter(alert => {
+    if (!searchTerm) return true
+    const term = searchTerm.toLowerCase()
+    return alert.product?.toLowerCase().includes(term)
+  })
 
 
   const loadDashboardData = async () => {
@@ -290,11 +327,46 @@ const DashboardContent = memo(function DashboardContent() {
 
         {/* Main Content */}
         <Tabs defaultValue="pacientes" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="pacientes">Últimos Pacientes</TabsTrigger>
-            <TabsTrigger value="procedimientos">Procedimientos Cerrados</TabsTrigger>
-            <TabsTrigger value="alertas">Alertas</TabsTrigger>
-          </TabsList>
+          <div className="flex flex-col space-y-4">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="pacientes">Últimos Pacientes</TabsTrigger>
+              <TabsTrigger value="procedimientos">Procedimientos Cerrados</TabsTrigger>
+              <TabsTrigger value="alertas">Alertas</TabsTrigger>
+            </TabsList>
+            
+            {/* 🔍 Buscador Global */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="relative flex-1 w-full">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="Buscar pacientes, procedimientos, cirujanos, diagnósticos..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 w-full"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm("")}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+              
+              {/* Contador de resultados */}
+              {searchTerm && (
+                <div className="text-sm text-gray-500 whitespace-nowrap">
+                  <span className="hidden lg:inline">Mostrando: </span>
+                  <span className="font-medium">
+                    Pacientes: {filteredPatients.length} | 
+                    Procedimientos: {filteredClosedProcedures.length} | 
+                    Alertas: {filteredAlerts.length}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
 
           {loadingData ? (
             <div className="flex items-center justify-center h-64">
@@ -304,15 +376,30 @@ const DashboardContent = memo(function DashboardContent() {
             <>
               <TabsContent value="pacientes" className="space-y-4">
                 <div className="grid gap-4">
-                  {patients.length === 0 ? (
+                  {filteredPatients.length === 0 ? (
                     <Card>
                       <CardContent className="pt-6 text-center">
                         <Users className="h-12 w-12 mx-auto text-gray-300 mb-4" />
-                        <p className="text-gray-500">No hay pacientes registrados</p>
+                        {searchTerm ? (
+                          <div>
+                            <p className="text-gray-500 mb-2">
+                              No se encontraron pacientes que coincidan con "{searchTerm}"
+                            </p>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => setSearchTerm("")}
+                            >
+                              Limpiar búsqueda
+                            </Button>
+                          </div>
+                        ) : (
+                          <p className="text-gray-500">No hay pacientes registrados</p>
+                        )}
                       </CardContent>
                     </Card>
                   ) : (
-                    patients.map((patient) => {
+                    filteredPatients.map((patient) => {
                       const getPatientBadge = (status: string) => {
                         switch (status) {
                           case "active":
@@ -368,15 +455,30 @@ const DashboardContent = memo(function DashboardContent() {
 
               <TabsContent value="procedimientos" className="space-y-4">
                 <div className="grid gap-4">
-                  {closedProcedures.length === 0 ? (
+                  {filteredClosedProcedures.length === 0 ? (
                     <Card>
                       <CardContent className="pt-6 text-center">
                         <Activity className="h-12 w-12 mx-auto text-gray-300 mb-4" />
-                        <p className="text-gray-500">No hay procedimientos cerrados</p>
+                        {searchTerm ? (
+                          <div>
+                            <p className="text-gray-500 mb-2">
+                              No se encontraron procedimientos que coincidan con "{searchTerm}"
+                            </p>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => setSearchTerm("")}
+                            >
+                              Limpiar búsqueda
+                            </Button>
+                          </div>
+                        ) : (
+                          <p className="text-gray-500">No hay procedimientos cerrados</p>
+                        )}
                       </CardContent>
                     </Card>
                   ) : (
-                    closedProcedures.map((procedure: any) => (
+                    filteredClosedProcedures.map((procedure: any) => (
                       <Card key={procedure.id} className="hover:shadow-md transition-shadow">
                         <CardContent className="pt-6">
                           <div className="flex items-center justify-between mb-4">
@@ -449,7 +551,30 @@ const DashboardContent = memo(function DashboardContent() {
 
               <TabsContent value="alertas" className="space-y-4">
                 <div className="grid gap-4">
-                  {alerts.map((alert, index) => (
+                  {filteredAlerts.length === 0 ? (
+                    <Card>
+                      <CardContent className="pt-6 text-center">
+                        <AlertTriangle className="h-12 w-12 mx-auto text-gray-300 mb-4" />
+                        {searchTerm ? (
+                          <div>
+                            <p className="text-gray-500 mb-2">
+                              No se encontraron alertas que coincidan con "{searchTerm}"
+                            </p>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => setSearchTerm("")}
+                            >
+                              Limpiar búsqueda
+                            </Button>
+                          </div>
+                        ) : (
+                          <p className="text-gray-500">No hay alertas de inventario</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    filteredAlerts.map((alert, index) => (
                     <Card key={index} className="border-orange-200">
                       <CardContent className="pt-6">
                         <div className="flex items-center justify-between">
@@ -470,7 +595,8 @@ const DashboardContent = memo(function DashboardContent() {
                         </div>
                       </CardContent>
                     </Card>
-                  ))}
+                    ))
+                  )}
                 </div>
               </TabsContent>
             </>
