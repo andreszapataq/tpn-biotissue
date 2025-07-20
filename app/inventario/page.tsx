@@ -26,6 +26,21 @@ import { ProtectedRoute } from "@/components/auth/protected-route"
 import { usePermissions } from "@/hooks/use-permissions"
 import { useAuth } from "@/components/auth/auth-provider"
 
+// 🇨🇴 Función para formatear moneda colombiana
+const formatCurrency = (amount: number): string => {
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(amount)
+}
+
+// 🔢 Función para formatear números con separador de miles
+const formatNumber = (number: number): string => {
+  return new Intl.NumberFormat('es-CO').format(number)
+}
+
 type InventoryProduct = Tables<"inventory_products">
 
 export default function Inventario() {
@@ -582,7 +597,7 @@ export default function Inventario() {
                   <Package className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{totalProducts}</div>
+                  <div className="text-2xl font-bold">{formatNumber(totalProducts)}</div>
                   <p className="text-xs text-muted-foreground">Tipos de productos</p>
                 </CardContent>
               </Card>
@@ -593,19 +608,28 @@ export default function Inventario() {
                   <AlertTriangle className="h-4 w-4 text-orange-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-orange-500">{lowStockCount}</div>
+                  <div className="text-2xl font-bold text-orange-500">{formatNumber(lowStockCount)}</div>
                   <p className="text-xs text-muted-foreground">Requieren reposición</p>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Valor Total</CardTitle>
+                  <CardTitle className="text-sm font-medium">
+                    {permissions.isAdmin ? "Valor Total" : "Productos Activos"}
+                  </CardTitle>
                   <TrendingUp className="h-4 w-4 text-green-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">${totalValue.toFixed(2)}</div>
-                  <p className="text-xs text-muted-foreground">Valor del inventario</p>
+                  <div className="text-2xl font-bold">
+                    {permissions.isAdmin 
+                      ? formatCurrency(totalValue)
+                      : formatNumber(inventory.filter(i => (i.stock || 0) > 0).length)
+                    }
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {permissions.isAdmin ? "Valor del inventario" : "Con stock disponible"}
+                  </p>
                 </CardContent>
               </Card>
 
@@ -700,19 +724,22 @@ export default function Inventario() {
                             />
                           </div>
                         </div>
-                        <div>
-                          <Label htmlFor="unit_price">Precio Unitario ($)</Label>
-                          <Input
-                            id="unit_price"
-                            type="number"
-                            step="0.01"
-                            value={newProduct.unit_price}
-                            onChange={(e) =>
-                              setNewProduct({ ...newProduct, unit_price: Number.parseFloat(e.target.value) || 0 })
-                            }
-                            min="0"
-                          />
-                        </div>
+                        {/* 🔒 Solo mostrar precio unitario para administradores */}
+                        {permissions.isAdmin && (
+                          <div>
+                            <Label htmlFor="unit_price">Precio Unitario (COP)</Label>
+                            <Input
+                              id="unit_price"
+                              type="number"
+                              step="0.01"
+                              value={newProduct.unit_price}
+                              onChange={(e) =>
+                                setNewProduct({ ...newProduct, unit_price: Number.parseFloat(e.target.value) || 0 })
+                              }
+                              min="0"
+                            />
+                          </div>
+                        )}
                       </div>
                       <DialogFooter>
                         <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
@@ -781,7 +808,7 @@ export default function Inventario() {
                                 <div className="flex items-center gap-2 mb-1">
                                   <span className="font-medium">{product.name}</span>
                                   <Badge variant="outline">{product.code}</Badge>
-                                  <Badge variant="secondary">Stock actual: {product.stock || 0}</Badge>
+                                  <Badge variant="secondary">Stock actual: {formatNumber(product.stock || 0)}</Badge>
                                 </div>
                                 <p className="text-sm text-gray-600">
                                   Categoría: {product.category} • Lote: {product.lote || "N/A"}
@@ -862,9 +889,9 @@ export default function Inventario() {
           ) : (
             <Tabs defaultValue="todos" className="space-y-4">
               <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="todos">Todos los Productos ({filteredInventory.length})</TabsTrigger>
-                <TabsTrigger value="bajo-stock">Stock Bajo ({lowStockItems.length})</TabsTrigger>
-                <TabsTrigger value="normal">Stock Normal ({normalStockItems.length})</TabsTrigger>
+                <TabsTrigger value="todos">Todos los Productos ({formatNumber(filteredInventory.length)})</TabsTrigger>
+                <TabsTrigger value="bajo-stock">Stock Bajo ({formatNumber(lowStockItems.length)})</TabsTrigger>
+                <TabsTrigger value="normal">Stock Normal ({formatNumber(normalStockItems.length)})</TabsTrigger>
               </TabsList>
 
               <TabsContent value="todos" className="space-y-4">
@@ -894,23 +921,34 @@ export default function Inventario() {
                                   <Badge variant={status.variant}>{status.label}</Badge>
                                   <Badge variant="secondary">{item.category}</Badge>
                                 </div>
-                                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm text-gray-600">
+                                <div className={`grid gap-4 text-sm text-gray-600 ${permissions.isAdmin ? 'grid-cols-2 md:grid-cols-5' : 'grid-cols-2 md:grid-cols-4'}`}>
                                   <div>
                                     <span className="font-medium">Lote:</span> {item.lote || "N/A"}
                                   </div>
                                   <div>
-                                    <span className="font-medium">Stock Actual:</span> {item.stock || 0}
+                                    <span className="font-medium">Stock Actual:</span> {formatNumber(item.stock || 0)}
                                   </div>
                                   <div>
-                                    <span className="font-medium">Stock Mínimo:</span> {item.minimum_stock || 0}
+                                    <span className="font-medium">Stock Mínimo:</span> {formatNumber(item.minimum_stock || 0)}
                                   </div>
-                                  <div>
-                                    <span className="font-medium">Precio Unitario:</span> ${item.unit_price || 0}
-                                  </div>
-                                  <div>
-                                    <span className="font-medium">Valor Total:</span> $
-                                    {((item.stock || 0) * (item.unit_price || 0)).toFixed(2)}
-                                  </div>
+                                  {/* 🔒 Solo mostrar precios para administradores */}
+                                  {permissions.isAdmin ? (
+                                    <>
+                                      <div>
+                                        <span className="font-medium">Precio Unitario:</span> {formatCurrency(item.unit_price || 0)}
+                                      </div>
+                                      <div>
+                                        <span className="font-medium">Valor Total:</span> {formatCurrency((item.stock || 0) * (item.unit_price || 0))}
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <div>
+                                      <span className="font-medium">Estado:</span> 
+                                      <Badge variant={status.variant} className="ml-1">
+                                        {status.label}
+                                      </Badge>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
@@ -1101,19 +1139,22 @@ export default function Inventario() {
                     />
                   </div>
                 </div>
-                <div>
-                  <Label htmlFor="edit_unit_price">Precio Unitario ($)</Label>
-                  <Input
-                    id="edit_unit_price"
-                    type="number"
-                    step="0.01"
-                    value={editProduct.unit_price}
-                    onChange={(e) =>
-                      setEditProduct({ ...editProduct, unit_price: Number.parseFloat(e.target.value) || 0 })
-                    }
-                    min="0"
-                  />
-                </div>
+                {/* 🔒 Solo mostrar precio unitario para administradores */}
+                {permissions.isAdmin && (
+                  <div>
+                    <Label htmlFor="edit_unit_price">Precio Unitario (COP)</Label>
+                    <Input
+                      id="edit_unit_price"
+                      type="number"
+                      step="0.01"
+                      value={editProduct.unit_price}
+                      onChange={(e) =>
+                        setEditProduct({ ...editProduct, unit_price: Number.parseFloat(e.target.value) || 0 })
+                      }
+                      min="0"
+                    />
+                  </div>
+                )}
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
@@ -1165,19 +1206,19 @@ export default function Inventario() {
                       <div className="grid grid-cols-3 gap-4 text-center">
                         <div>
                           <div className="text-2xl font-bold text-green-600">
-                            +{movementHistory.filter(m => m.movement_type === 'in').reduce((sum, m) => sum + m.quantity, 0)}
+                            +{formatNumber(movementHistory.filter(m => m.movement_type === 'in').reduce((sum, m) => sum + m.quantity, 0))}
                           </div>
                           <p className="text-sm text-gray-600">Total Entradas</p>
                         </div>
                         <div>
                           <div className="text-2xl font-bold text-red-600">
-                            -{movementHistory.filter(m => m.movement_type === 'out').reduce((sum, m) => sum + Math.abs(m.quantity), 0)}
+                            -{formatNumber(movementHistory.filter(m => m.movement_type === 'out').reduce((sum, m) => sum + Math.abs(m.quantity), 0))}
                           </div>
                           <p className="text-sm text-gray-600">Total Salidas</p>
                         </div>
                         <div>
                           <div className="text-2xl font-bold text-blue-600">
-                            {selectedProductForHistory?.stock || 0}
+                            {formatNumber(selectedProductForHistory?.stock || 0)}
                           </div>
                           <p className="text-sm text-gray-600">Stock Actual</p>
                         </div>
@@ -1199,7 +1240,7 @@ export default function Inventario() {
                                   {movement.movement_type === 'in' ? '📈 ENTRADA' : '📉 SALIDA'}
                                 </Badge>
                                 <Badge variant="outline">
-                                  {movement.movement_type === 'in' ? '+' : ''}{movement.quantity}
+                                  {movement.movement_type === 'in' ? '+' : ''}{formatNumber(Math.abs(movement.quantity))}
                                 </Badge>
                                 <Badge variant="secondary">
                                   {movement.reference_type === 'procedure' ? '🏥 Procedimiento' :

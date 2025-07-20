@@ -9,14 +9,16 @@ import Link from "next/link"
 import { ProtectedRoute } from "@/components/auth/protected-route"
 import { UserMenu } from "@/components/auth/user-menu"
 import { useAuth } from "@/components/auth/auth-provider"
+import { usePermissions } from "@/hooks/use-permissions"
 import { supabase } from "@/lib/supabase"
 import { getCurrentDateInColombia, formatDateForColombia, formatTimestampForColombia, getMachineDisplayName } from "@/lib/utils"
-import { Plus, Users, Package, Activity, AlertTriangle, Calendar, Clock, Loader2, Settings } from "lucide-react"
+import { Plus, Users, Package, Activity, AlertTriangle, Calendar, Clock, Loader2, Settings, FileText } from "lucide-react"
 
 // Componente memoizado para evitar re-renders innecesarios
 const DashboardContent = memo(function DashboardContent() {
   const [currentTime, setCurrentTime] = useState(new Date())
   const { user } = useAuth()
+  const permissions = usePermissions()
 
   const [activePatients, setActivePatients] = useState(0)
   const [totalClosedProcedures, setTotalClosedProcedures] = useState(0)
@@ -181,6 +183,15 @@ const DashboardContent = memo(function DashboardContent() {
                 Inventario
               </Button>
             </Link>
+            {/* 📊 Solo mostrar informes para administradores */}
+            {permissions.isAdmin && (
+              <Link href="/informes">
+                <Button variant="outline" size="lg" className="h-12">
+                  <FileText className="mr-2 h-5 w-5" />
+                  Informes
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
 
