@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -102,6 +102,7 @@ export default function Informes() {
   const [inventoryData, setInventoryData] = useState<InventoryReport[]>([])
   const [totalInventoryValue, setTotalInventoryValue] = useState(0)
   const [lowStockValue, setLowStockValue] = useState(0)
+  const [highestStockProduct, setHighestStockProduct] = useState<{name: string, quantity: number}>({name: "-", quantity: 0})
 
   // Calcular fechas según el rango seleccionado
   const getDateRange = () => {
@@ -271,11 +272,54 @@ export default function Informes() {
         }
       }
 
-      const consumptionArray = Array.from(productMap.values())
-        .sort((a, b) => b.total_value - a.total_value)
+      // 🔧 NUEVO: Cargar todos los productos del inventario para mostrar también los no utilizados
+      const { data: allProducts, error: allProductsError } = await supabase
+        .from("inventory_products")
+        .select("id, name, code, category, unit_price")
+        .order("name", { ascending: true })
 
-      // 🔧 CORREGIDO: Usar el conteo real de procedimientos del período
-      const mostUsedProduct = consumptionArray.length > 0 ? consumptionArray[0] : null
+      if (allProductsError) throw allProductsError
+
+      // Crear un array completo que incluya todos los productos
+      const completeConsumptionArray: ConsumptionData[] = (allProducts || []).map(product => {
+        const existingData = productMap.get(product.id)
+        
+        if (existingData) {
+          // Producto que sí se consumió - usar datos reales
+          return existingData
+        } else {
+          // Producto que NO se consumió - mostrar con valores en 0
+          return {
+            product_id: product.id,
+            product_name: product.name,
+            product_code: product.code,
+            category: product.category,
+            total_consumed: 0,
+            unit_price: product.unit_price || 0,
+            total_value: 0,
+            procedures_count: 0,
+            patients_count: 0
+          }
+        }
+      })
+
+      // Ordenar: primero los que tienen consumo (por valor), luego los que no tienen consumo (alfabéticamente)
+      const consumptionArray = completeConsumptionArray.sort((a, b) => {
+        if (a.total_consumed === 0 && b.total_consumed === 0) {
+          // Ambos sin consumo: ordenar alfabéticamente
+          return a.product_name.localeCompare(b.product_name)
+        }
+        if (a.total_consumed === 0) return 1 // a va al final
+        if (b.total_consumed === 0) return -1 // b va al final
+        // Ambos con consumo: ordenar por valor (mayor a menor), o por cantidad si ambos tienen valor 0
+        if (a.total_value === 0 && b.total_value === 0) {
+          return b.total_consumed - a.total_consumed
+        }
+        return b.total_value - a.total_value
+      })
+
+      // El producto más utilizado sigue siendo el primero con consumo real
+      const mostUsedProduct = consumptionArray.find(item => item.total_consumed > 0) || null
       const summary: ProcedureSummary = {
         total_procedures: totalProceduresInPeriod, // Usar conteo real de procedimientos
         total_value: totalValue,
@@ -314,10 +358,22 @@ export default function Informes() {
 
       let totalValue = 0
       let lowStockValue = 0
+      let maxStock = 0
+      let productWithMostStock = { name: "-", quantity: 0 }
 
       const inventoryArray: InventoryReport[] = (products || []).map(product => {
         const stockValue = (product.stock || 0) * (product.unit_price || 0)
+        const currentStock = product.stock || 0
         totalValue += stockValue
+
+        // Verificar si este producto tiene el mayor stock
+        if (currentStock > maxStock) {
+          maxStock = currentStock
+          productWithMostStock = {
+            name: product.name,
+            quantity: currentStock
+          }
+        }
 
         let status = "normal"
         if ((product.stock || 0) === 0) {
@@ -343,6 +399,7 @@ export default function Informes() {
       setInventoryData(inventoryArray)
       setTotalInventoryValue(totalValue)
       setLowStockValue(lowStockValue)
+      setHighestStockProduct(productWithMostStock)
 
     } catch (error: any) {
       console.error("Error loading inventory data:", error)
@@ -542,7 +599,7 @@ export default function Informes() {
 
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Costo Promedio</CardTitle>
+                        <CardTitle className="text-sm font-medium">Promedio</CardTitle>
                         <DollarSign className="h-4 w-4 text-green-500" />
                       </CardHeader>
                       <CardContent>
@@ -575,6 +632,9 @@ export default function Informes() {
                   <Card>
                     <CardHeader>
                       <CardTitle>Detalle de Consumo por Producto</CardTitle>
+                      <CardDescription>
+                        Incluye todos los productos del inventario. Los productos sin uso se muestran en gris.
+                      </CardDescription>
                     </CardHeader>
                     <CardContent>
                       {consumptionData.length === 0 ? (
@@ -598,24 +658,41 @@ export default function Informes() {
                               </tr>
                             </thead>
                             <tbody>
-                              {consumptionData.map((item) => (
-                                <tr key={item.product_id} className="border-b hover:bg-gray-50">
-                                  <td className="py-3 px-4 font-medium">{item.product_name}</td>
-                                  <td className="py-3 px-4">
-                                    <Badge variant="outline">{item.product_code}</Badge>
-                                  </td>
-                                  <td className="py-3 px-4">
-                                    <Badge variant="secondary">{item.category}</Badge>
-                                  </td>
-                                  <td className="py-3 px-4 text-right">{formatNumber(item.total_consumed)}</td>
-                                  <td className="py-3 px-4 text-right">{formatCurrency(item.unit_price)}</td>
-                                  <td className="py-3 px-4 text-right font-bold text-red-600">
-                                    {formatCurrency(item.total_value)}
-                                  </td>
-                                  <td className="py-3 px-4 text-right">{formatNumber(item.procedures_count)}</td>
-                                  <td className="py-3 px-4 text-right">{formatNumber(item.patients_count)}</td>
-                                </tr>
-                              ))}
+                              {consumptionData.map((item) => {
+                                const isUnused = item.total_consumed === 0
+                                return (
+                                  <tr 
+                                    key={item.product_id} 
+                                    className={`border-b hover:bg-gray-50 ${isUnused ? 'bg-orange-50/30' : ''}`}
+                                  >
+                                    <td className="py-3 px-4 font-medium">
+                                      {item.product_name}
+                                      {isUnused && <span className="ml-2 text-xs text-orange-600 font-semibold">(Sin uso en este rango)</span>}
+                                    </td>
+                                    <td className="py-3 px-4">
+                                      <Badge variant={isUnused ? "secondary" : "outline"}>{item.product_code}</Badge>
+                                    </td>
+                                    <td className="py-3 px-4">
+                                      <Badge variant="secondary">{item.category}</Badge>
+                                    </td>
+                                    <td className="py-3 px-4 text-right">
+                                      {formatNumber(item.total_consumed)}
+                                    </td>
+                                    <td className="py-3 px-4 text-right">
+                                      {formatCurrency(item.unit_price)}
+                                    </td>
+                                    <td className={`py-3 px-4 text-right font-bold ${isUnused ? 'text-orange-600' : 'text-red-600'}`}>
+                                      {formatCurrency(item.total_value)}
+                                    </td>
+                                    <td className="py-3 px-4 text-right">
+                                      {formatNumber(item.procedures_count)}
+                                    </td>
+                                    <td className="py-3 px-4 text-right">
+                                      {formatNumber(item.patients_count)}
+                                    </td>
+                                  </tr>
+                                )
+                              })}
                             </tbody>
                           </table>
                         </div>
@@ -669,15 +746,15 @@ export default function Informes() {
 
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Stock Bajo</CardTitle>
-                        <AlertTriangle className="h-4 w-4 text-orange-500" />
+                        <CardTitle className="text-sm font-medium">Mayor Stock</CardTitle>
+                        <TrendingUp className="h-4 w-4 text-green-500" />
                       </CardHeader>
                       <CardContent>
-                        <div className="text-2xl font-bold text-orange-600">
-                          {formatCurrency(lowStockValue)}
+                        <div className="text-lg font-bold text-green-600 truncate">
+                          {highestStockProduct.name}
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          Valor en riesgo
+                          {formatNumber(highestStockProduct.quantity)} unidades disponibles
                         </p>
                       </CardContent>
                     </Card>
@@ -731,7 +808,7 @@ export default function Informes() {
                                 <td className="py-3 px-4 text-right">{formatNumber(item.current_stock)}</td>
                                 <td className="py-3 px-4 text-right">{formatNumber(item.minimum_stock)}</td>
                                 <td className="py-3 px-4 text-right">{formatCurrency(item.unit_price)}</td>
-                                <td className="py-3 px-4 text-right font-bold text-green-600">
+                                <td className={`py-3 px-4 text-right font-bold ${item.stock_value === 0 ? 'text-red-600' : 'text-green-600'}`}>
                                   {formatCurrency(item.stock_value)}
                                 </td>
                                 <td className="py-3 px-4 text-center">
