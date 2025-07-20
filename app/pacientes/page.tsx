@@ -153,12 +153,12 @@ export default function Pacientes() {
 
                             <div className="grid grid-cols-2 gap-4 text-sm">
                               <div>
-                                <p className="font-medium text-gray-600">Estado</p>
-                                <p className="capitalize">{patient.status}</p>
-                              </div>
-                              <div>
                                 <p className="font-medium text-gray-600">Creado</p>
                                 <p>{formatTimestampForColombia(patient.created_at)}</p>
+                              </div>
+                              <div>
+                                <p className="font-medium text-gray-600">Última Actualización</p>
+                                <p>{formatTimestampForColombia(patient.updated_at)}</p>
                               </div>
                             </div>
                           </CardContent>
@@ -187,7 +187,7 @@ export default function Pacientes() {
                                 </p>
                               </div>
                               <div className="flex items-center gap-2">
-                                <Badge variant="secondary">Completado</Badge>
+                                <Badge variant="default" className="bg-green-600 hover:bg-green-700">Completado</Badge>
                                 <Button variant="outline" size="sm" onClick={() => setSelectedPatient(patient)}>
                                   <Eye className="h-3 w-3 mr-1" />
                                   Ver Historial
@@ -201,8 +201,8 @@ export default function Pacientes() {
                                 <p>{formatTimestampForColombia(patient.updated_at)}</p>
                               </div>
                               <div>
-                                <p className="font-medium text-gray-600">Estado</p>
-                                <p className="capitalize text-green-600">{patient.status}</p>
+                                <p className="font-medium text-gray-600">Creado</p>
+                                <p>{formatTimestampForColombia(patient.created_at)}</p>
                               </div>
                             </div>
                           </CardContent>
@@ -236,7 +236,8 @@ export default function Pacientes() {
                           </p>
                           <div className="flex items-center gap-2">
                             <span className="font-medium">Estado:</span>
-                            <Badge variant={selectedPatient.status === "active" ? "default" : "secondary"}>
+                            <Badge variant={selectedPatient.status === "active" ? "default" : "default"} 
+                                   className={selectedPatient.status === "completed" ? "bg-green-600 hover:bg-green-700" : ""}>
                               {selectedPatient.status === "active" ? "Activo" : "Completado"}
                             </Badge>
                           </div>
