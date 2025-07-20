@@ -763,7 +763,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle>Datos del Paciente</CardTitle>
-                    {procedure?.status === "active" && permissions.isAdmin && (
+                    {procedure?.status === "active" && permissions.canEditMachines && (
                       <Button variant="outline" size="sm" onClick={openEditPatientDialog}>
                         <Edit className="h-4 w-4 mr-2" />
                         Editar
