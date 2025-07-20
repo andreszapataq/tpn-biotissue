@@ -372,7 +372,7 @@ export default function Informes() {
       case "out_of_stock":
         return <Badge variant="destructive">Agotado</Badge>
       case "low_stock":
-        return <Badge variant="secondary">Stock Bajo</Badge>
+        return <Badge variant="destructive">Stock Bajo</Badge>
       default:
         return <Badge variant="default">Normal</Badge>
     }
