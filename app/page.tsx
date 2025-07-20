@@ -12,7 +12,7 @@ import { useAuth } from "@/components/auth/auth-provider"
 import { usePermissions } from "@/hooks/use-permissions"
 import { supabase } from "@/lib/supabase"
 import { getCurrentDateInColombia, formatDateForColombia, formatTimestampForColombia, getMachineDisplayName } from "@/lib/utils"
-import { Plus, Users, Package, Activity, AlertTriangle, Calendar, Clock, Loader2, Settings, FileText, Search } from "lucide-react"
+import { Plus, Users, Package, Activity, AlertTriangle, Calendar, Clock, Loader2, Settings, FileText, Search, ChevronLeft, ChevronRight } from "lucide-react"
 import { Input } from "@/components/ui/input"
 
 // Componente memoizado para evitar re-renders innecesarios
@@ -31,8 +31,14 @@ const DashboardContent = memo(function DashboardContent() {
   const [alerts, setAlerts] = useState<any[]>([])
   const [loadingData, setLoadingData] = useState(true)
   
-  // 🔍 Nuevo estado para el buscador
+  // 🔍 Estado para el buscador
   const [searchTerm, setSearchTerm] = useState("")
+  
+  // 📄 Estados para paginación
+  const [currentPagePatients, setCurrentPagePatients] = useState(1)
+  const [currentPageProcedures, setCurrentPageProcedures] = useState(1)
+  const [currentPageAlerts, setCurrentPageAlerts] = useState(1)
+  const ITEMS_PER_PAGE = 10
 
   // 🔍 Funciones de filtrado
   const filteredPatients = patients.filter(patient => {
@@ -68,6 +74,126 @@ const DashboardContent = memo(function DashboardContent() {
     return alert.product?.toLowerCase().includes(term)
   })
 
+  // 📄 Cálculos de paginación
+  const totalPagesPatients = Math.ceil(filteredPatients.length / ITEMS_PER_PAGE)
+  const totalPagesProcedures = Math.ceil(filteredClosedProcedures.length / ITEMS_PER_PAGE)
+  const totalPagesAlerts = Math.ceil(filteredAlerts.length / ITEMS_PER_PAGE)
+
+  // 📄 Datos paginados
+  const paginatedPatients = filteredPatients.slice(
+    (currentPagePatients - 1) * ITEMS_PER_PAGE,
+    currentPagePatients * ITEMS_PER_PAGE
+  )
+
+  const paginatedProcedures = filteredClosedProcedures.slice(
+    (currentPageProcedures - 1) * ITEMS_PER_PAGE,
+    currentPageProcedures * ITEMS_PER_PAGE
+  )
+
+  const paginatedAlerts = filteredAlerts.slice(
+    (currentPageAlerts - 1) * ITEMS_PER_PAGE,
+    currentPageAlerts * ITEMS_PER_PAGE
+  )
+
+  // 📄 Funciones de navegación
+  const goToPagePatients = (page: number) => {
+    setCurrentPagePatients(Math.max(1, Math.min(page, totalPagesPatients)))
+  }
+
+  const goToPageProcedures = (page: number) => {
+    setCurrentPageProcedures(Math.max(1, Math.min(page, totalPagesProcedures)))
+  }
+
+  const goToPageAlerts = (page: number) => {
+    setCurrentPageAlerts(Math.max(1, Math.min(page, totalPagesAlerts)))
+  }
+
+  // 🔄 Reset paginación cuando cambia la búsqueda
+  useEffect(() => {
+    setCurrentPagePatients(1)
+    setCurrentPageProcedures(1)
+    setCurrentPageAlerts(1)
+  }, [searchTerm])
+
+
+  // 📄 Componente de Paginación
+  const PaginationControls = ({ 
+    currentPage, 
+    totalPages, 
+    onPageChange, 
+    totalItems,
+    itemsPerPage 
+  }: {
+    currentPage: number
+    totalPages: number
+    onPageChange: (page: number) => void
+    totalItems: number
+    itemsPerPage: number
+  }) => {
+    if (totalPages <= 1) return null
+
+    const startItem = (currentPage - 1) * itemsPerPage + 1
+    const endItem = Math.min(currentPage * itemsPerPage, totalItems)
+
+    return (
+      <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50">
+        <div className="flex items-center text-sm text-gray-700">
+          <span>
+            Mostrando {startItem} - {endItem} de {totalItems} registros
+          </span>
+        </div>
+        
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Anterior
+          </Button>
+          
+          <div className="flex items-center space-x-1">
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              let pageNumber
+              if (totalPages <= 5) {
+                pageNumber = i + 1
+              } else if (currentPage <= 3) {
+                pageNumber = i + 1
+              } else if (currentPage >= totalPages - 2) {
+                pageNumber = totalPages - 4 + i
+              } else {
+                pageNumber = currentPage - 2 + i
+              }
+              
+              return (
+                <Button
+                  key={pageNumber}
+                  variant={currentPage === pageNumber ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => onPageChange(pageNumber)}
+                  className="w-8 h-8 p-0"
+                >
+                  {pageNumber}
+                </Button>
+              )
+            })}
+          </div>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+          >
+            Siguiente
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   const loadDashboardData = async () => {
     try {
@@ -83,12 +209,11 @@ const DashboardContent = memo(function DashboardContent() {
         supabase.rpc("get_low_stock_products"),
       ])
 
-      // Cargar últimos pacientes (todos los estados)
+      // Cargar todos los pacientes (todos los estados)
       const { data: allPatientsData } = await supabase
         .from("patients")
         .select("*")
         .order("created_at", { ascending: false })
-        .limit(10)
 
       setActivePatients(patientsResult.count || 0)
       setTotalClosedProcedures(closedProceduresResult.count || 0)
@@ -113,7 +238,7 @@ const DashboardContent = memo(function DashboardContent() {
         .eq("status", "active")
         .order("created_at", { ascending: false })
 
-      // Cargar procedimientos cerrados
+      // Cargar todos los procedimientos cerrados
       const { data: closedProceduresData } = await supabase
         .from("procedures")
         .select(`
@@ -123,7 +248,6 @@ const DashboardContent = memo(function DashboardContent() {
         `)
         .eq("status", "completed")
         .order("updated_at", { ascending: false })
-        .limit(10)
 
       // Cargar datos para las tabs
       if (allPatientsData) setPatients(allPatientsData)
@@ -355,13 +479,13 @@ const DashboardContent = memo(function DashboardContent() {
               </div>
               
               {/* Contador de resultados */}
-              {searchTerm && (
+              {(searchTerm || filteredPatients.length > 0 || filteredClosedProcedures.length > 0 || filteredAlerts.length > 0) && (
                 <div className="text-sm text-gray-500 whitespace-nowrap">
-                  <span className="hidden lg:inline">Mostrando: </span>
+                  <span className="hidden lg:inline">Encontrados: </span>
                   <span className="font-medium">
-                    Pacientes: {filteredPatients.length} | 
-                    Procedimientos: {filteredClosedProcedures.length} | 
-                    Alertas: {filteredAlerts.length}
+                    {filteredPatients.length} pacientes | 
+                    {filteredClosedProcedures.length} procedimientos | 
+                    {filteredAlerts.length} alertas
                   </span>
                 </div>
               )}
@@ -376,7 +500,7 @@ const DashboardContent = memo(function DashboardContent() {
             <>
               <TabsContent value="pacientes" className="space-y-4">
                 <div className="grid gap-4">
-                  {filteredPatients.length === 0 ? (
+                  {paginatedPatients.length === 0 ? (
                     <Card>
                       <CardContent className="pt-6 text-center">
                         <Users className="h-12 w-12 mx-auto text-gray-300 mb-4" />
@@ -399,7 +523,7 @@ const DashboardContent = memo(function DashboardContent() {
                       </CardContent>
                     </Card>
                   ) : (
-                    filteredPatients.map((patient) => {
+                    paginatedPatients.map((patient) => {
                       const getPatientBadge = (status: string) => {
                         switch (status) {
                           case "active":
@@ -450,12 +574,21 @@ const DashboardContent = memo(function DashboardContent() {
                       )
                     })
                   )}
+                  
+                  {/* Paginación para Pacientes */}
+                  <PaginationControls
+                    currentPage={currentPagePatients}
+                    totalPages={totalPagesPatients}
+                    onPageChange={goToPagePatients}
+                    totalItems={filteredPatients.length}
+                    itemsPerPage={ITEMS_PER_PAGE}
+                  />
                 </div>
               </TabsContent>
 
               <TabsContent value="procedimientos" className="space-y-4">
                 <div className="grid gap-4">
-                  {filteredClosedProcedures.length === 0 ? (
+                  {paginatedProcedures.length === 0 ? (
                     <Card>
                       <CardContent className="pt-6 text-center">
                         <Activity className="h-12 w-12 mx-auto text-gray-300 mb-4" />
@@ -478,7 +611,7 @@ const DashboardContent = memo(function DashboardContent() {
                       </CardContent>
                     </Card>
                   ) : (
-                    filteredClosedProcedures.map((procedure: any) => (
+                    paginatedProcedures.map((procedure: any) => (
                       <Card key={procedure.id} className="hover:shadow-md transition-shadow">
                         <CardContent className="pt-6">
                           <div className="flex items-center justify-between mb-4">
@@ -546,12 +679,21 @@ const DashboardContent = memo(function DashboardContent() {
                       </Card>
                     ))
                   )}
+                  
+                  {/* Paginación para Procedimientos */}
+                  <PaginationControls
+                    currentPage={currentPageProcedures}
+                    totalPages={totalPagesProcedures}
+                    onPageChange={goToPageProcedures}
+                    totalItems={filteredClosedProcedures.length}
+                    itemsPerPage={ITEMS_PER_PAGE}
+                  />
                 </div>
               </TabsContent>
 
               <TabsContent value="alertas" className="space-y-4">
                 <div className="grid gap-4">
-                  {filteredAlerts.length === 0 ? (
+                  {paginatedAlerts.length === 0 ? (
                     <Card>
                       <CardContent className="pt-6 text-center">
                         <AlertTriangle className="h-12 w-12 mx-auto text-gray-300 mb-4" />
@@ -574,7 +716,7 @@ const DashboardContent = memo(function DashboardContent() {
                       </CardContent>
                     </Card>
                   ) : (
-                    filteredAlerts.map((alert, index) => (
+                    paginatedAlerts.map((alert, index) => (
                     <Card key={index} className="border-orange-200">
                       <CardContent className="pt-6">
                         <div className="flex items-center justify-between">
@@ -597,6 +739,15 @@ const DashboardContent = memo(function DashboardContent() {
                     </Card>
                     ))
                   )}
+                  
+                  {/* Paginación para Alertas */}
+                  <PaginationControls
+                    currentPage={currentPageAlerts}
+                    totalPages={totalPagesAlerts}
+                    onPageChange={goToPageAlerts}
+                    totalItems={filteredAlerts.length}
+                    itemsPerPage={ITEMS_PER_PAGE}
+                  />
                 </div>
               </TabsContent>
             </>
