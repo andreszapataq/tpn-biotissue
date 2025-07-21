@@ -6,6 +6,7 @@ export interface UserPermissions {
   canEditInventory: boolean
   canAdjustStock: boolean
   canAddProcedureSupplies: boolean // Nuevo permiso específico
+  canViewReports: boolean // Nuevo permiso para acceso a informes
   canViewAll: boolean
   isAdmin: boolean
 }
@@ -20,15 +21,17 @@ export function usePermissions(): UserPermissions {
       canEditInventory: false,
       canAdjustStock: false,
       canAddProcedureSupplies: false,
+      canViewReports: false,
       canViewAll: false,
       isAdmin: false,
     }
   }
 
-  // Solo administradores tienen permisos completos
+  // Definir roles
   const isAdmin = user.role === "administrador"
   const isSurgeon = user.role === "cirujano"
   const isSupport = user.role === "soporte"
+  const isFinanciero = user.role === "financiero"
 
   return {
     canEditMachines: isAdmin,
@@ -36,6 +39,7 @@ export function usePermissions(): UserPermissions {
     canEditInventory: isAdmin,
     canAdjustStock: isAdmin,
     canAddProcedureSupplies: isAdmin || isSurgeon || isSupport, // Cirujanos y soporte pueden agregar insumos a procedimientos
+    canViewReports: isAdmin || isFinanciero, // Administradores y financieros pueden ver informes
     canViewAll: true, // Todos pueden ver la información
     isAdmin: isAdmin,
   }

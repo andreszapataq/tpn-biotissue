@@ -344,8 +344,8 @@ const DashboardContent = memo(function DashboardContent() {
                 Inventario
               </Button>
             </Link>
-            {/* 📊 Solo mostrar informes para administradores */}
-            {permissions.isAdmin && (
+            {/* 📊 Solo mostrar informes para administradores y financieros */}
+            {permissions.canViewReports && (
               <Link href="/informes">
                 <Button variant="outline" size="lg" className="h-12">
                   <FileText className="mr-2 h-5 w-5" />

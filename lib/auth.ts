@@ -21,7 +21,7 @@ export class AuthService {
     password: string,
     userData: {
       name: string
-      role: "cirujano" | "soporte" | "administrador"
+      role: "cirujano" | "soporte" | "administrador" | "financiero"
       phone?: string
       department?: string
       license_number?: string

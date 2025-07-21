@@ -437,13 +437,13 @@ export default function Informes() {
 
   // Cargar datos al inicializar y cuando cambia el rango de fechas
   useEffect(() => {
-    if (permissions.isAdmin) {
+    if (permissions.canViewReports) {
       loadAllData()
     }
-  }, [dateRange, startDate, endDate, permissions.isAdmin])
+  }, [dateRange, startDate, endDate, permissions.canViewReports])
 
-  // Verificar permisos - Solo administradores pueden ver los informes
-  if (!permissions.isAdmin) {
+  // Verificar permisos - Solo administradores y financieros pueden ver los informes
+  if (!permissions.canViewReports) {
     return (
       <ProtectedRoute>
         <div className="min-h-screen bg-gray-50 p-4">
@@ -460,7 +460,7 @@ export default function Informes() {
               <CardContent className="pt-6 text-center">
                 <AlertTriangle className="h-12 w-12 mx-auto text-orange-500 mb-4" />
                 <h2 className="text-xl font-bold text-gray-900 mb-2">Acceso Restringido</h2>
-                <p className="text-gray-600">Los informes financieros están disponibles únicamente para administradores.</p>
+                <p className="text-gray-600">Los informes financieros están disponibles únicamente para administradores y personal financiero.</p>
               </CardContent>
             </Card>
           </div>
@@ -470,7 +470,7 @@ export default function Informes() {
   }
 
   return (
-    <ProtectedRoute requiredRole={["administrador"]}>
+    <ProtectedRoute requiredRole={["administrador", "financiero"]}>
       <div className="min-h-screen bg-gray-50 p-4">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
@@ -633,7 +633,7 @@ export default function Informes() {
                     <CardHeader>
                       <CardTitle>Detalle de Consumo por Producto</CardTitle>
                       <CardDescription>
-                        Incluye todos los productos del inventario. Los productos sin uso se muestran en gris.
+                        Incluye todos los productos del inventario. Los productos sin uso se muestran en naranja.
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
