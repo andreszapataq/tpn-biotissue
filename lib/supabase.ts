@@ -73,7 +73,7 @@ export interface User {
   auth_id: string
   email: string
   name: string
-  role: "cirujano" | "enfermera" | "administrador"
+  role: "cirujano" | "enfermera" | "administrador" | "financiero" | "soporte"
   phone?: string
   department?: string
   license_number?: string

@@ -20,7 +20,7 @@ export default function RegisterForm() {
     password: "",
     confirmPassword: "",
     name: "",
-    role: "" as "cirujano" | "soporte" | "administrador" | "",
+    role: "" as "cirujano" | "soporte" | "administrador" | "financiero" | "",
     phone: "",
     department: "",
     license_number: "",
@@ -203,6 +203,7 @@ export default function RegisterForm() {
                     <SelectItem value="cirujano">Cirujano</SelectItem>
                     <SelectItem value="soporte">Soporte</SelectItem>
                     <SelectItem value="administrador">Administrador</SelectItem>
+                    <SelectItem value="financiero">Financiero</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
