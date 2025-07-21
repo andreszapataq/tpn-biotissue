@@ -176,6 +176,46 @@ export class AuthService {
     return { error }
   }
 
+  // 🔧 NUEVO: Crear perfil manualmente cuando el trigger automático falla
+  static async createUserProfile(authUser: any, userData: {
+    name: string
+    role: "cirujano" | "soporte" | "administrador" | "financiero"
+    phone?: string
+    department?: string
+    license_number?: string
+  }) {
+    try {
+      console.log("👤 Creating user profile manually...")
+      
+      const { data: profile, error } = await supabase
+        .from("users")
+        .insert({
+          auth_id: authUser.id,
+          email: authUser.email || userData.name + "@placeholder.com",
+          name: userData.name,
+          role: userData.role,
+          phone: userData.phone || null,
+          department: userData.department || null,
+          license_number: userData.license_number || null,
+          is_active: true,
+          mfa_enabled: false,
+        })
+        .select()
+        .single()
+
+      if (error) {
+        console.error("❌ Error creating user profile:", error)
+        return { profile: null, error }
+      }
+
+      console.log("✅ User profile created manually:", profile.id)
+      return { profile, error: null }
+    } catch (err) {
+      console.error("❌ Exception creating user profile:", err)
+      return { profile: null, error: err }
+    }
+  }
+
   // Métodos privados
   private static async updateLastLogin(authId: string) {
     try {

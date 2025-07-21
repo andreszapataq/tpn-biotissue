@@ -13,6 +13,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Eye, EyeOff, UserPlus, Mail, User, Phone, Building, FileText, AlertCircle, CheckCircle } from "lucide-react"
 import { AuthService } from "@/lib/auth"
 import Link from "next/link"
+import { useToast } from "@/components/ui/use-toast"
+import { supabase } from "@/lib/supabase"
 
 export default function RegisterForm() {
   const [formData, setFormData] = useState({
@@ -31,6 +33,7 @@ export default function RegisterForm() {
   const [error, setError] = useState("")
   const [success, setSuccess] = useState(false)
   const router = useRouter()
+  const { toast } = useToast()
 
   const validatePassword = (password: string) => {
     const minLength = password.length >= 8
@@ -89,6 +92,60 @@ export default function RegisterForm() {
       if (error) {
         console.error("Registration failed:", error)
 
+        // 🔧 NUEVO: Si el error es de base de datos y es por el rol financiero, intentar método alternativo
+        if (error.message?.includes("Database error") && formData.role === "financiero") {
+          console.log("🔄 Trying alternative registration method for Financiero role...")
+          
+          try {
+            // Intentar registro básico sin trigger automático problemático
+            const { data: altData, error: altError } = await supabase.auth.signUp({
+              email: formData.email,
+              password: formData.password,
+              options: {
+                emailRedirectTo: `${window.location.origin}/auth/callback`,
+              },
+            })
+
+            if (altError) {
+              throw altError
+            }
+
+            if (altData.user) {
+              // Crear perfil manualmente usando AuthService
+              const { profile, error: profileError } = await AuthService.createUserProfile(altData.user, {
+                name: formData.name,
+                role: formData.role,
+                phone: formData.phone,
+                department: formData.department,
+                license_number: formData.license_number,
+              })
+
+              if (profileError) {
+                console.error("Error creating profile manually:", profileError)
+                toast({
+                  title: "Registro Parcial",
+                  description: "Usuario creado pero requiere configuración manual del perfil. Contacte al administrador.",
+                  variant: "destructive",
+                })
+              } else {
+                console.log("✅ Complete registration successful with manual profile")
+                toast({
+                  title: "Registro Exitoso",
+                  description: "Usuario Financiero creado correctamente con todos los permisos.",
+                  variant: "default",
+                })
+              }
+              
+              setSuccess(true)
+              return
+            }
+          } catch (altErr: any) {
+            console.error("Alternative registration also failed:", altErr)
+            setError("Error crítico en el registro. Contacte al administrador para crear usuarios Financieros.")
+            return
+          }
+        }
+
         // Manejar diferentes tipos de errores
         if (error.message?.includes("already registered")) {
           setError("Este correo electrónico ya está registrado")
@@ -96,6 +153,8 @@ export default function RegisterForm() {
           setError("El formato del correo electrónico no es válido")
         } else if (error.message?.includes("weak password")) {
           setError("La contraseña es muy débil")
+        } else if (error.message?.includes("Database error")) {
+          setError("Error en la base de datos. Por favor contacte al administrador para crear el rol Financiero.")
         } else {
           setError(error.message || "Error al crear la cuenta")
         }
@@ -125,7 +184,12 @@ export default function RegisterForm() {
               <CheckCircle className="h-6 w-6 text-green-600" />
             </div>
             <CardTitle>¡Registro Exitoso!</CardTitle>
-            <CardDescription>Tu cuenta ha sido creada correctamente</CardDescription>
+            <CardDescription>
+              {formData.role === "financiero" 
+                ? "Usuario Financiero creado con acceso a informes" 
+                : "Tu cuenta ha sido creada correctamente"
+              }
+            </CardDescription>
           </CardHeader>
           <CardContent className="text-center space-y-4">
             <Alert>
@@ -133,6 +197,13 @@ export default function RegisterForm() {
               <AlertDescription>
                 Se ha enviado un correo de confirmación a <strong>{formData.email}</strong>. Por favor, revisa tu
                 bandeja de entrada y haz clic en el enlace para activar tu cuenta.
+                {formData.role === "financiero" && (
+                  <div className="mt-2 p-2 bg-orange-50 rounded-md border border-orange-200">
+                    <span className="text-orange-800 text-sm">
+                      ✅ <strong>Rol Financiero:</strong> Tendrás acceso a informes financieros una vez confirmado el email.
+                    </span>
+                  </div>
+                )}
               </AlertDescription>
             </Alert>
 
