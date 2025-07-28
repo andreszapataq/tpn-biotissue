@@ -761,15 +761,15 @@ export default function Informes() {
 
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Productos Activos</CardTitle>
-                        <Users className="h-4 w-4 text-purple-500" />
+                        <CardTitle className="text-sm font-medium">Valor Total Histórico</CardTitle>
+                        <TrendingUp className="h-4 w-4 text-purple-500" />
                       </CardHeader>
                       <CardContent>
                         <div className="text-2xl font-bold">
-                          {formatNumber(inventoryData.filter(item => item.current_stock > 0).length)}
+                          {formatCurrency(totalInventoryValue + totalConsumptionValue)}
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          Con stock disponible
+                          Inventario + Consumo total
                         </p>
                       </CardContent>
                     </Card>

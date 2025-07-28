@@ -918,9 +918,9 @@ export default function Inventario() {
                                 <div className="flex items-center gap-3 mb-2">
                                   <h3 className="text-lg font-semibold">{item.name}</h3>
                                   <Badge variant="outline">{item.code}</Badge>
+                                  <Badge variant="secondary">{item.category}</Badge>
                                   {/* Solo mostrar badge de estado para administradores */}
                                   {permissions.isAdmin && <Badge variant={status.variant}>{status.label}</Badge>}
-                                  <Badge variant="secondary">{item.category}</Badge>
                                 </div>
                                 <div className={`grid gap-4 text-sm text-gray-600 ${permissions.isAdmin ? 'grid-cols-2 md:grid-cols-5' : 'grid-cols-2 md:grid-cols-4'}`}>
                                   <div>
@@ -1004,6 +1004,7 @@ export default function Inventario() {
                                   <AlertTriangle className="h-5 w-5 text-orange-500" />
                                   <h3 className="text-lg font-semibold">{item.name}</h3>
                                   <Badge variant="outline">{item.code}</Badge>
+                                  <Badge variant="secondary">{item.category}</Badge>
                                   <Badge variant={status.variant}>{status.label}</Badge>
                                 </div>
                                 <p className="text-sm text-gray-600">
@@ -1041,6 +1042,7 @@ export default function Inventario() {
                                 <div className="flex items-center gap-3 mb-2">
                                   <h3 className="text-lg font-semibold">{item.name}</h3>
                                   <Badge variant="outline">{item.code}</Badge>
+                                  <Badge variant="secondary">{item.category}</Badge>
                                   <Badge variant={status.variant}>{status.label}</Badge>
                                 </div>
                                 <p className="text-sm text-gray-600">
