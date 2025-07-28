@@ -187,7 +187,29 @@ export default function Maquinas() {
 
   // Eliminar máquina
   const handleDeleteMachine = async (machineId: string) => {
-    if (!confirm("¿Estás seguro de que quieres eliminar esta máquina?")) return
+    // Primero verificar si la máquina está siendo usada en procedimientos
+    const { data: procedures } = await supabase
+      .from("procedures")
+      .select("id, patient:patients(name), procedure_date, status")
+      .eq("machine_id", machineId)
+
+    if (procedures && procedures.length > 0) {
+      const activeProcedures = procedures.filter(p => p.status === "active")
+      const completedProcedures = procedures.filter(p => p.status === "completed")
+      
+      // Si hay procedimientos asociados, ofrecer inactivar en lugar de eliminar
+      const message = activeProcedures.length > 0 
+        ? `Esta máquina tiene ${activeProcedures.length} procedimiento(s) ACTIVO(S).\n\n¿Deseas INACTIVARLA para preservar el historial médico?\n\n✅ Recomendado: Mantiene el historial\n❌ No se perderán datos médicos`
+        : `Esta máquina tiene ${completedProcedures.length} procedimiento(s) en el historial.\n\n¿Deseas INACTIVARLA para preservar el historial médico?\n\n✅ Recomendado: Mantiene el historial\n❌ No se perderán datos médicos`
+      
+      if (confirm(message)) {
+        await handleInactivateMachine(machineId)
+      }
+      return
+    }
+
+    // Si no hay procedimientos, permitir eliminación física
+    if (!confirm("Esta máquina no tiene procedimientos asociados.\n\n¿Estás seguro de que quieres ELIMINAR PERMANENTEMENTE esta máquina?")) return
 
     try {
       const { error } = await supabase
@@ -195,20 +217,91 @@ export default function Maquinas() {
         .delete()
         .eq("id", machineId)
 
-      if (error) throw error
+      if (error) {
+        if (error.code === "23503" || error.message?.includes("still referenced")) {
+          toast({
+            title: "Error de Integridad",
+            description: "Esta máquina está siendo referenciada por otros registros. Se inactivará en su lugar.",
+            variant: "destructive",
+          })
+          await handleInactivateMachine(machineId)
+          return
+        }
+        throw error
+      }
 
       toast({
         title: "Éxito",
-        description: "Máquina eliminada correctamente",
+        description: "Máquina eliminada permanentemente",
       })
 
-      // Recargar datos para actualizar estados
       await loadMachines()
     } catch (error: any) {
       console.error("Error deleting machine:", error)
       toast({
         title: "Error",
-        description: error.message || "No se pudo eliminar la máquina",
+        description: "No se pudo eliminar. Se inactivará la máquina en su lugar.",
+        variant: "destructive",
+      })
+      await handleInactivateMachine(machineId)
+    }
+  }
+
+  const handleInactivateMachine = async (machineId: string) => {
+    try {
+      const { error } = await supabase
+        .from("machines")
+        .update({ 
+          status: "inactive",
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", machineId)
+
+      if (error) throw error
+
+      toast({
+        title: "Máquina Inactivada",
+        description: "La máquina se marcó como inactiva. El historial médico se preservó.",
+        variant: "default",
+      })
+
+      await loadMachines()
+    } catch (error: any) {
+      console.error("Error inactivating machine:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo inactivar la máquina",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Reactivar máquina
+  const handleReactivateMachine = async (machineId: string) => {
+    if (!confirm("¿Estás seguro de que quieres reactivar esta máquina?")) return
+
+    try {
+      const { error } = await supabase
+        .from("machines")
+        .update({ 
+          status: "active",
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", machineId)
+
+      if (error) throw error
+
+      toast({
+        title: "Máquina Reactivada",
+        description: "La máquina está ahora disponible para nuevos procedimientos",
+      })
+
+      await loadMachines()
+    } catch (error: any) {
+      console.error("Error reactivating machine:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo reactivar la máquina",
         variant: "destructive",
       })
     }
@@ -234,6 +327,8 @@ export default function Maquinas() {
         matchesAvailability = isInUse
       } else if (availabilityFilter === "maintenance") {
         matchesAvailability = isInMaintenance
+      } else if (availabilityFilter === "inactive") {
+        matchesAvailability = machine.status === "inactive"
       }
 
       return matchesSearch && matchesAvailability
@@ -313,12 +408,14 @@ export default function Maquinas() {
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Máquinas</CardTitle>
+                  <CardTitle className="text-sm font-medium">Capacidad Operativa</CardTitle>
                   <Settings className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{machines.length}</div>
-                  <p className="text-xs text-muted-foreground">Equipos registrados</p>
+                  <div className="text-2xl font-bold">
+                    {machines.filter(m => m.status === "active" || m.status === "maintenance").length}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Máquinas en servicio</p>
                 </CardContent>
               </Card>
 
@@ -363,124 +460,121 @@ export default function Maquinas() {
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Acciones</CardTitle>
-                  <Plus className="h-4 w-4 text-blue-500" />
+                  <CardTitle className="text-sm font-medium">Historial</CardTitle>
+                  <Trash2 className="h-4 w-4 text-gray-500" />
                 </CardHeader>
                 <CardContent>
-                  {permissions.canEditMachines ? (
-                    <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button size="sm" className="w-full h-10 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium">
-                          <Plus className="h-4 w-4 flex-shrink-0" />
-                          <span className="whitespace-nowrap">Nueva Máquina</span>
-                        </Button>
-                      </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Crear Nueva Máquina</DialogTitle>
-                        <DialogDescription>Registrar un nuevo equipo NPWT</DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <div>
-                          <Label htmlFor="lote">Lote</Label>
-                          <Input
-                            id="lote"
-                            value={newMachine.lote}
-                            onChange={(e) => setNewMachine({ ...newMachine, lote: e.target.value.toUpperCase() })}
-                            placeholder="Ej: 1221110001"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="model">Modelo</Label>
-                          <Select
-                            value={newMachine.model}
-                            onValueChange={(value) => {
-                              const selectedModel = machineModels.find(m => m.name === value)
-                              setNewMachine({ 
-                                ...newMachine, 
-                                model: value,
-                                reference_code: selectedModel?.code || ""
-                              })
-                            }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {machineModels.map((model) => (
-                                <SelectItem key={model.code} value={model.name}>
-                                  {model.code} - {model.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label htmlFor="observations">Observaciones</Label>
-                          <Textarea
-                            id="observations"
-                            value={newMachine.observations}
-                            onChange={(e) => setNewMachine({ ...newMachine, observations: e.target.value })}
-                            placeholder="Observaciones importantes sobre la máquina..."
-                            rows={3}
-                          />
-                        </div>
-                      </div>
-                      <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                          Cancelar
-                        </Button>
-                        <Button
-                          onClick={handleCreateMachine}
-                          disabled={isCreating || !newMachine.lote}
-                        >
-                          {isCreating ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Creando...
-                            </>
-                          ) : (
-                            "Crear Máquina"
-                          )}
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                  ) : (
-                    <div className="text-center py-2">
-                      <p className="text-sm text-gray-500">Solo administradores</p>
-                      <p className="text-xs text-gray-400">pueden crear máquinas</p>
-                    </div>
-                  )}
+                  <div className="text-2xl font-bold text-gray-500">
+                    {machines.filter(m => m.status === "inactive").length}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Máquinas inactivas</p>
                 </CardContent>
               </Card>
+
+
             </div>
 
             {/* Search and Filters */}
-            <div className="flex gap-4 max-w-2xl">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  placeholder="Buscar máquinas..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+              <div className="flex gap-4 flex-1 max-w-2xl">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Input
+                    placeholder="Buscar máquinas..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <div className="relative">
+                  <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 z-10" />
+                  <Select value={availabilityFilter} onValueChange={setAvailabilityFilter}>
+                    <SelectTrigger className="w-48 pl-10">
+                      <SelectValue placeholder="Filtrar por estado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas las máquinas</SelectItem>
+                      <SelectItem value="available">Solo disponibles</SelectItem>
+                      <SelectItem value="in_use">Solo en uso</SelectItem>
+                      <SelectItem value="maintenance">En mantenimiento</SelectItem>
+                      <SelectItem value="inactive">Inactivas</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="relative">
-                <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 z-10" />
-                <Select value={availabilityFilter} onValueChange={setAvailabilityFilter}>
-                  <SelectTrigger className="w-48 pl-10">
-                    <SelectValue placeholder="Filtrar por estado" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas las máquinas</SelectItem>
-                    <SelectItem value="available">Solo disponibles</SelectItem>
-                    <SelectItem value="in_use">Solo en uso</SelectItem>
-                    <SelectItem value="maintenance">En mantenimiento</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              
+              {/* Botón Nueva Máquina integrado en los filtros */}
+              {permissions.canEditMachines && (
+                <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="default" className="shrink-0 w-full sm:w-auto">
+                      <Plus className="h-4 w-4 mr-2" />
+                      <span className="hidden sm:inline">Nueva Máquina</span>
+                      <span className="sm:hidden">Nueva</span>
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Crear Nueva Máquina</DialogTitle>
+                      <DialogDescription>Registrar un nuevo equipo NPWT</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="lote">Lote</Label>
+                        <Input
+                          id="lote"
+                          value={newMachine.lote}
+                          onChange={(e) => setNewMachine({ ...newMachine, lote: e.target.value.toUpperCase() })}
+                          placeholder="Ej: 1221110001"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="model">Modelo</Label>
+                        <Select
+                          value={newMachine.model}
+                          onValueChange={(value) => {
+                            const selectedModel = machineModels.find(m => m.name === value)
+                            setNewMachine({ 
+                              ...newMachine, 
+                              model: value,
+                              reference_code: selectedModel?.code || ""
+                            })
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {machineModels.map((model) => (
+                              <SelectItem key={model.code} value={model.name}>
+                                {model.code} - {model.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="observations">Observaciones</Label>
+                        <Textarea
+                          id="observations"
+                          value={newMachine.observations}
+                          onChange={(e) => setNewMachine({ ...newMachine, observations: e.target.value })}
+                          placeholder="Observaciones importantes sobre la máquina..."
+                          rows={3}
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                        Cancelar
+                      </Button>
+                      <Button onClick={handleCreateMachine} disabled={!newMachine.lote || !newMachine.model}>
+                        Crear Máquina
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              )}
             </div>
           </div>
 
@@ -539,15 +633,29 @@ export default function Maquinas() {
                           >
                             Editar
                           </Button>
-                          {permissions.canDeleteMachines && (
+                          
+                          {/* Mostrar botón de reactivar para máquinas inactivas */}
+                          {machine.status === "inactive" ? (
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleDeleteMachine(machine.id)}
-                              className="text-red-600 hover:text-red-700"
+                              onClick={() => handleReactivateMachine(machine.id)}
+                              className="text-green-600 hover:text-green-700"
                             >
-                              <Trash2 className="h-3 w-3" />
+                              Reactivar
                             </Button>
+                          ) : (
+                            /* Mostrar botón de eliminar/inactivar para máquinas activas */
+                            permissions.canDeleteMachines && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDeleteMachine(machine.id)}
+                                className="text-red-600 hover:text-red-700"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            )
                           )}
                         </div>
                       )}
