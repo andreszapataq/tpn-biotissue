@@ -736,10 +736,13 @@ export default function NuevoProcedimiento() {
                 {availableProducts.map((product) => (
                   <div key={product.id} className="flex items-center justify-between p-3 border rounded-lg">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 mb-1">
                         <span className="font-medium">{product.name}</span>
                         <Badge variant="outline">{product.code}</Badge>
                         <Badge variant={(product.stock || 0) <= (product.minimum_stock || 0) ? "destructive" : "secondary"}>Stock: {product.stock || 0}</Badge>
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        <span className="font-medium">Lote:</span> <span className={`font-semibold ${product.lote ? 'text-blue-600' : 'text-gray-500'}`}>{product.lote || "N/A"}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">

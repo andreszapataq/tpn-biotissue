@@ -131,15 +131,32 @@ export default function Inventario() {
         throw new Error("El código del producto es requerido")
       }
 
-      // Verificar que el código no existe
-      const { data: existingProduct } = await supabase
+      // Verificar que la combinación código+lote no existe
+      let query = supabase
         .from("inventory_products")
         .select("id")
         .eq("code", newProduct.code.toUpperCase())
-        .single()
 
-      if (existingProduct) {
-        throw new Error("Ya existe un producto con este código")
+      // Si se especifica un lote, verificar la combinación código+lote
+      if (newProduct.lote && newProduct.lote.trim()) {
+        query = query.eq("lote", newProduct.lote.trim())
+      } else {
+        // Si no hay lote, verificar que no exista un producto con el mismo código y sin lote
+        query = query.is("lote", null)
+      }
+
+      const { data: existingProducts, error: checkError } = await query
+
+      if (checkError) {
+        console.error("Error checking for existing product:", checkError)
+        throw new Error("Error al verificar productos existentes")
+      }
+
+      if (existingProducts && existingProducts.length > 0) {
+        const errorMsg = newProduct.lote && newProduct.lote.trim() 
+          ? `Ya existe un producto con el código ${newProduct.code.toUpperCase()} y lote ${newProduct.lote.trim()}`
+          : `Ya existe un producto con el código ${newProduct.code.toUpperCase()} sin lote especificado`
+        throw new Error(errorMsg)
       }
 
       // Obtener perfil del usuario para registrar el movimiento
@@ -386,7 +403,7 @@ export default function Inventario() {
     return { variant: "default" as const, label: "Stock Normal" }
   }
 
-  const totalProducts = inventory.length
+  const totalProducts = new Set(inventory.map(item => item.code)).size
   const lowStockCount = lowStockItems.length
   const totalValue = inventory.reduce((sum, item) => sum + (item.stock || 0) * (item.unit_price || 0), 0)
 
@@ -811,7 +828,7 @@ export default function Inventario() {
                                   <Badge variant="secondary">Stock actual: {formatNumber(product.stock || 0)}</Badge>
                                 </div>
                                 <p className="text-sm text-gray-600">
-                                  Categoría: {product.category} • Lote: {product.lote || "N/A"}
+                                  Categoría: {product.category} • Lote: <span className={`font-semibold ${product.lote ? 'text-blue-600' : 'text-gray-500'}`}>{product.lote || "N/A"}</span>
                                 </p>
                               </div>
                               <div className="flex items-center gap-2">
@@ -924,7 +941,7 @@ export default function Inventario() {
                                 </div>
                                 <div className={`grid gap-4 text-sm text-gray-600 ${permissions.isAdmin ? 'grid-cols-2 md:grid-cols-5' : 'grid-cols-2 md:grid-cols-4'}`}>
                                   <div>
-                                    <span className="font-medium">Lote:</span> {item.lote || "N/A"}
+                                    <span className="font-medium">Lote:</span> <span className={`font-semibold ${item.lote ? 'text-blue-600' : 'text-gray-500'}`}>{item.lote || "N/A"}</span>
                                   </div>
                                   <div>
                                     <span className="font-medium">Stock Actual:</span> {formatNumber(item.stock || 0)}
