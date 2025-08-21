@@ -134,24 +134,7 @@ export default function NuevoProcedimiento() {
       return
     }
 
-    // Validaciones básicas
-    if (machines.length === 0) {
-      toast({
-        title: "Error",
-        description: "No hay máquinas disponibles. Cierre un procedimiento activo para liberar una máquina.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    if (!formData.machine) {
-      toast({
-        title: "Error",
-        description: "Debe seleccionar una máquina",
-        variant: "destructive",
-      })
-      return
-    }
+    // Validaciones básicas - La máquina ahora es opcional
 
     if (Object.keys(selectedProducts).length === 0) {
       toast({
@@ -337,7 +320,7 @@ export default function NuevoProcedimiento() {
       // 4. Crear procedimiento
       const procedureData: any = {
         patient_id: patient.id,
-        machine_id: formData.machine,
+        machine_id: formData.machine || null, // null si no se selecciona máquina
         surgeon_name: formData.surgeon,
         assistant_name: formData.assistant || null,
         procedure_date: formData.date,
@@ -681,21 +664,20 @@ export default function NuevoProcedimiento() {
             <CardHeader>
               <CardTitle>Máquina NPWT</CardTitle>
               <CardDescription>
-                Seleccionar equipo utilizado • {machines.length} máquina{machines.length !== 1 ? 's' : ''} disponible{machines.length !== 1 ? 's' : ''}
+                Seleccionar equipo utilizado si el procedimiento lo requiere • {machines.length} máquina{machines.length !== 1 ? 's' : ''} disponible{machines.length !== 1 ? 's' : ''}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div>
                 <Label htmlFor="machine">Máquina Utilizada</Label>
                 {machines.length === 0 ? (
-                  <div className="mt-2 p-4 border border-orange-200 rounded-lg bg-orange-50">
-                    <div className="flex items-center gap-2 text-orange-800">
-                      <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                  <div className="mt-2 p-4 border border-blue-200 rounded-lg bg-blue-50">
+                    <div className="flex items-center gap-2 text-blue-800">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                       <span className="font-medium">No hay máquinas disponibles</span>
                     </div>
-                    <p className="text-sm text-orange-700 mt-1">
-                      Todas las máquinas están siendo utilizadas en procedimientos activos. 
-                      Debe cerrar un procedimiento existente para liberar una máquina.
+                    <p className="text-sm text-blue-700 mt-1">
+                      Todas las máquinas están en uso. Puede continuar sin máquina para procedimientos como colocación de apósitos.
                     </p>
                   </div>
                 ) : (
@@ -704,7 +686,7 @@ export default function NuevoProcedimiento() {
                     onValueChange={(value) => setFormData((prev) => ({ ...prev, machine: value }))}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar máquina NPWT" />
+                      <SelectValue placeholder="Seleccionar máquina NPWT (opcional)" />
                     </SelectTrigger>
                     <SelectContent>
                       {machines.map((machine) => (

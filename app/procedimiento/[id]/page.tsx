@@ -38,7 +38,7 @@ type ProcedureProduct = Tables<"procedure_products">
 
 interface ProcedureDetails extends Procedure {
   patient: Patient
-  machine: Machine
+  machine: Machine | null
 }
 
 interface ProductUsage extends ProcedureProduct {
@@ -794,7 +794,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle>Equipo NPWT</CardTitle>
-                    {procedure.status === "active" && permissions.canEditMachines && (
+                    {procedure.status === "active" && permissions.canEditMachines && procedure.machine && (
                       <Dialog open={isChangeMachineDialogOpen} onOpenChange={setIsChangeMachineDialogOpen}>
                         <DialogTrigger asChild>
                           <Button variant="outline" size="sm">
@@ -883,16 +883,96 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-sm font-medium text-gray-500">Modelo</Label>
-                      <p className="text-lg font-semibold">{getMachineDisplayName(procedure.machine.model, procedure.machine.lote)}</p>
+                  {procedure.machine ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-sm font-medium text-gray-500">Modelo</Label>
+                        <p className="text-lg font-semibold">{getMachineDisplayName(procedure.machine.model, procedure.machine.lote)}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-500">Lote</Label>
+                        <p className="text-lg font-semibold">{procedure.machine.lote}</p>
+                      </div>
                     </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-500">Lote</Label>
-                      <p className="text-lg font-semibold">{procedure.machine.lote}</p>
+                  ) : (
+                    <div className="text-center py-8">
+                      <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                        <p className="text-blue-800 font-medium">Sin máquina asignada</p>
+                        <p className="text-blue-600 text-sm mt-1">
+                          Este procedimiento no requiere equipo NPWT (ej: colocación de apósitos)
+                        </p>
+                        {procedure.status === "active" && permissions.canEditMachines && availableMachines.length > 0 && (
+                          <div className="mt-4">
+                            <Dialog open={isChangeMachineDialogOpen} onOpenChange={setIsChangeMachineDialogOpen}>
+                              <DialogTrigger asChild>
+                                <Button variant="outline" size="sm">
+                                  <Plus className="h-4 w-4 mr-2" />
+                                  Asignar Máquina
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent>
+                                <DialogHeader>
+                                  <DialogTitle>Asignar Máquina al Procedimiento</DialogTitle>
+                                  <DialogDescription>
+                                    Seleccione una máquina disponible para asignar a este procedimiento.
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4">
+                                  <div>
+                                    <Label htmlFor="new-machine">Máquina a Asignar</Label>
+                                    <Select value={selectedNewMachine} onValueChange={setSelectedNewMachine}>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Seleccionar máquina" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {availableMachines.map((machine) => (
+                                          <SelectItem key={machine.id} value={machine.id}>
+                                            <div className="flex items-center gap-2">
+                                              <span>{getMachineDisplayName(machine.model, machine.lote)}</span>
+                                              <Badge variant="outline" className="text-xs">
+                                                Lote: {machine.lote}
+                                              </Badge>
+                                            </div>
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                </div>
+                                <DialogFooter>
+                                  <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                      setIsChangeMachineDialogOpen(false)
+                                      setSelectedNewMachine("")
+                                    }}
+                                  >
+                                    Cancelar
+                                  </Button>
+                                  <Button
+                                    onClick={handleChangeMachine}
+                                    disabled={!selectedNewMachine || changingMachine}
+                                  >
+                                    {changingMachine ? (
+                                      <>
+                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                        Asignando...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Settings className="h-4 w-4 mr-2" />
+                                        Asignar Máquina
+                                      </>
+                                    )}
+                                  </Button>
+                                </DialogFooter>
+                              </DialogContent>
+                            </Dialog>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
                   {procedure.status === "active" && permissions.canEditMachines && (
                     <div className="mt-4 pt-4 border-t">
                       <div className="flex items-center justify-between text-sm">
