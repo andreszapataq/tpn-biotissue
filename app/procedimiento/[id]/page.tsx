@@ -190,6 +190,16 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
 
   // Cambiar máquina del procedimiento
   const handleChangeMachine = async () => {
+    // ✅ Verificar permisos antes de proceder
+    if (!permissions.canEditMachines) {
+      toast({
+        title: "Acceso Denegado",
+        description: "No tienes permisos para cambiar máquinas",
+        variant: "destructive",
+      })
+      return
+    }
+
     if (!selectedNewMachine || !procedure) return
 
     try {

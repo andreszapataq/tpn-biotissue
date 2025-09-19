@@ -34,7 +34,7 @@ export function usePermissions(): UserPermissions {
   const isFinanciero = user.role === "financiero"
 
   return {
-    canEditMachines: isAdmin,
+    canEditMachines: isAdmin || isSupport, // Administradores y soporte pueden cambiar máquinas
     canDeleteMachines: isAdmin,
     canEditInventory: isAdmin,
     canAdjustStock: isAdmin,
