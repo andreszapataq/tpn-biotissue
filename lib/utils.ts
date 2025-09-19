@@ -70,7 +70,7 @@ export function getMachineDisplayName(model: string, lote: string): string {
   const lastFourDigits = lote.slice(-4)
   
   // Definir los números para cada tipo
-  const cassetteNumbers = ["0895", "0896", "0897"]
+  const cassetteNumbers = ["0895", "0896", "0897", "0898"]
   const puntaNumbers = ["0903", "0910", "0911", "0914", "0916"]
   
   if (cassetteNumbers.includes(lastFourDigits)) {
