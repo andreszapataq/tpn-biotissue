@@ -18,6 +18,8 @@ import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { ProtectedRoute } from "@/components/auth/protected-route"
 import { useAuth } from "@/components/auth/auth-provider"
+import { InstitutionSwitcher } from "@/components/institutions/institution-switcher"
+import { useInstitution } from "@/components/institutions/institution-provider"
 import { getCurrentDateInColombia, getMachineDisplayName } from "@/lib/utils"
 
 type Machine = Tables<"machines">
@@ -33,6 +35,7 @@ export default function NuevoProcedimiento() {
   const [saving, setSaving] = useState(false)
   const { toast } = useToast()
   const { user } = useAuth()
+  const { selectedInstitutionId } = useInstitution()
   const router = useRouter()
   
   const [formData, setFormData] = useState({
@@ -72,11 +75,16 @@ export default function NuevoProcedimiento() {
   const loadData = async () => {
     try {
       setLoading(true)
+      if (!selectedInstitutionId) {
+        setMachines([])
+        setAvailableProducts([])
+        return
+      }
       
       const [machinesResult, productsResult, activeProceduresResult] = await Promise.all([
-        supabase.from("machines").select("*").eq("status", "active").order("model", { ascending: true }),
-        supabase.from("inventory_products").select("*").order("name", { ascending: true }),
-        supabase.from("procedures").select("machine_id").eq("status", "active")
+        supabase.from("machines").select("*").eq("institution_id", selectedInstitutionId).eq("status", "active").order("model", { ascending: true }),
+        supabase.from("inventory_products").select("*").eq("institution_id", selectedInstitutionId).order("name", { ascending: true }),
+        supabase.from("procedures").select("machine_id").eq("institution_id", selectedInstitutionId).eq("status", "active")
       ])
 
       if (machinesResult.error) throw machinesResult.error
@@ -108,8 +116,8 @@ export default function NuevoProcedimiento() {
   }
 
   useEffect(() => {
-    loadData()
-  }, [])
+    void loadData()
+  }, [selectedInstitutionId])
 
   const handleProductQuantityChange = (productId: string, change: number) => {
     setSelectedProducts((prev) => {
@@ -187,6 +195,7 @@ export default function NuevoProcedimiento() {
       const { data: existingPatients, error: searchError } = await supabase
         .from("patients")
         .select("*")
+        .eq("institution_id", selectedInstitutionId || "")
         .eq("identification", formData.patientId)
 
       if (searchError) {
@@ -206,6 +215,7 @@ export default function NuevoProcedimiento() {
             name: formData.patientName,
             age: parseInt(formData.patientAge),
             status: "active",
+            institution_id: selectedInstitutionId || undefined,
             updated_at: new Date().toISOString()
           })
           .eq("id", existingPatient.id)
@@ -234,6 +244,7 @@ export default function NuevoProcedimiento() {
             name: formData.patientName,
             identification: formData.patientId,
             age: parseInt(formData.patientAge),
+            institution_id: selectedInstitutionId || undefined,
             status: "active"
           })
           .select()
@@ -300,6 +311,7 @@ export default function NuevoProcedimiento() {
       const { data: recentProcedures } = await supabase
         .from("procedures")
         .select("id, created_at")
+        .eq("institution_id", selectedInstitutionId || "")
         .eq("patient_id", patient.id)
         .eq("machine_id", formData.machine)
         .eq("surgeon_name", formData.surgeon)
@@ -319,6 +331,7 @@ export default function NuevoProcedimiento() {
 
       // 4. Crear procedimiento
       const procedureData: any = {
+        institution_id: selectedInstitutionId || undefined,
         patient_id: patient.id,
         machine_id: formData.machine || null, // null si no se selecciona máquina
         surgeon_name: formData.surgeon,
@@ -410,6 +423,7 @@ export default function NuevoProcedimiento() {
           quantity: -quantity,
           reference_type: "procedure",
           reference_id: procedure.id,
+          institution_id: selectedInstitutionId || undefined,
           notes: `Usado en procedimiento - Paciente: ${patient.name}`
         }
         
@@ -497,22 +511,25 @@ export default function NuevoProcedimiento() {
   }
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute requiredRole={["administrador", "soporte", "asistente"]}>
       <div className="min-h-screen bg-gray-50 p-4">
         <div className="max-w-4xl mx-auto">
           {/* Header */}
           <div className="mb-6">
-            <div className="flex items-center gap-4 mb-4">
-              <Link href="/">
-                <Button variant="outline" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Volver al Dashboard
-                </Button>
-              </Link>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Nuevo Procedimiento</h1>
-                <p className="text-gray-600">Registro de terapia de presión negativa</p>
+            <div className="flex flex-col gap-4 mb-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-center gap-4">
+                <Link href="/">
+                  <Button variant="outline" size="sm">
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Volver al Dashboard
+                  </Button>
+                </Link>
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-900">Nuevo Procedimiento</h1>
+                  <p className="text-gray-600">Registro de terapia de presión negativa</p>
+                </div>
               </div>
+              <InstitutionSwitcher />
             </div>
           </div>
 

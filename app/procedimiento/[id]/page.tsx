@@ -29,6 +29,7 @@ import { useToast } from "@/hooks/use-toast"
 import { ProtectedRoute } from "@/components/auth/protected-route"
 import { useAuth } from "@/components/auth/auth-provider"
 import { usePermissions } from "@/hooks/use-permissions"
+import { InstitutionSwitcher } from "@/components/institutions/institution-switcher"
 
 type Procedure = Tables<"procedures">
 type Patient = Tables<"patients">
@@ -124,6 +125,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
       const { data: productsData, error: productsError } = await supabase
         .from("inventory_products")
         .select("*")
+        .eq("institution_id", (procedureData as ProcedureDetails).institution_id)
         .order("name", { ascending: true })
 
       if (productsError) throw productsError
@@ -155,11 +157,13 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
         supabase
           .from("machines")
           .select("*")
+          .eq("institution_id", procedure?.institution_id || "")
           .eq("status", "active")
           .order("model", { ascending: true }),
         supabase
           .from("procedures")
           .select("machine_id")
+          .eq("institution_id", procedure?.institution_id || "")
           .eq("status", "active")
           .neq("id", resolvedParams.id) // Excluir el procedimiento actual
       ])
@@ -433,6 +437,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
       const procedureProducts: Array<{
         procedure_id: string
         product_id: string
+        institution_id: string
         quantity_used: number
       }> = []
       
@@ -442,6 +447,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
         quantity: number
         reference_type: string
         reference_id: string
+        institution_id: string
         notes: string
         created_by?: string
       }> = []
@@ -490,6 +496,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
         procedureProducts.push({
           procedure_id: procedure.id,
           product_id: productId,
+          institution_id: procedure.institution_id,
           quantity_used: quantity
         })
 
@@ -500,6 +507,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
           quantity: -quantity,
           reference_type: "procedure",
           reference_id: procedure.id,
+          institution_id: procedure.institution_id,
           notes: `Insumo adicional - Paciente: ${procedure.patient?.name || 'Sin nombre'}`
         }
         
@@ -646,7 +654,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
 
   if (loading) {
     return (
-      <ProtectedRoute>
+      <ProtectedRoute requiredRole={["administrador", "soporte", "asistente"]}>
         <div className="min-h-screen bg-gray-50 p-4">
           <div className="max-w-6xl mx-auto">
             <div className="flex items-center justify-center h-64">
@@ -660,7 +668,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
 
   if (!procedure) {
     return (
-      <ProtectedRoute>
+      <ProtectedRoute requiredRole={["administrador", "soporte", "asistente"]}>
         <div className="min-h-screen bg-gray-50 p-4">
           <div className="max-w-6xl mx-auto">
             <div className="text-center py-12">
@@ -676,7 +684,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
   }
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute requiredRole={["administrador", "soporte", "asistente"]}>
       <div className="min-h-screen bg-gray-50 p-3 md:p-4">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
@@ -694,7 +702,8 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                   <p className="text-sm md:text-base text-gray-600">Gestión de terapia NPWT</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap justify-end">
+                <InstitutionSwitcher />
                 {getStatusBadge(procedure.status || "unknown")}
                 {procedure.status === "active" && (
                   <Button 

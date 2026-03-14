@@ -24,6 +24,8 @@ import { Tables } from "@/lib/database.types"
 import { formatTimestampForColombia, getMachineDisplayName } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { ProtectedRoute } from "@/components/auth/protected-route"
+import { InstitutionSwitcher } from "@/components/institutions/institution-switcher"
+import { useInstitution } from "@/components/institutions/institution-provider"
 import { usePermissions } from "@/hooks/use-permissions"
 
 type Machine = Tables<"machines">
@@ -41,6 +43,7 @@ export default function Maquinas() {
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null)
   const { toast } = useToast()
   const permissions = usePermissions()
+  const { selectedInstitutionId } = useInstitution()
 
   // Modelos de máquinas NPWT disponibles con códigos de referencia
   const machineModels = [
@@ -68,16 +71,23 @@ export default function Maquinas() {
   const loadMachines = async () => {
     try {
       setLoading(true)
+      if (!selectedInstitutionId) {
+        setMachines([])
+        setMachinesInUse(new Set())
+        return
+      }
       
       // Cargar máquinas y procedimientos activos en paralelo
       const [machinesResult, activeProceduresResult] = await Promise.all([
         supabase
           .from("machines")
           .select("*")
+          .eq("institution_id", selectedInstitutionId)
           .order("lote", { ascending: true }),
         supabase
           .from("procedures")
           .select("machine_id")
+          .eq("institution_id", selectedInstitutionId)
           .eq("status", "active")
       ])
 
@@ -104,8 +114,8 @@ export default function Maquinas() {
   }
 
   useEffect(() => {
-    loadMachines()
-  }, [])
+    void loadMachines()
+  }, [selectedInstitutionId])
 
   // Crear nueva máquina
   const handleCreateMachine = async () => {
@@ -114,7 +124,7 @@ export default function Maquinas() {
 
       const { data, error } = await supabase
         .from("machines")
-        .insert([newMachine])
+        .insert([{ ...newMachine, institution_id: selectedInstitutionId || undefined }])
         .select()
         .single()
 
@@ -386,22 +396,25 @@ export default function Maquinas() {
   }
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute requiredRole={["administrador", "soporte", "asistente"]}>
       <div className="min-h-screen bg-gray-50 p-4">
         <div className="max-w-6xl mx-auto">
           {/* Header */}
           <div className="mb-6">
-            <div className="flex items-center gap-4 mb-4">
-              <Link href="/">
-                <Button variant="outline" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Volver al Dashboard
-                </Button>
-              </Link>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Gestión de Máquinas</h1>
-                <p className="text-gray-600">Control y administración de equipos NPWT</p>
+            <div className="flex flex-col gap-4 mb-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-center gap-4">
+                <Link href="/">
+                  <Button variant="outline" size="sm">
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Volver al Dashboard
+                  </Button>
+                </Link>
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-900">Gestión de Máquinas</h1>
+                  <p className="text-gray-600">Control y administración de equipos NPWT</p>
+                </div>
               </div>
+              <InstitutionSwitcher />
             </div>
 
             {/* Stats Cards */}

@@ -1,11 +1,27 @@
 import { supabase } from "./supabase"
+import { canSelfRegisterRole, hasGlobalVisibility, normalizeAppRole, type AppRole } from "./roles"
+
+export interface UserInstitutionMembership {
+  institution_id: string
+  institution_name: string
+  institution_code: string
+  role: AppRole
+  is_primary: boolean
+}
 
 export interface AuthUser {
   id: string
+  profile_id: string | null
   email: string
   name: string
-  role: string
+  role: AppRole
   mfa_enabled: boolean
+  is_active: boolean
+  institution_id: string | null
+  institution_name: string | null
+  institution_code: string | null
+  has_global_visibility: boolean
+  memberships: UserInstitutionMembership[]
 }
 
 function getBaseUrl() {
@@ -21,19 +37,25 @@ export class AuthService {
     password: string,
     userData: {
       name: string
-      role: "cirujano" | "soporte" | "administrador" | "financiero"
+      role: AppRole
       phone?: string
       department?: string
       license_number?: string
+      institution_code?: string
     },
   ) {
     const baseUrl = getBaseUrl()
+    const safeRole = canSelfRegisterRole(userData.role) ? normalizeAppRole(userData.role) : "asistente"
 
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: userData,
+        data: {
+          ...userData,
+          role: safeRole,
+          institution_code: userData.institution_code?.trim() || undefined,
+        },
         emailRedirectTo: `${baseUrl}/auth/callback`,
       },
     })
@@ -55,11 +77,62 @@ export class AuthService {
     return { error }
   }
 
+  private static async fetchUserProfile(authUserId: string) {
+    return supabase
+      .from("users")
+      .select(`
+        id,
+        auth_id,
+        email,
+        name,
+        role,
+        mfa_enabled,
+        is_active,
+        institution_id,
+        institution:institutions!users_institution_id_fkey(id, name, code),
+        memberships:user_institutions(
+          institution_id,
+          role,
+          is_primary,
+          institution:institutions!user_institutions_institution_id_fkey(id, name, code)
+        )
+      `)
+      .eq("auth_id", authUserId)
+      .single()
+  }
+
+  private static mapAuthUser(sessionUser: any, profile: any): AuthUser {
+    const memberships: UserInstitutionMembership[] = (profile.memberships || [])
+      .map((membership: any) => ({
+        institution_id: membership.institution_id,
+        institution_name: membership.institution?.name || "Institucion",
+        institution_code: membership.institution?.code || "",
+        role: normalizeAppRole(membership.role),
+        is_primary: Boolean(membership.is_primary),
+      }))
+      .sort((a: UserInstitutionMembership, b: UserInstitutionMembership) => Number(b.is_primary) - Number(a.is_primary))
+
+    const primaryMembership = memberships.find((membership) => membership.is_primary) || memberships[0] || null
+    const institution = profile.institution || null
+
+    return {
+      id: sessionUser.id,
+      profile_id: profile.id ?? null,
+      email: profile.email || sessionUser.email || "",
+      name: profile.name || sessionUser.user_metadata?.name || sessionUser.email || "",
+      role: normalizeAppRole(profile.role),
+      mfa_enabled: Boolean(profile.mfa_enabled),
+      is_active: profile.is_active !== false,
+      institution_id: institution?.id || primaryMembership?.institution_id || null,
+      institution_name: institution?.name || primaryMembership?.institution_name || null,
+      institution_code: institution?.code || primaryMembership?.institution_code || null,
+      has_global_visibility: hasGlobalVisibility(profile.role),
+      memberships,
+    }
+  }
+
   static async getCurrentUser(): Promise<AuthUser | null> {
     try {
-      console.log("👤 Getting current user...")
-
-      // Timeout para evitar esperas infinitas
       const timeoutPromise = new Promise<null>((_, reject) => {
         setTimeout(() => reject(new Error("User fetch timeout")), 10000)
       })
@@ -70,88 +143,45 @@ export class AuthService {
         } = await supabase.auth.getUser()
 
         if (!user) {
-          console.log("❌ No authenticated user found")
           return null
         }
 
-        console.log("✅ Found authenticated user:", user.email)
-
-        // Intentar obtener el perfil
-        const { data: profile, error } = await supabase.from("users").select("*").eq("auth_id", user.id).single()
+        const { data: profile, error } = await this.fetchUserProfile(user.id)
 
         if (error || !profile) {
-          console.warn("⚠️ Profile not found, creating...")
+          const fallbackRole = canSelfRegisterRole(user.user_metadata?.role)
+            ? normalizeAppRole(user.user_metadata?.role)
+            : "asistente"
 
-          // Determinar el rol correcto (migrar 'enfermera' a 'soporte')
-          let userRole = user.user_metadata?.role || "soporte"
-          if (userRole === "enfermera") {
-            userRole = "soporte"
-          }
-
-          // Crear perfil si no existe
-          const { data: newProfile, error: insertError } = await supabase
+          const { error: insertError } = await supabase
             .from("users")
             .insert({
               auth_id: user.id,
               email: user.email || "",
               name: user.user_metadata?.name || user.email || "",
-              role: userRole,
+              role: fallbackRole,
               phone: user.user_metadata?.phone || null,
               department: user.user_metadata?.department || null,
               license_number: user.user_metadata?.license_number || null,
               is_active: true,
               mfa_enabled: false,
             })
-            .select()
-            .single()
 
           if (insertError) {
-            console.error("❌ Error creating profile:", insertError)
             return null
           }
 
-          if (newProfile) {
-            console.log("✅ Profile created:", newProfile.name)
-            return {
-              id: newProfile.id,
-              email: newProfile.email,
-              name: newProfile.name,
-              role: newProfile.role,
-              mfa_enabled: newProfile.mfa_enabled || false,
-            }
+          const { data: refreshedProfile, error: refreshedError } = await this.fetchUserProfile(user.id)
+          if (refreshedError || !refreshedProfile) {
+            return null
           }
+
+          await this.updateLastLogin(user.id)
+          return this.mapAuthUser(user, refreshedProfile)
         }
 
-        if (profile) {
-          // Migrar rol 'enfermera' a 'soporte' si es necesario
-          if (profile.role === "enfermera") {
-            console.log("🔄 Migrating role from 'enfermera' to 'soporte'")
-            const { data: updatedProfile, error: updateError } = await supabase
-              .from("users")
-              .update({ role: "soporte", updated_at: new Date().toISOString() })
-              .eq("id", profile.id)
-              .select()
-              .single()
-
-            if (updateError) {
-              console.error("❌ Error updating role:", updateError)
-            } else {
-              profile.role = "soporte"
-              console.log("✅ Role updated to 'soporte'")
-            }
-          }
-
-          console.log("✅ Profile loaded:", profile.name)
-          return {
-            id: profile.id,
-            email: profile.email,
-            name: profile.name,
-            role: profile.role,
-            mfa_enabled: profile.mfa_enabled || false,
-          }
-        }
-
-        return null
+        await this.updateLastLogin(user.id)
+        return this.mapAuthUser(user, profile)
       })()
 
       return await Promise.race([userPromise, timeoutPromise])
@@ -180,21 +210,8 @@ export class AuthService {
   private static async updateLastLogin(authId: string) {
     try {
       await supabase.from("users").update({ last_login: new Date().toISOString() }).eq("auth_id", authId)
-    } catch (error) {
-      console.error("❌ Error updating last login:", error)
-    }
-  }
-
-  private static async logLoginAttempt(email: string, success: boolean, failureReason?: string) {
-    try {
-      await supabase.from("login_attempts").insert({
-        email,
-        success,
-        failure_reason: failureReason,
-        attempted_at: new Date().toISOString(),
-      })
-    } catch (error) {
-      console.error("❌ Error logging login attempt:", error)
+    } catch {
+      // No bloquear el flujo de login si falla la auditoria del ultimo acceso.
     }
   }
 }

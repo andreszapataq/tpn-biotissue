@@ -12,6 +12,8 @@ import { supabase, type Patient } from "@/lib/supabase"
 import { formatTimestampForColombia } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { ProtectedRoute } from "@/components/auth/protected-route"
+import { InstitutionSwitcher } from "@/components/institutions/institution-switcher"
+import { useInstitution } from "@/components/institutions/institution-provider"
 
 export default function Pacientes() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -19,14 +21,21 @@ export default function Pacientes() {
   const [patients, setPatients] = useState<Patient[]>([])
   const [loading, setLoading] = useState(true)
   const { toast } = useToast()
+  const { selectedInstitutionId } = useInstitution()
 
   // Cargar pacientes desde la base de datos
   const loadPatients = async () => {
     try {
       setLoading(true)
+      if (!selectedInstitutionId) {
+        setPatients([])
+        return
+      }
+
       const { data, error } = await supabase
         .from("patients")
         .select("*")
+        .eq("institution_id", selectedInstitutionId)
         .order("name", { ascending: true })
 
       if (error) throw error
@@ -53,8 +62,8 @@ export default function Pacientes() {
   }
 
   useEffect(() => {
-    loadPatients()
-  }, [])
+    void loadPatients()
+  }, [selectedInstitutionId])
 
   const filteredPatients = patients.filter(
     (patient) =>
@@ -66,22 +75,25 @@ export default function Pacientes() {
   const completedPatients = filteredPatients.filter((p) => p.status === "completed")
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute requiredRole={["administrador", "soporte", "asistente"]}>
       <div className="min-h-screen bg-gray-50 p-4">
         <div className="max-w-6xl mx-auto">
           {/* Header */}
           <div className="mb-6">
-            <div className="flex items-center gap-4 mb-4">
-              <Link href="/">
-                <Button variant="outline" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Volver al Dashboard
-                </Button>
-              </Link>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Gestión de Pacientes</h1>
-                <p className="text-gray-600">Control y seguimiento de pacientes en terapia NPWT</p>
+            <div className="flex flex-col gap-4 mb-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-center gap-4">
+                <Link href="/">
+                  <Button variant="outline" size="sm">
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Volver al Dashboard
+                  </Button>
+                </Link>
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-900">Gestión de Pacientes</h1>
+                  <p className="text-gray-600">Control y seguimiento de pacientes en terapia NPWT</p>
+                </div>
               </div>
+              <InstitutionSwitcher />
             </div>
 
             {/* Search */}

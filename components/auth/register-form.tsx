@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Eye, EyeOff, UserPlus, Mail, User, Phone, Building, FileText, AlertCircle, CheckCircle } from "lucide-react"
 import { AuthService } from "@/lib/auth"
+import { PUBLIC_REGISTRATION_ROLES, getRoleLabel, type AppRole } from "@/lib/roles"
 import Link from "next/link"
 
 
@@ -21,10 +22,11 @@ export default function RegisterForm() {
     password: "",
     confirmPassword: "",
     name: "",
-    role: "" as "cirujano" | "soporte" | "administrador" | "financiero" | "",
+    role: "" as AppRole | "",
     phone: "",
     department: "",
     license_number: "",
+    institution_code: "",
   })
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -85,6 +87,7 @@ export default function RegisterForm() {
         phone: formData.phone || undefined,
         department: formData.department || undefined,
         license_number: formData.license_number || undefined,
+        institution_code: formData.institution_code || undefined,
       })
 
       if (error) {
@@ -163,7 +166,7 @@ export default function RegisterForm() {
             <UserPlus className="h-6 w-6 text-blue-600" />
           </div>
           <CardTitle>Crear Cuenta</CardTitle>
-          <CardDescription>Registro para personal médico autorizado</CardDescription>
+          <CardDescription>Registro para personal autorizado</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -203,10 +206,11 @@ export default function RegisterForm() {
                     <SelectValue placeholder="Seleccionar rol" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="cirujano">Cirujano</SelectItem>
-                    <SelectItem value="soporte">Soporte</SelectItem>
-                    <SelectItem value="administrador">Administrador</SelectItem>
-                    <SelectItem value="financiero">Financiero</SelectItem>
+                    {PUBLIC_REGISTRATION_ROLES.map((role) => (
+                      <SelectItem key={role} value={role}>
+                        {getRoleLabel(role)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -245,7 +249,7 @@ export default function RegisterForm() {
               </div>
 
               <div>
-                <Label htmlFor="department">Departamento</Label>
+                <Label htmlFor="department">Departamento / Área</Label>
                 <div className="relative">
                   <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                   <Input
@@ -258,6 +262,26 @@ export default function RegisterForm() {
                   />
                 </div>
               </div>
+            </div>
+
+            <div>
+              <Label htmlFor="institution_code">Código de Institución</Label>
+              <div className="relative">
+                <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  id="institution_code"
+                  type="text"
+                  value={formData.institution_code}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, institution_code: e.target.value.toLowerCase().trimStart() }))
+                  }
+                  placeholder="institucion-principal"
+                  className="pl-10"
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Opcional. Si tu administrador te compartio un codigo, tu cuenta quedara asociada automaticamente.
+              </p>
             </div>
 
             <div>
@@ -376,6 +400,10 @@ export default function RegisterForm() {
             >
               {isLoading ? "Creando cuenta..." : "Crear Cuenta"}
             </Button>
+            <p className="text-xs text-gray-500">
+              Los roles administrativos y de gerencia no se asignan por autoregistro y deben ser habilitados por un
+              administrador.
+            </p>
           </form>
 
           <div className="mt-6 text-center">

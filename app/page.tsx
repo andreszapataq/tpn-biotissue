@@ -8,17 +8,20 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Link from "next/link"
 import { ProtectedRoute } from "@/components/auth/protected-route"
 import { UserMenu } from "@/components/auth/user-menu"
+import { InstitutionSwitcher } from "@/components/institutions/institution-switcher"
+import { useInstitution } from "@/components/institutions/institution-provider"
 import { useAuth } from "@/components/auth/auth-provider"
 import { usePermissions } from "@/hooks/use-permissions"
 import { supabase } from "@/lib/supabase"
 import { getCurrentDateInColombia, formatDateForColombia, formatTimestampForColombia, getMachineDisplayName } from "@/lib/utils"
-import { Plus, Users, Package, Activity, AlertTriangle, Calendar, Clock, Loader2, Settings, FileText, Search, ChevronLeft, ChevronRight } from "lucide-react"
+import { Plus, Users, Package, Activity, AlertTriangle, Calendar, Clock, Loader2, Settings, FileText, Search, ChevronLeft, ChevronRight, Building2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 
 // Componente memoizado para evitar re-renders innecesarios
 const DashboardContent = memo(function DashboardContent() {
   const [currentTime, setCurrentTime] = useState(new Date())
   const { user } = useAuth()
+  const { selectedInstitutionId, selectedInstitutionName } = useInstitution()
   const permissions = usePermissions()
 
   const [activePatients, setActivePatients] = useState(0)
@@ -199,20 +202,38 @@ const DashboardContent = memo(function DashboardContent() {
     try {
       setLoadingData(true)
 
+      if (!selectedInstitutionId) {
+        setActivePatients(0)
+        setTotalClosedProcedures(0)
+        setInventoryAlerts(0)
+        setActiveMachines(0)
+        setClosedProcedures([])
+        setActiveProcedures([])
+        setPatients([])
+        setAlerts([])
+        return
+      }
+
       // Cargar contadores
       const [patientsResult, closedProceduresResult, inventoryResult] = await Promise.all([
-        supabase.from("patients").select("*", { count: "exact" }).eq("status", "active"),
+        supabase
+          .from("patients")
+          .select("*", { count: "exact" })
+          .eq("institution_id", selectedInstitutionId)
+          .eq("status", "active"),
         supabase
           .from("procedures")
           .select("*", { count: "exact" })
+          .eq("institution_id", selectedInstitutionId)
           .eq("status", "completed"),
-        supabase.rpc("get_low_stock_products"),
+        supabase.rpc("get_low_stock_products", { target_institution_id: selectedInstitutionId }),
       ])
 
       // Cargar todos los pacientes (todos los estados)
       const { data: allPatientsData } = await supabase
         .from("patients")
         .select("*")
+        .eq("institution_id", selectedInstitutionId)
         .order("created_at", { ascending: false })
 
       setActivePatients(patientsResult.count || 0)
@@ -223,6 +244,7 @@ const DashboardContent = memo(function DashboardContent() {
       const { data: machinesData } = await supabase
         .from("machines")
         .select("*", { count: "exact" })
+        .eq("institution_id", selectedInstitutionId)
         .eq("status", "active")
       
       setActiveMachines(machinesData?.length || 0)
@@ -235,6 +257,7 @@ const DashboardContent = memo(function DashboardContent() {
           patient:patients(name, identification),
           machine:machines(model, lote)
         `)
+        .eq("institution_id", selectedInstitutionId)
         .eq("status", "active")
         .order("created_at", { ascending: false })
 
@@ -246,6 +269,7 @@ const DashboardContent = memo(function DashboardContent() {
           patient:patients(name, identification, status),
           machine:machines(model, lote)
         `)
+        .eq("institution_id", selectedInstitutionId)
         .eq("status", "completed")
         .order("updated_at", { ascending: false })
 
@@ -285,7 +309,7 @@ const DashboardContent = memo(function DashboardContent() {
     if (user) {
       loadDashboardData()
     }
-  }, [user])
+  }, [user, selectedInstitutionId])
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
@@ -299,10 +323,12 @@ const DashboardContent = memo(function DashboardContent() {
               {user && (
                 <p className="text-sm text-blue-600 mt-1">
                   Bienvenido, {user.name} ({user.role})
+                  {selectedInstitutionName ? ` • ${selectedInstitutionName}` : " • Sin institucion asignada"}
                 </p>
               )}
             </div>
             <div className="flex items-center gap-4">
+              <InstitutionSwitcher />
               <div className="text-right">
                 <p className="text-sm text-gray-500">
                   {currentTime.toLocaleDateString("es-ES", {
@@ -344,12 +370,28 @@ const DashboardContent = memo(function DashboardContent() {
                 Inventario
               </Button>
             </Link>
-            {/* 📊 Solo mostrar informes para administradores y financieros */}
+            {/* 📊 Solo mostrar informes para administradores */}
             {permissions.canViewReports && (
               <Link href="/informes">
                 <Button variant="outline" size="lg" className="h-12">
                   <FileText className="mr-2 h-5 w-5" />
                   Informes
+                </Button>
+              </Link>
+            )}
+            {permissions.canViewGlobalDashboard && (
+              <Link href="/dashboard-global">
+                <Button variant="outline" size="lg" className="h-12">
+                  <Building2 className="mr-2 h-5 w-5" />
+                  Vista Global
+                </Button>
+              </Link>
+            )}
+            {permissions.canManageAdministration && (
+              <Link href="/admin">
+                <Button variant="outline" size="lg" className="h-12">
+                  <Settings className="mr-2 h-5 w-5" />
+                  Administración
                 </Button>
               </Link>
             )}
@@ -760,7 +802,7 @@ const DashboardContent = memo(function DashboardContent() {
 
 export default function Dashboard() {
   return (
-    <ProtectedRoute>
+    <ProtectedRoute requiredRole={["administrador", "soporte", "asistente"]}>
       <DashboardContent />
     </ProtectedRoute>
   )

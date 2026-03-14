@@ -23,6 +23,8 @@ import { supabase } from "@/lib/supabase"
 import { Tables } from "@/lib/database.types"
 import { useToast } from "@/hooks/use-toast"
 import { ProtectedRoute } from "@/components/auth/protected-route"
+import { InstitutionSwitcher } from "@/components/institutions/institution-switcher"
+import { useInstitution } from "@/components/institutions/institution-provider"
 import { usePermissions } from "@/hooks/use-permissions"
 import { useAuth } from "@/components/auth/auth-provider"
 
@@ -45,6 +47,7 @@ type InventoryProduct = Tables<"inventory_products">
 
 export default function Inventario() {
   const { user } = useAuth()
+  const { selectedInstitutionId } = useInstitution()
   const [searchTerm, setSearchTerm] = useState("")
   const [inventory, setInventory] = useState<InventoryProduct[]>([])
   const [loading, setLoading] = useState(true)
@@ -97,7 +100,16 @@ export default function Inventario() {
   const loadInventory = async () => {
     try {
       setLoading(true)
-      const { data, error } = await supabase.from("inventory_products").select("*").order("name", { ascending: true })
+      if (!selectedInstitutionId) {
+        setInventory([])
+        return
+      }
+
+      const { data, error } = await supabase
+        .from("inventory_products")
+        .select("*")
+        .eq("institution_id", selectedInstitutionId)
+        .order("name", { ascending: true })
 
       if (error) throw error
 
@@ -115,8 +127,8 @@ export default function Inventario() {
   }
 
   useEffect(() => {
-    loadInventory()
-  }, [])
+    void loadInventory()
+  }, [selectedInstitutionId])
 
   // Crear nuevo producto
   const handleCreateProduct = async () => {
@@ -136,6 +148,7 @@ export default function Inventario() {
         .from("inventory_products")
         .select("id")
         .eq("code", newProduct.code.toUpperCase())
+        .eq("institution_id", selectedInstitutionId || "")
 
       // Si se especifica un lote, verificar la combinación código+lote
       if (newProduct.lote && newProduct.lote.trim()) {
@@ -175,6 +188,7 @@ export default function Inventario() {
         name: newProduct.name.trim(),
         code: newProduct.code.trim().toUpperCase(),
         category: newProduct.category,
+        institution_id: selectedInstitutionId || undefined,
         stock: newProduct.stock,
         minimum_stock: newProduct.minimum_stock,
         unit_price: newProduct.unit_price,
@@ -202,6 +216,7 @@ export default function Inventario() {
           quantity: newProduct.stock,
           reference_type: "initial_stock",
           reference_id: null,
+          institution_id: selectedInstitutionId || undefined,
           notes: `Inventario inicial del sistema`,
           created_at: new Date().toISOString()
         }
@@ -328,6 +343,7 @@ export default function Inventario() {
           quantity: Math.abs(stockChange),
           reference_type: "manual_edit",
           reference_id: null,
+          institution_id: selectedInstitutionId || undefined,
           notes: `Edición manual: ${oldStock} → ${newStock} unidades (${stockChange >= 0 ? '+' : ''}${stockChange})`
         }
 
@@ -453,6 +469,7 @@ export default function Inventario() {
           quantity: entry.quantity,
           reference_type: "stock_entry",
           reference_id: null,
+          institution_id: selectedInstitutionId || undefined,
           notes: entry.reason || `Entrada de inventario: +${entry.quantity} unidades`
         }
 
@@ -523,6 +540,7 @@ export default function Inventario() {
       const { data, error } = await supabase
         .from("inventory_movements")
         .select("*")
+        .eq("institution_id", selectedInstitutionId || "")
         .eq("product_id", productId)
         .order("created_at", { ascending: false })
         .limit(50)
@@ -543,6 +561,7 @@ export default function Inventario() {
                 id,
                 patient:patients(name)
               `)
+              .eq("institution_id", selectedInstitutionId || "")
               .eq("id", movement.reference_id)
               .single()
             
@@ -588,22 +607,25 @@ export default function Inventario() {
   }
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute requiredRole={["administrador", "soporte", "asistente"]}>
       <div className="min-h-screen bg-gray-50 p-4">
         <div className="max-w-6xl mx-auto">
           {/* Header */}
           <div className="mb-6">
-            <div className="flex items-center gap-4 mb-4">
-              <Link href="/">
-                <Button variant="outline" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Volver al Dashboard
-                </Button>
-              </Link>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Gestión de Inventario</h1>
-                <p className="text-gray-600">Control de stock de productos NPWT</p>
+            <div className="flex flex-col gap-4 mb-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-center gap-4">
+                <Link href="/">
+                  <Button variant="outline" size="sm">
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Volver al Dashboard
+                  </Button>
+                </Link>
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-900">Gestión de Inventario</h1>
+                  <p className="text-gray-600">Control de stock de productos NPWT</p>
+                </div>
               </div>
+              <InstitutionSwitcher />
             </div>
 
             {/* Stats Cards */}

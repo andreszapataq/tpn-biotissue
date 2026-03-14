@@ -73,7 +73,8 @@ export interface User {
   auth_id: string
   email: string
   name: string
-  role: "cirujano" | "enfermera" | "administrador" | "financiero" | "soporte"
+  role: "administrador" | "soporte" | "asistente" | "gerente"
+  institution_id?: string | null
   phone?: string
   department?: string
   license_number?: string
@@ -86,6 +87,7 @@ export interface User {
 
 export interface Patient {
   id: string
+  institution_id: string
   name: string
   identification: string
   age: number
@@ -96,6 +98,7 @@ export interface Patient {
 
 export interface Procedure {
   id: string
+  institution_id: string
   patient_id: string
   machine_id: string
   surgeon_name: string
@@ -113,6 +116,7 @@ export interface Procedure {
 
 export interface InventoryProduct {
   id: string
+  institution_id: string
   name: string
   code: string
   category: string
@@ -125,13 +129,13 @@ export interface InventoryProduct {
 
 export interface Machine {
   id: string
-  name: string
-  serial_number: string
+  institution_id: string
+  lote: string
+  reference_code: string
   model: string
   status: "active" | "maintenance" | "inactive"
-  location?: string
-  purchase_date?: string
   last_maintenance?: string
+  observations?: string
   created_at: string
   updated_at: string
 }

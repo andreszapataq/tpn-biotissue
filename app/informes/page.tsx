@@ -26,6 +26,8 @@ import Link from "next/link"
 import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { ProtectedRoute } from "@/components/auth/protected-route"
+import { InstitutionSwitcher } from "@/components/institutions/institution-switcher"
+import { useInstitution } from "@/components/institutions/institution-provider"
 import { usePermissions } from "@/hooks/use-permissions"
 import { format, subDays, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns"
 import { es } from "date-fns/locale"
@@ -82,6 +84,7 @@ interface ProcedureSummary {
 export default function Informes() {
   const permissions = usePermissions()
   const { toast } = useToast()
+  const { selectedInstitutionId } = useInstitution()
   
   const [loading, setLoading] = useState(false)
   const [dateRange, setDateRange] = useState("this_month")
@@ -152,6 +155,7 @@ export default function Informes() {
       const { data: allProcedures, error: procError } = await supabase
         .from("procedures")
         .select("id, patient_id")
+        .eq("institution_id", selectedInstitutionId || "")
         .gte("created_at", `${start}T00:00:00`)
         .lte("created_at", `${end}T23:59:59`)
 
@@ -167,6 +171,7 @@ export default function Informes() {
           *,
           product:inventory_products(name, code, category, unit_price)
         `)
+        .eq("institution_id", selectedInstitutionId || "")
         .eq("movement_type", "out")
         .gte("created_at", `${start}T00:00:00`)
         .lte("created_at", `${end}T23:59:59`)
@@ -232,6 +237,7 @@ export default function Informes() {
           const { data: movementsForProduct, error: movError } = await supabase
             .from("inventory_movements")
             .select("reference_id")
+            .eq("institution_id", selectedInstitutionId || "")
             .eq("product_id", productId)
             .eq("movement_type", "out")
             .eq("reference_type", "procedure")
@@ -253,6 +259,7 @@ export default function Informes() {
               const { data: procedures, error: procError } = await supabase
                 .from("procedures")
                 .select("patient_id")
+                .eq("institution_id", selectedInstitutionId || "")
                 .in("id", uniqueProcedureIds)
 
               if (!procError && procedures) {
@@ -276,6 +283,7 @@ export default function Informes() {
       const { data: allProducts, error: allProductsError } = await supabase
         .from("inventory_products")
         .select("id, name, code, category, unit_price")
+        .eq("institution_id", selectedInstitutionId || "")
         .order("name", { ascending: true })
 
       if (allProductsError) throw allProductsError
@@ -352,6 +360,7 @@ export default function Informes() {
       const { data: products, error } = await supabase
         .from("inventory_products")
         .select("*")
+        .eq("institution_id", selectedInstitutionId || "")
         .order("name", { ascending: true })
 
       if (error) throw error
@@ -415,6 +424,22 @@ export default function Informes() {
   const loadAllData = async () => {
     setLoading(true)
     try {
+      if (!selectedInstitutionId) {
+        setConsumptionData([])
+        setInventoryData([])
+        setTotalConsumptionValue(0)
+        setTotalInventoryValue(0)
+        setLowStockValue(0)
+        setHighestStockProduct({ name: "-", quantity: 0 })
+        setProcedureSummary({
+          total_procedures: 0,
+          total_value: 0,
+          avg_value_per_procedure: 0,
+          most_used_product: { name: "-", quantity: 0 },
+        })
+        return
+      }
+
       await Promise.all([
         loadConsumptionData(),
         loadInventoryData()
@@ -440,9 +465,9 @@ export default function Informes() {
     if (permissions.canViewReports) {
       loadAllData()
     }
-  }, [dateRange, startDate, endDate, permissions.canViewReports])
+  }, [dateRange, startDate, endDate, permissions.canViewReports, selectedInstitutionId])
 
-  // Verificar permisos - Solo administradores y financieros pueden ver los informes
+  // Verificar permisos - Solo administradores pueden ver los informes
   if (!permissions.canViewReports) {
     return (
       <ProtectedRoute>
@@ -460,7 +485,7 @@ export default function Informes() {
               <CardContent className="pt-6 text-center">
                 <AlertTriangle className="h-12 w-12 mx-auto text-orange-500 mb-4" />
                 <h2 className="text-xl font-bold text-gray-900 mb-2">Acceso Restringido</h2>
-                <p className="text-gray-600">Los informes financieros están disponibles únicamente para administradores y personal financiero.</p>
+                <p className="text-gray-600">Los informes están disponibles únicamente para administradores.</p>
               </CardContent>
             </Card>
           </div>
@@ -470,22 +495,25 @@ export default function Informes() {
   }
 
   return (
-    <ProtectedRoute requiredRole={["administrador", "financiero"]}>
+    <ProtectedRoute requiredRole={["administrador"]}>
       <div className="min-h-screen bg-gray-50 p-4">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
           <div className="mb-6">
-            <div className="flex items-center gap-4 mb-4">
-              <Link href="/">
-                <Button variant="outline" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Volver al Dashboard
-                </Button>
-              </Link>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Informes Financieros</h1>
-                <p className="text-gray-600">Reportes de consumo e inventario con valores monetarios</p>
+            <div className="flex flex-col gap-4 mb-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-center gap-4">
+                <Link href="/">
+                  <Button variant="outline" size="sm">
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Volver al Dashboard
+                  </Button>
+                </Link>
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-900">Informes</h1>
+                  <p className="text-gray-600">Reportes de consumo e inventario de la institución activa</p>
+                </div>
               </div>
+              <InstitutionSwitcher />
             </div>
 
             {/* Controles de filtro */}

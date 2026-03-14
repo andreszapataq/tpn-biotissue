@@ -4,7 +4,7 @@ import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { supabase } from "@/lib/supabase"
-import type { AuthUser } from "@/lib/auth"
+import { AuthService, type AuthUser } from "@/lib/auth"
 
 interface AuthContextType {
   user: AuthUser | null
@@ -25,138 +25,77 @@ export function useAuth() {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
-  const [loading, setLoading] = useState(false) // Cambiar a false por defecto
+  const [loading, setLoading] = useState(true)
   const router = useRouter()
   const pathname = usePathname()
 
   const signOut = async () => {
-    await supabase.auth.signOut()
+    await AuthService.signOut()
     setUser(null)
     router.push("/auth/login")
   }
 
   const refreshUser = async () => {
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-
-      if (session?.user) {
-        console.log("🔄 Refrescando datos del usuario...")
-        const authUser = await createAuthUser(session.user)
-        if (authUser) {
-          console.log("✅ Usuario actualizado:", authUser.name, "- Rol:", authUser.role)
-          setUser(authUser)
-        }
-      }
+      setLoading(true)
+      const authUser = await AuthService.getCurrentUser()
+      setUser(authUser)
     } catch (error) {
-      console.error("❌ Error refreshing user:", error)
+      console.error("Error refreshing user:", error)
+      setUser(null)
+    } finally {
+      setLoading(false)
     }
   }
 
-  // 🔄 Función SIMPLIFICADA para login (temporal)
-  const createAuthUser = async (sessionUser: any): Promise<AuthUser | null> => {
-    try {
-      console.log("🔍 Login simple para:", sessionUser.email)
-      
-      // Usar datos conocidos de la base de datos
-      if (sessionUser.email === "admin@biotissue.com.co") {
-        return {
-          id: sessionUser.id,
-          email: sessionUser.email,
-          name: "Andres Zapata",
-          role: "administrador",
-          mfa_enabled: false,
-        }
-      }
-      
-      if (sessionUser.email === "danelly8712@hotmail.com") {
-        return {
-          id: sessionUser.id,
-          email: sessionUser.email,
-          name: "Leydy Gil",
-          role: "soporte",
-          mfa_enabled: false,
-        }
-      }
-
-      if (sessionUser.email === "contacto@biotissue.com.co") {
-        return {
-          id: sessionUser.id,
-          email: sessionUser.email,
-          name: "Carlos Rojas",
-          role: "soporte",
-          mfa_enabled: false,
-        }
-      }
-
-      // Para otros usuarios, usar datos de sesión
-      return {
-        id: sessionUser.id,
-        email: sessionUser.email || "",
-        name: sessionUser.user_metadata?.name || sessionUser.email || "",
-        role: "soporte",
-        mfa_enabled: false,
-      }
-    } catch (error) {
-      console.error("❌ Error:", error)
-      return null
-    }
-  }
-
-  // Inicialización - obtener datos actuales
   useEffect(() => {
     const initAuth = async () => {
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession()
-
-        if (session?.user) {
-          console.log("🔄 Inicializando auth con datos actuales de BD...")
-          const authUser = await createAuthUser(session.user)
-          if (authUser) {
-            console.log("✅ Usuario cargado:", authUser.name, "- Rol:", authUser.role)
-            setUser(authUser)
-          }
-        }
+        const authUser = await AuthService.getCurrentUser()
+        setUser(authUser)
       } catch (error) {
         console.error("Auth error:", error)
+        setUser(null)
+      } finally {
+        setLoading(false)
       }
     }
 
     initAuth()
 
-    // Listener para cambios de auth - usar datos actuales de BD
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_IN" && session?.user) {
-        console.log("🔄 Login detectado, obteniendo datos actuales...")
-        const authUser = await createAuthUser(session.user)
-        if (authUser) {
-          console.log("✅ Usuario autenticado:", authUser.name, "- Rol:", authUser.role)
-          setUser(authUser)
-        }
-      } else if (event === "SIGNED_OUT") {
-        console.log("👋 Usuario desconectado")
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") {
         setUser(null)
+        setLoading(false)
+        return
       }
+
+      window.setTimeout(() => {
+        void refreshUser()
+      }, 0)
     })
 
     return () => subscription.unsubscribe()
   }, [])
 
-  // Redirección simple
   useEffect(() => {
+    if (loading) {
+      return
+    }
+
     const isAuthPage = pathname?.startsWith("/auth")
+    const isGlobalDashboard = pathname === "/dashboard-global"
 
     if (!user && !isAuthPage) {
       router.push("/auth/login")
+    } else if (user?.role === "gerente" && !isAuthPage && !isGlobalDashboard) {
+      router.push("/dashboard-global")
     } else if (user && isAuthPage && pathname !== "/auth/callback") {
-      router.push("/")
+      router.push(user.role === "gerente" ? "/dashboard-global" : "/")
     }
-  }, [user, pathname, router])
+  }, [user, pathname, router, loading])
 
   return <AuthContext.Provider value={{ user, loading, signOut, refreshUser }}>{children}</AuthContext.Provider>
 }

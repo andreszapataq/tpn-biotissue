@@ -10,8 +10,9 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { User, Settings, Shield, LogOut, Key, RefreshCw } from "lucide-react"
+import { User, Settings, Shield, LogOut, Key, RefreshCw, Building2, Globe } from "lucide-react"
 import { useAuth } from "./auth-provider"
+import { getRoleBadgeClassName, getRoleLabel } from "@/lib/roles"
 
 export function UserMenu() {
   const { user, signOut, refreshUser } = useAuth()
@@ -25,39 +26,6 @@ export function UserMenu() {
       .join("")
       .toUpperCase()
       .slice(0, 2)
-  }
-
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case "cirujano":
-        return "bg-blue-100 text-blue-800"
-      case "enfermera":
-      case "soporte":
-        return "bg-green-100 text-green-800"
-      case "administrador":
-        return "bg-purple-100 text-purple-800"
-      case "financiero":
-        return "bg-orange-100 text-orange-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
-  }
-
-  const getRoleLabel = (role: string) => {
-    switch (role) {
-      case "cirujano":
-        return "Cirujano"
-      case "enfermera":
-        return "Enfermera"
-      case "soporte":
-        return "Soporte"
-      case "administrador":
-        return "Administrador"
-      case "financiero":
-        return "Financiero"
-      default:
-        return role
-    }
   }
 
   return (
@@ -77,9 +45,13 @@ export function UserMenu() {
               {user.mfa_enabled && <Shield className="h-3 w-3 text-green-600" />}
             </div>
             <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
-            <Badge className={getRoleColor(user.role)} variant="secondary">
+            <Badge className={getRoleBadgeClassName(user.role)} variant="secondary">
               {getRoleLabel(user.role)}
             </Badge>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              {user.has_global_visibility ? <Globe className="h-3 w-3" /> : <Building2 className="h-3 w-3" />}
+              <span>{user.institution_name || "Sin institucion asignada"}</span>
+            </div>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
