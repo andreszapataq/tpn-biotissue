@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowLeft, Plus, Minus, Save, Loader2, CheckCircle, XCircle, Clock, Package, Settings, Edit } from "lucide-react"
+import { ArrowLeft, Plus, Minus, Save, Loader2, CheckCircle, XCircle, Clock, Package, Settings, Edit, Search, X } from "lucide-react"
 import Link from "next/link"
 import { supabase } from "@/lib/supabase"
 import { Tables } from "@/lib/database.types"
@@ -68,6 +68,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
   const [productUsage, setProductUsage] = useState<ProductUsage[]>([])
   const [availableProducts, setAvailableProducts] = useState<InventoryProduct[]>([])
   const [selectedProducts, setSelectedProducts] = useState<{ [key: string]: number }>({})
+  const [addProductSearch, setAddProductSearch] = useState("")
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [closing, setClosing] = useState(false)
@@ -1121,46 +1122,99 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                     <CardDescription>Seleccionar insumos adicionales para el tratamiento</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="space-y-3 max-h-64 overflow-y-auto">
-                      {availableProducts.map((product) => (
-                        <div key={product.id} className="flex items-center justify-between p-2 border rounded">
-                          <div className="flex-1">
-                            <p className="font-medium text-sm">{product.name}</p>
-                            <div className="flex items-center gap-1 mt-1">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <Input
+                        placeholder="Buscar por nombre, código o lote..."
+                        value={addProductSearch}
+                        onChange={(e) => setAddProductSearch(e.target.value)}
+                        className="pl-9 pr-9"
+                      />
+                      {addProductSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setAddProductSearch("")}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                    <div className="space-y-2 max-h-72 overflow-y-auto">
+                      {availableProducts
+                        .filter((product) => (product.stock || 0) > 0)
+                        .filter((product) => {
+                          if (!addProductSearch.trim()) return true
+                          const search = addProductSearch.toLowerCase()
+                          return (
+                            product.name?.toLowerCase().includes(search) ||
+                            product.code?.toLowerCase().includes(search) ||
+                            product.lote?.toLowerCase().includes(search)
+                          )
+                        })
+                        .map((product) => {
+                          const qty = selectedProducts[product.id] || 0
+                          const isSelected = qty > 0
+                          return (
+                        <div
+                          key={product.id}
+                          className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
+                            isSelected
+                              ? "border-blue-300 bg-blue-50/70 shadow-sm"
+                              : "border-gray-200 hover:border-gray-300"
+                          }`}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">{product.name}</p>
+                            <div className="flex items-center gap-1.5 mt-1">
                               <Badge variant="outline" className="text-xs">{product.code}</Badge>
-                              <Badge 
-                                variant={(product.stock || 0) <= (product.minimum_stock || 0) ? "destructive" : "secondary"}
-                                className="text-xs"
-                              >
-                                Stock: {product.stock || 0}
-                              </Badge>
+                              <span className="text-xs text-gray-400">|</span>
+                              <span className="text-xs text-gray-500">{product.stock} disp.</span>
                             </div>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleProductQuantityChange(product.id, -1)}
-                              disabled={!selectedProducts[product.id]}
-                              className="h-8 w-8 p-0 touch-manipulation"
-                            >
-                              <Minus className="h-4 w-4" />
-                            </Button>
-                            <span className="w-8 text-center text-sm font-medium">{selectedProducts[product.id] || 0}</span>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleProductQuantityChange(product.id, 1)}
-                              disabled={selectedProducts[product.id] >= (product.stock || 0)}
-                              className="h-8 w-8 p-0 touch-manipulation"
-                            >
-                              <Plus className="h-4 w-4" />
-                            </Button>
+                          <div className="flex items-center gap-1 ml-2">
+                            {isSelected ? (
+                              <>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleProductQuantityChange(product.id, -1)}
+                                  className="h-8 w-8 p-0 touch-manipulation border-blue-300 hover:bg-blue-100"
+                                >
+                                  <Minus className="h-3.5 w-3.5" />
+                                </Button>
+                                <div className="flex flex-col items-center w-10">
+                                  <span className="text-sm font-bold text-blue-700 leading-none">{qty}</span>
+                                  <span className="text-[10px] text-blue-500 leading-tight">uds.</span>
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleProductQuantityChange(product.id, 1)}
+                                  disabled={qty >= (product.stock || 0)}
+                                  className="h-8 w-8 p-0 touch-manipulation border-blue-300 hover:bg-blue-100"
+                                >
+                                  <Plus className="h-3.5 w-3.5" />
+                                </Button>
+                              </>
+                            ) : (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleProductQuantityChange(product.id, 1)}
+                                className="h-8 px-3 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 touch-manipulation"
+                              >
+                                <Plus className="h-3.5 w-3.5 mr-1" />
+                                Agregar
+                              </Button>
+                            )}
                           </div>
                         </div>
-                      ))}
+                          )
+                        })}
                     </div>
                     
                     {Object.keys(selectedProducts).length > 0 && (
