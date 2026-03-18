@@ -29,6 +29,7 @@ const DashboardContent = memo(function DashboardContent() {
   const [totalClosedProcedures, setTotalClosedProcedures] = useState(0)
   const [inventoryAlerts, setInventoryAlerts] = useState(0)
   const [activeMachines, setActiveMachines] = useState(0)
+  const [machinesInUseCount, setMachinesInUseCount] = useState(0)
   const [closedProcedures, setClosedProcedures] = useState<any[]>([])
   const [activeProcedures, setActiveProcedures] = useState<any[]>([])
   const [patients, setPatients] = useState<any[]>([])
@@ -61,14 +62,18 @@ const DashboardContent = memo(function DashboardContent() {
   const filteredClosedProcedures = closedProcedures.filter(procedure => {
     if (!searchTerm) return true
     const term = searchTerm.toLowerCase()
+    const machineMatch = procedure.procedure_machines?.some((pm: any) =>
+      pm.machine?.model?.toLowerCase().includes(term) ||
+      pm.machine?.lote?.toLowerCase().includes(term)
+    ) || procedure.machine?.model?.toLowerCase().includes(term) ||
+      procedure.machine?.lote?.toLowerCase().includes(term)
     return (
       procedure.patient?.name?.toLowerCase().includes(term) ||
       procedure.patient?.identification?.toLowerCase().includes(term) ||
       procedure.surgeon_name?.toLowerCase().includes(term) ||
       procedure.diagnosis?.toLowerCase().includes(term) ||
       procedure.location?.toLowerCase().includes(term) ||
-      procedure.machine?.model?.toLowerCase().includes(term) ||
-      procedure.machine?.lote?.toLowerCase().includes(term)
+      machineMatch
     )
   })
 
@@ -241,14 +246,26 @@ const DashboardContent = memo(function DashboardContent() {
       setTotalClosedProcedures(closedProceduresResult.count || 0)
       setInventoryAlerts(inventoryResult.data?.length || 0)
       
-      // Cargar máquinas activas
-      const { data: machinesData } = await supabase
-        .from("machines")
-        .select("*", { count: "exact" })
-        .eq("institution_id", selectedInstitutionId)
-        .eq("status", "active")
-      
+      // Cargar máquinas activas y máquinas en uso
+      const [machinesDataResult, usedMachinesResult] = await Promise.all([
+        supabase
+          .from("machines")
+          .select("*", { count: "exact" })
+          .eq("institution_id", selectedInstitutionId)
+          .eq("status", "active"),
+        supabase
+          .from("procedure_machines")
+          .select("machine_id, procedure:procedures!inner(status)")
+          .eq("institution_id", selectedInstitutionId)
+          .eq("procedure.status", "active")
+      ])
+
+      const machinesData = machinesDataResult.data
       setActiveMachines(machinesData?.length || 0)
+
+      // Contar máquinas únicas en uso
+      const uniqueUsedMachines = new Set(usedMachinesResult.data?.map(pm => pm.machine_id) || [])
+      setMachinesInUseCount(uniqueUsedMachines.size)
 
       // Cargar procedimientos activos
       const { data: activeProceduresData } = await supabase
@@ -256,7 +273,8 @@ const DashboardContent = memo(function DashboardContent() {
         .select(`
           *,
           patient:patients(name, identification),
-          machine:machines(model, lote)
+          machine:machines(model, lote),
+          procedure_machines(machine_id, machine:machines(model, lote))
         `)
         .eq("institution_id", selectedInstitutionId)
         .eq("status", "active")
@@ -268,7 +286,8 @@ const DashboardContent = memo(function DashboardContent() {
         .select(`
           *,
           patient:patients(name, identification, status),
-          machine:machines(model, lote)
+          machine:machines(model, lote),
+          procedure_machines(machine_id, machine:machines(model, lote))
         `)
         .eq("institution_id", selectedInstitutionId)
         .eq("status", "completed")
@@ -416,7 +435,7 @@ const DashboardContent = memo(function DashboardContent() {
               iconColor: "text-emerald-600",
               iconBg: "bg-emerald-50/80",
               label: "Disponibles",
-              value: activeMachines - activeProcedures.length,
+              value: activeMachines - machinesInUseCount,
               valueColor: "text-emerald-600",
               description: "Máquinas listas para usar",
             },
@@ -463,8 +482,11 @@ const DashboardContent = memo(function DashboardContent() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {activeProcedures.map((procedure: any) => {
-                const machineName = getMachineDisplayName(procedure.machine?.model || '', procedure.machine?.lote || '')
-                const machineLote = procedure.machine?.lote || ''
+                // Use procedure_machines if available, fall back to legacy machine FK
+                const procedureMachines = procedure.procedure_machines?.length > 0
+                  ? procedure.procedure_machines.map((pm: any) => pm.machine)
+                  : procedure.machine ? [procedure.machine] : []
+
                 return (
                 <Card
                   key={procedure.id}
@@ -498,20 +520,34 @@ const DashboardContent = memo(function DashboardContent() {
                       </div>
                     </div>
 
-                    {/* Machine info — full width with tooltip showing lote */}
+                    {/* Machine info — supports multiple machines */}
                     <div className="bg-slate-50/80 rounded-lg px-3 py-2 mb-3">
-                      <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wide mb-0.5">Máquina</p>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <p className="text-sm text-slate-700 font-medium truncate cursor-default">{machineName}</p>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom" className="max-w-xs">
-                          <div className="space-y-1">
-                            <p className="font-medium">{machineName}</p>
-                            {machineLote && <p className="text-xs text-muted-foreground">Lote: {machineLote}</p>}
-                          </div>
-                        </TooltipContent>
-                      </Tooltip>
+                      <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wide mb-0.5">
+                        Máquina{procedureMachines.length !== 1 ? 's' : ''}
+                      </p>
+                      {procedureMachines.length === 0 ? (
+                        <p className="text-sm text-slate-400 italic">Sin máquina asignada</p>
+                      ) : (
+                        <div className="space-y-1">
+                          {procedureMachines.map((machine: any, idx: number) => {
+                            const name = getMachineDisplayName(machine?.model || '', machine?.lote || '')
+                            const lote = machine?.lote || ''
+                            return (
+                              <Tooltip key={idx}>
+                                <TooltipTrigger asChild>
+                                  <p className="text-sm text-slate-700 font-medium truncate cursor-default">{name}</p>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="max-w-xs">
+                                  <div className="space-y-1">
+                                    <p className="font-medium">{name}</p>
+                                    {lote && <p className="text-xs text-muted-foreground">Lote: {lote}</p>}
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            )
+                          })}
+                        </div>
+                      )}
                     </div>
 
                     <Link href={`/procedimiento/${procedure.id}`}>
@@ -737,18 +773,29 @@ const DashboardContent = memo(function DashboardContent() {
                               <p className="text-gray-900">{procedure.location || 'No especificada'}</p>
                             </div>
                             <div>
-                              <p className="font-medium text-gray-600">Máquina</p>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <p className="text-gray-900 truncate cursor-default">{getMachineDisplayName(procedure.machine?.model || '', procedure.machine?.lote || '')}</p>
-                                </TooltipTrigger>
-                                <TooltipContent side="bottom" className="max-w-xs">
-                                  <div className="space-y-1">
-                                    <p className="font-medium">{getMachineDisplayName(procedure.machine?.model || '', procedure.machine?.lote || '')}</p>
-                                    {procedure.machine?.lote && <p className="text-xs text-muted-foreground">Lote: {procedure.machine.lote}</p>}
-                                  </div>
-                                </TooltipContent>
-                              </Tooltip>
+                              <p className="font-medium text-gray-600">Máquina{((procedure.procedure_machines?.length || 0) > 1) ? 's' : ''}</p>
+                              {(() => {
+                                const machines = procedure.procedure_machines?.length > 0
+                                  ? procedure.procedure_machines.map((pm: any) => pm.machine)
+                                  : procedure.machine ? [procedure.machine] : []
+                                return machines.length === 0 ? (
+                                  <p className="text-gray-400 italic">Sin máquina</p>
+                                ) : (
+                                  machines.map((m: any, idx: number) => (
+                                    <Tooltip key={idx}>
+                                      <TooltipTrigger asChild>
+                                        <p className="text-gray-900 truncate cursor-default">{getMachineDisplayName(m?.model || '', m?.lote || '')}</p>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="bottom" className="max-w-xs">
+                                        <div className="space-y-1">
+                                          <p className="font-medium">{getMachineDisplayName(m?.model || '', m?.lote || '')}</p>
+                                          {m?.lote && <p className="text-xs text-muted-foreground">Lote: {m.lote}</p>}
+                                        </div>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  ))
+                                )
+                              })()}
                             </div>
                             <div>
                               <p className="font-medium text-gray-600">Finalizado</p>

@@ -8,8 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
 import { ArrowLeft, Plus, Minus, Save, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { supabase } from "@/lib/supabase"
@@ -49,7 +49,7 @@ export default function NuevoProcedimiento() {
     assistant: "",
     diagnosis: "",
     location: "",
-    machine: "",
+    machines: [] as string[],
   })
 
 
@@ -81,23 +81,23 @@ export default function NuevoProcedimiento() {
         return
       }
       
-      const [machinesResult, productsResult, activeProceduresResult] = await Promise.all([
+      const [machinesResult, productsResult, activeProcedureMachinesResult] = await Promise.all([
         supabase.from("machines").select("*").eq("institution_id", selectedInstitutionId).eq("status", "active").order("model", { ascending: true }),
         supabase.from("inventory_products").select("*").eq("institution_id", selectedInstitutionId).order("name", { ascending: true }),
-        supabase.from("procedures").select("machine_id").eq("institution_id", selectedInstitutionId).eq("status", "active")
+        supabase.from("procedure_machines").select("machine_id, procedure:procedures!inner(status)").eq("institution_id", selectedInstitutionId).eq("procedure.status", "active")
       ])
 
       if (machinesResult.error) throw machinesResult.error
       if (productsResult.error) throw productsResult.error
-      if (activeProceduresResult.error) throw activeProceduresResult.error
+      if (activeProcedureMachinesResult.error) throw activeProcedureMachinesResult.error
 
       // Obtener IDs de máquinas que están siendo usadas en procedimientos activos
       const usedMachineIds = new Set(
-        activeProceduresResult.data?.map(proc => proc.machine_id).filter(Boolean) || []
+        activeProcedureMachinesResult.data?.map(pm => pm.machine_id).filter(Boolean) || []
       )
 
       // Filtrar máquinas disponibles (no en uso)
-      const availableMachines = machinesResult.data?.filter(machine => 
+      const availableMachines = machinesResult.data?.filter(machine =>
         !usedMachineIds.has(machine.id)
       ) || []
 
@@ -307,13 +307,12 @@ export default function NuevoProcedimiento() {
       // 3. 🔍 Verificar si ya existe un procedimiento reciente para evitar duplicados
       console.log("🔍 Checking for recent procedures to prevent duplicates...")
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
-      
+
       const { data: recentProcedures } = await supabase
         .from("procedures")
         .select("id, created_at")
         .eq("institution_id", selectedInstitutionId || "")
         .eq("patient_id", patient.id)
-        .eq("machine_id", formData.machine)
         .eq("surgeon_name", formData.surgeon)
         .eq("status", "active")
         .gte("created_at", fiveMinutesAgo)
@@ -333,7 +332,7 @@ export default function NuevoProcedimiento() {
       const procedureData: any = {
         institution_id: selectedInstitutionId || undefined,
         patient_id: patient.id,
-        machine_id: formData.machine || null, // null si no se selecciona máquina
+        machine_id: formData.machines.length > 0 ? formData.machines[0] : null, // Primera máquina para backward compat
         surgeon_name: formData.surgeon,
         assistant_name: formData.assistant || null,
         procedure_date: formData.date,
@@ -343,12 +342,12 @@ export default function NuevoProcedimiento() {
         location: formData.location || null,
         status: "active"
       }
-      
+
       // Solo agregar created_by si tenemos un usuario válido
       if (userProfile?.id) {
         procedureData.created_by = userProfile.id
       }
-      
+
       console.log("📋 Creating procedure with data:", procedureData)
 
       const { data: procedure, error: procedureError } = await supabase
@@ -362,6 +361,25 @@ export default function NuevoProcedimiento() {
         throw procedureError
       }
       console.log("✅ Procedure created successfully:", procedure.id)
+
+      // 4.1 Insertar máquinas en la tabla procedure_machines
+      if (formData.machines.length > 0) {
+        const procedureMachines = formData.machines.map(machineId => ({
+          procedure_id: procedure.id,
+          machine_id: machineId,
+          institution_id: selectedInstitutionId || "",
+        }))
+
+        const { error: pmError } = await supabase
+          .from("procedure_machines")
+          .insert(procedureMachines)
+
+        if (pmError) {
+          console.error("❌ Error inserting procedure_machines:", pmError)
+          throw pmError
+        }
+        console.log("✅ Procedure machines inserted:", formData.machines.length)
+      }
 
       // 5. Registrar productos utilizados y actualizar inventario
       console.log("📦 Processing inventory updates for products:", Object.keys(selectedProducts))
@@ -676,17 +694,22 @@ export default function NuevoProcedimiento() {
             </CardContent>
           </Card>
 
-          {/* Máquina NPWT */}
+          {/* Máquinas NPWT */}
           <Card>
             <CardHeader>
-              <CardTitle>Máquina NPWT</CardTitle>
+              <CardTitle>Máquinas NPWT</CardTitle>
               <CardDescription>
-                Seleccionar equipo utilizado si el procedimiento lo requiere • {machines.length} máquina{machines.length !== 1 ? 's' : ''} disponible{machines.length !== 1 ? 's' : ''}
+                Seleccionar equipos utilizados si el procedimiento lo requiere • {machines.length} máquina{machines.length !== 1 ? 's' : ''} disponible{machines.length !== 1 ? 's' : ''}
+                {formData.machines.length > 0 && (
+                  <span className="ml-2 font-medium text-blue-700">
+                    ({formData.machines.length} seleccionada{formData.machines.length !== 1 ? 's' : ''})
+                  </span>
+                )}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div>
-                <Label htmlFor="machine">Máquina Utilizada</Label>
+                <Label>Máquinas Utilizadas</Label>
                 {machines.length === 0 ? (
                   <div className="mt-2 p-4 border border-blue-200 rounded-lg bg-blue-50">
                     <div className="flex items-center gap-2 text-blue-800">
@@ -698,27 +721,40 @@ export default function NuevoProcedimiento() {
                     </p>
                   </div>
                 ) : (
-                  <Select
-                    value={formData.machine}
-                    onValueChange={(value) => setFormData((prev) => ({ ...prev, machine: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar máquina NPWT (opcional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {machines.map((machine) => (
-                        <SelectItem key={machine.id} value={machine.id}>
-                          <div className="flex items-center gap-2">
-                            <span>{getMachineDisplayName(machine.model, machine.lote)}</span>
+                  <div className="mt-2 space-y-2">
+                    {machines.map((machine) => {
+                      const isSelected = formData.machines.includes(machine.id)
+                      return (
+                        <label
+                          key={machine.id}
+                          className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+                            isSelected
+                              ? "border-blue-500 bg-blue-50/60"
+                              : "border-gray-200 hover:bg-gray-50"
+                          }`}
+                        >
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={(checked) => {
+                              setFormData((prev) => ({
+                                ...prev,
+                                machines: checked
+                                  ? [...prev.machines, machine.id]
+                                  : prev.machines.filter((id) => id !== machine.id),
+                              }))
+                            }}
+                          />
+                          <div className="flex items-center gap-2 flex-1">
+                            <span className="font-medium">{getMachineDisplayName(machine.model, machine.lote)}</span>
                             <Badge variant="outline" className="text-xs">
                               Lote: {machine.lote}
                             </Badge>
                             {getMachineStatusBadge(true)}
                           </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                        </label>
+                      )
+                    })}
+                  </div>
                 )}
               </div>
             </CardContent>
@@ -776,20 +812,15 @@ export default function NuevoProcedimiento() {
                 <Link href="/">
                   <Button variant="outline">Cancelar</Button>
                 </Link>
-                <Button 
-                  type="submit" 
-                  className="min-w-32" 
-                  disabled={saving || machines.length === 0}
+                <Button
+                  type="submit"
+                  className="min-w-32"
+                  disabled={saving}
                 >
                   {saving ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       Guardando...
-                    </>
-                  ) : machines.length === 0 ? (
-                    <>
-                      <Save className="h-4 w-4 mr-2" />
-                      Sin Máquinas Disponibles
                     </>
                   ) : (
                     <>

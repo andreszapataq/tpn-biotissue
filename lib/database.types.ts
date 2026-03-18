@@ -347,6 +347,52 @@ export type Database = {
           },
         ]
       }
+      procedure_machines: {
+        Row: {
+          id: string
+          procedure_id: string
+          machine_id: string
+          institution_id: string
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          procedure_id: string
+          machine_id: string
+          institution_id: string
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          procedure_id?: string
+          machine_id?: string
+          institution_id?: string
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "procedure_machines_procedure_id_fkey"
+            columns: ["procedure_id"]
+            isOneToOne: false
+            referencedRelation: "procedures"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "procedure_machines_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "procedure_machines_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       procedure_products: {
         Row: {
           created_at: string | null

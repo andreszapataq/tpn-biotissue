@@ -17,6 +17,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { ArrowLeft, Plus, Minus, Save, Loader2, CheckCircle, XCircle, Clock, Package, Settings, Edit } from "lucide-react"
@@ -37,9 +47,15 @@ type Machine = Tables<"machines">
 type InventoryProduct = Tables<"inventory_products">
 type ProcedureProduct = Tables<"procedure_products">
 
+interface ProcedureMachineRow {
+  machine_id: string
+  machine: Machine
+}
+
 interface ProcedureDetails extends Procedure {
   patient: Patient
   machine: Machine | null
+  procedure_machines: ProcedureMachineRow[]
 }
 
 interface ProductUsage extends ProcedureProduct {
@@ -61,6 +77,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
   const [isChangeMachineDialogOpen, setIsChangeMachineDialogOpen] = useState(false)
   const [selectedNewMachine, setSelectedNewMachine] = useState("")
   const [changingMachine, setChangingMachine] = useState(false)
+  const [machineToRemove, setMachineToRemove] = useState<string | null>(null)
 
   // Estados para edición de procedimiento
   const [isEditGeneralDialogOpen, setIsEditGeneralDialogOpen] = useState(false)
@@ -98,7 +115,8 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
         .select(`
           *,
           patient:patients(*),
-          machine:machines(*)
+          machine:machines(*),
+          procedure_machines(machine_id, machine:machines(*))
         `)
         .eq("id", resolvedParams.id)
         .single()
@@ -132,9 +150,13 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
 
       setAvailableProducts(productsData || [])
 
-      // Cargar máquinas disponibles para cambio (solo si el procedimiento está activo)
-      if (procedureData?.status === "active" && procedureData.machine_id) {
-        await loadAvailableMachines(procedureData.machine_id)
+      // Cargar máquinas disponibles para cambio/adición (solo si el procedimiento está activo)
+      if (procedureData?.status === "active") {
+        const currentMachineIds = (procedureData as ProcedureDetails).procedure_machines?.map(pm => pm.machine_id) || []
+        if (currentMachineIds.length === 0 && procedureData.machine_id) {
+          currentMachineIds.push(procedureData.machine_id)
+        }
+        await loadAvailableMachines(currentMachineIds, (procedureData as ProcedureDetails).institution_id)
       }
 
     } catch (error: any) {
@@ -149,36 +171,40 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
     }
   }
 
-  // Cargar máquinas disponibles para cambio
-  const loadAvailableMachines = async (currentMachineId: string) => {
+  // Cargar máquinas disponibles para cambio/adición
+  const loadAvailableMachines = async (currentMachineIds: string[], institutionId?: string) => {
+    const instId = institutionId || procedure?.institution_id || ""
     try {
-      // Cargar todas las máquinas activas y procedimientos activos en paralelo
-      const [machinesResult, activeProceduresResult] = await Promise.all([
+      // Cargar todas las máquinas activas y máquinas en uso en procedimientos activos (excluyendo el actual)
+      const [machinesResult, activeProcedureMachinesResult] = await Promise.all([
         supabase
           .from("machines")
           .select("*")
-          .eq("institution_id", procedure?.institution_id || "")
+          .eq("institution_id", instId)
           .eq("status", "active")
           .order("model", { ascending: true }),
         supabase
-          .from("procedures")
-          .select("machine_id")
-          .eq("institution_id", procedure?.institution_id || "")
-          .eq("status", "active")
-          .neq("id", resolvedParams.id) // Excluir el procedimiento actual
+          .from("procedure_machines")
+          .select("machine_id, procedure:procedures!inner(id, status)")
+          .eq("institution_id", instId)
+          .eq("procedure.status", "active")
       ])
 
       if (machinesResult.error) throw machinesResult.error
-      if (activeProceduresResult.error) throw activeProceduresResult.error
+      if (activeProcedureMachinesResult.error) throw activeProcedureMachinesResult.error
 
-      // Crear set de máquinas en uso (excluyendo la máquina actual)
+      // Crear set de máquinas en uso en OTROS procedimientos activos
       const usedMachineIds = new Set(
-        activeProceduresResult.data?.map(proc => proc.machine_id).filter((id): id is string => Boolean(id)) || []
+        activeProcedureMachinesResult.data
+          ?.filter((pm: any) => pm.procedure?.id !== resolvedParams.id)
+          .map(pm => pm.machine_id)
+          .filter(Boolean) || []
       )
 
-      // Filtrar máquinas disponibles (no en uso y diferentes a la actual)
-      const availableMachinesForChange = machinesResult.data?.filter(machine => 
-        !usedMachineIds.has(machine.id) && machine.id !== currentMachineId
+      // Filtrar máquinas disponibles (no en uso en otros procedimientos y no ya asignadas a este)
+      const currentMachineIdSet = new Set(currentMachineIds)
+      const availableMachinesForChange = machinesResult.data?.filter(machine =>
+        !usedMachineIds.has(machine.id) && !currentMachineIdSet.has(machine.id)
       ) || []
 
       setAvailableMachines(availableMachinesForChange)
@@ -192,9 +218,8 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
     }
   }
 
-  // Cambiar máquina del procedimiento
-  const handleChangeMachine = async () => {
-    // ✅ Verificar permisos antes de proceder
+  // Agregar máquina al procedimiento
+  const handleAddMachine = async () => {
     if (!permissions.canEditMachines) {
       toast({
         title: "Acceso Denegado",
@@ -209,34 +234,83 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
     try {
       setChangingMachine(true)
 
-      // Actualizar la máquina del procedimiento
-      const { error: procedureError } = await supabase
-        .from("procedures")
-        .update({ 
+      // Insertar en procedure_machines
+      const { error: pmError } = await supabase
+        .from("procedure_machines")
+        .insert({
+          procedure_id: procedure.id,
           machine_id: selectedNewMachine,
+          institution_id: procedure.institution_id,
+        })
+
+      if (pmError) throw pmError
+
+      // Actualizar machine_id en procedures para backward compat (solo si no tiene una)
+      if (!procedure.machine_id) {
+        await supabase
+          .from("procedures")
+          .update({ machine_id: selectedNewMachine, updated_at: new Date().toISOString() })
+          .eq("id", procedure.id)
+      }
+
+      toast({
+        title: "Éxito",
+        description: "Máquina agregada correctamente",
+      })
+
+      setIsChangeMachineDialogOpen(false)
+      setSelectedNewMachine("")
+      await loadProcedureData()
+
+    } catch (error: any) {
+      console.error("Error adding machine:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo agregar la máquina",
+        variant: "destructive",
+      })
+    } finally {
+      setChangingMachine(false)
+    }
+  }
+
+  // Quitar máquina del procedimiento
+  const handleRemoveMachine = async (machineId: string) => {
+    if (!permissions.canEditMachines || !procedure) return
+
+    try {
+      setChangingMachine(true)
+
+      const { error } = await supabase
+        .from("procedure_machines")
+        .delete()
+        .eq("procedure_id", procedure.id)
+        .eq("machine_id", machineId)
+
+      if (error) throw error
+
+      // Actualizar machine_id en procedures para backward compat
+      const remaining = procedure.procedure_machines.filter(pm => pm.machine_id !== machineId)
+      await supabase
+        .from("procedures")
+        .update({
+          machine_id: remaining.length > 0 ? remaining[0].machine_id : null,
           updated_at: new Date().toISOString()
         })
         .eq("id", procedure.id)
 
-      if (procedureError) throw procedureError
-
       toast({
         title: "Éxito",
-        description: "Máquina cambiada correctamente",
+        description: "Máquina removida correctamente",
       })
 
-      // Cerrar el diálogo y limpiar la selección
-      setIsChangeMachineDialogOpen(false)
-      setSelectedNewMachine("")
-
-      // Recargar los datos del procedimiento
       await loadProcedureData()
 
     } catch (error: any) {
-      console.error("Error changing machine:", error)
+      console.error("Error removing machine:", error)
       toast({
         title: "Error",
-        description: "No se pudo cambiar la máquina",
+        description: "No se pudo remover la máquina",
         variant: "destructive",
       })
     } finally {
@@ -808,39 +882,32 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                 </CardContent>
               </Card>
 
-              {/* Máquina Utilizada */}
+              {/* Máquinas Utilizadas */}
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <CardTitle>Equipo NPWT</CardTitle>
-                    {procedure.status === "active" && permissions.canEditMachines && procedure.machine && (
+                    <CardTitle>Equipos NPWT</CardTitle>
+                    {procedure.status === "active" && permissions.canEditMachines && availableMachines.length > 0 && (
                       <Dialog open={isChangeMachineDialogOpen} onOpenChange={setIsChangeMachineDialogOpen}>
                         <DialogTrigger asChild>
                           <Button variant="outline" size="sm">
-                            <Settings className="h-4 w-4 mr-2" />
-                            Cambiar Máquina
+                            <Plus className="h-4 w-4 mr-2" />
+                            Agregar Máquina
                           </Button>
                         </DialogTrigger>
                         <DialogContent>
                           <DialogHeader>
-                            <DialogTitle>Cambiar Máquina del Procedimiento</DialogTitle>
+                            <DialogTitle>Agregar Máquina al Procedimiento</DialogTitle>
                             <DialogDescription>
-                              Seleccione una nueva máquina disponible. La máquina anterior se liberará automáticamente.
+                              Seleccione una máquina disponible para agregar a este procedimiento.
                             </DialogDescription>
                           </DialogHeader>
                           <div className="space-y-4">
                             <div>
-                              <Label>Máquina Actual</Label>
-                              <div className="p-3 bg-gray-50 rounded border">
-                                <p className="font-medium">{getMachineDisplayName(procedure.machine.model, procedure.machine.lote)}</p>
-                                <p className="text-sm text-gray-600">Lote: {procedure.machine.lote}</p>
-                              </div>
-                            </div>
-                            <div>
-                              <Label htmlFor="new-machine">Nueva Máquina</Label>
+                              <Label htmlFor="new-machine">Máquina a Agregar</Label>
                               {availableMachines.length === 0 ? (
                                 <div className="p-3 border border-orange-200 rounded bg-orange-50">
-                                  <p className="text-sm text-orange-800">No hay máquinas disponibles para cambio</p>
+                                  <p className="text-sm text-orange-800">No hay máquinas disponibles</p>
                                   <p className="text-xs text-orange-600 mt-1">
                                     Todas las demás máquinas están en uso o no están disponibles
                                   </p>
@@ -848,7 +915,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                               ) : (
                                 <Select value={selectedNewMachine} onValueChange={setSelectedNewMachine}>
                                   <SelectTrigger>
-                                    <SelectValue placeholder="Seleccionar nueva máquina" />
+                                    <SelectValue placeholder="Seleccionar máquina" />
                                   </SelectTrigger>
                                   <SelectContent>
                                     {availableMachines.map((machine) => (
@@ -870,8 +937,8 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                             </div>
                           </div>
                           <DialogFooter>
-                            <Button 
-                              variant="outline" 
+                            <Button
+                              variant="outline"
                               onClick={() => {
                                 setIsChangeMachineDialogOpen(false)
                                 setSelectedNewMachine("")
@@ -880,18 +947,18 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                               Cancelar
                             </Button>
                             <Button
-                              onClick={handleChangeMachine}
-                              disabled={changingMachine || !selectedNewMachine || availableMachines.length === 0}
+                              onClick={handleAddMachine}
+                              disabled={changingMachine || !selectedNewMachine}
                             >
                               {changingMachine ? (
                                 <>
                                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                  Cambiando...
+                                  Agregando...
                                 </>
                               ) : (
                                 <>
-                                  <Settings className="h-4 w-4 mr-2" />
-                                  Cambiar Máquina
+                                  <Plus className="h-4 w-4 mr-2" />
+                                  Agregar Máquina
                                 </>
                               )}
                             </Button>
@@ -902,100 +969,61 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {procedure.machine ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label className="text-sm font-medium text-gray-500">Modelo</Label>
-                        <p className="text-lg font-semibold">{getMachineDisplayName(procedure.machine.model, procedure.machine.lote)}</p>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium text-gray-500">Lote</Label>
-                        <p className="text-lg font-semibold">{procedure.machine.lote}</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                        <p className="text-blue-800 font-medium">Sin máquina asignada</p>
-                        <p className="text-blue-600 text-sm mt-1">
-                          Este procedimiento no requiere equipo NPWT (ej: colocación de apósitos)
-                        </p>
-                        {procedure.status === "active" && permissions.canEditMachines && availableMachines.length > 0 && (
-                          <div className="mt-4">
-                            <Dialog open={isChangeMachineDialogOpen} onOpenChange={setIsChangeMachineDialogOpen}>
-                              <DialogTrigger asChild>
-                                <Button variant="outline" size="sm">
-                                  <Plus className="h-4 w-4 mr-2" />
-                                  Asignar Máquina
-                                </Button>
-                              </DialogTrigger>
-                              <DialogContent>
-                                <DialogHeader>
-                                  <DialogTitle>Asignar Máquina al Procedimiento</DialogTitle>
-                                  <DialogDescription>
-                                    Seleccione una máquina disponible para asignar a este procedimiento.
-                                  </DialogDescription>
-                                </DialogHeader>
-                                <div className="space-y-4">
-                                  <div>
-                                    <Label htmlFor="new-machine">Máquina a Asignar</Label>
-                                    <Select value={selectedNewMachine} onValueChange={setSelectedNewMachine}>
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Seleccionar máquina" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {availableMachines.map((machine) => (
-                                          <SelectItem key={machine.id} value={machine.id}>
-                                            <div className="flex items-center gap-2">
-                                              <span>{getMachineDisplayName(machine.model, machine.lote)}</span>
-                                              <Badge variant="outline" className="text-xs">
-                                                Lote: {machine.lote}
-                                              </Badge>
-                                            </div>
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                </div>
-                                <DialogFooter>
-                                  <Button
-                                    variant="outline"
-                                    onClick={() => {
-                                      setIsChangeMachineDialogOpen(false)
-                                      setSelectedNewMachine("")
-                                    }}
-                                  >
-                                    Cancelar
-                                  </Button>
-                                  <Button
-                                    onClick={handleChangeMachine}
-                                    disabled={!selectedNewMachine || changingMachine}
-                                  >
-                                    {changingMachine ? (
-                                      <>
-                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                        Asignando...
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Settings className="h-4 w-4 mr-2" />
-                                        Asignar Máquina
-                                      </>
-                                    )}
-                                  </Button>
-                                </DialogFooter>
-                              </DialogContent>
-                            </Dialog>
+                  {(() => {
+                    const machines = procedure.procedure_machines?.length > 0
+                      ? procedure.procedure_machines.map(pm => pm.machine)
+                      : procedure.machine ? [procedure.machine] : []
+                    const machineIds = procedure.procedure_machines?.length > 0
+                      ? procedure.procedure_machines.map(pm => pm.machine_id)
+                      : procedure.machine_id ? [procedure.machine_id] : []
+
+                    if (machines.length === 0) {
+                      return (
+                        <div className="text-center py-8">
+                          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                            <p className="text-blue-800 font-medium">Sin máquina asignada</p>
+                            <p className="text-blue-600 text-sm mt-1">
+                              Este procedimiento no tiene equipo NPWT asignado
+                            </p>
                           </div>
-                        )}
+                        </div>
+                      )
+                    }
+
+                    return (
+                      <div className="space-y-3">
+                        {machines.map((machine, idx) => (
+                          <div key={machineIds[idx] || idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1">
+                              <div>
+                                <Label className="text-sm font-medium text-gray-500">Modelo</Label>
+                                <p className="text-lg font-semibold">{getMachineDisplayName(machine.model, machine.lote)}</p>
+                              </div>
+                              <div>
+                                <Label className="text-sm font-medium text-gray-500">Lote</Label>
+                                <p className="text-lg font-semibold">{machine.lote}</p>
+                              </div>
+                            </div>
+                            {procedure.status === "active" && permissions.canEditMachines && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50 ml-2"
+                                onClick={() => setMachineToRemove(machineIds[idx])}
+                                disabled={changingMachine}
+                              >
+                                <XCircle className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        ))}
                       </div>
-                    </div>
-                  )}
+                    )
+                  })()}
                   {procedure.status === "active" && permissions.canEditMachines && (
                     <div className="mt-4 pt-4 border-t">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600">Máquinas disponibles para cambio:</span>
+                        <span className="text-gray-600">Máquinas disponibles para agregar:</span>
                         <Badge variant="outline" className={availableMachines.length > 0 ? "text-green-700" : "text-orange-700"}>
                           {availableMachines.length} disponibles
                         </Badge>
@@ -1004,6 +1032,32 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                   )}
                 </CardContent>
               </Card>
+
+              {/* Confirmación para quitar máquina */}
+              <AlertDialog open={!!machineToRemove} onOpenChange={(open) => { if (!open) setMachineToRemove(null) }}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>¿Está seguro?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Esta acción quitará la máquina del procedimiento. Podrá volver a agregarla después si lo necesita.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="bg-red-600 hover:bg-red-700"
+                      onClick={() => {
+                        if (machineToRemove) {
+                          handleRemoveMachine(machineToRemove)
+                          setMachineToRemove(null)
+                        }
+                      }}
+                    >
+                      Quitar máquina
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
 
             {/* Panel de Insumos */}

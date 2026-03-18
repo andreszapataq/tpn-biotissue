@@ -77,26 +77,26 @@ export default function Maquinas() {
         return
       }
       
-      // Cargar máquinas y procedimientos activos en paralelo
-      const [machinesResult, activeProceduresResult] = await Promise.all([
+      // Cargar máquinas y máquinas en uso via procedure_machines
+      const [machinesResult, activeProcedureMachinesResult] = await Promise.all([
         supabase
           .from("machines")
           .select("*")
           .eq("institution_id", selectedInstitutionId)
           .order("lote", { ascending: true }),
         supabase
-          .from("procedures")
-          .select("machine_id")
+          .from("procedure_machines")
+          .select("machine_id, procedure:procedures!inner(status)")
           .eq("institution_id", selectedInstitutionId)
-          .eq("status", "active")
+          .eq("procedure.status", "active")
       ])
 
       if (machinesResult.error) throw machinesResult.error
-      if (activeProceduresResult.error) throw activeProceduresResult.error
+      if (activeProcedureMachinesResult.error) throw activeProcedureMachinesResult.error
 
       // Crear set de máquinas en uso
       const usedMachineIds = new Set(
-        activeProceduresResult.data?.map(proc => proc.machine_id).filter((id): id is string => Boolean(id)) || []
+        activeProcedureMachinesResult.data?.map(pm => pm.machine_id).filter((id): id is string => Boolean(id)) || []
       )
 
       setMachines(machinesResult.data || [])
@@ -197,11 +197,24 @@ export default function Maquinas() {
 
   // Eliminar máquina
   const handleDeleteMachine = async (machineId: string) => {
-    // Primero verificar si la máquina está siendo usada en procedimientos
-    const { data: procedures } = await supabase
-      .from("procedures")
-      .select("id, patient:patients(name), procedure_date, status")
+    // Verificar si la máquina está siendo usada en procedimientos (via procedure_machines)
+    const { data: pmData } = await supabase
+      .from("procedure_machines")
+      .select("procedure_id, procedure:procedures!inner(id, status, procedure_date, patient:patients(name))")
       .eq("machine_id", machineId)
+
+    const procedures = pmData?.map((pm: any) => pm.procedure) || []
+
+    // Fallback: también verificar via legacy machine_id
+    if (procedures.length === 0) {
+      const { data: legacyProcs } = await supabase
+        .from("procedures")
+        .select("id, patient:patients(name), procedure_date, status")
+        .eq("machine_id", machineId)
+      if (legacyProcs && legacyProcs.length > 0) {
+        procedures.push(...legacyProcs)
+      }
+    }
 
     if (procedures && procedures.length > 0) {
       const activeProcedures = procedures.filter(p => p.status === "active")
