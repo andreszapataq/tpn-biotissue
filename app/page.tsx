@@ -16,6 +16,7 @@ import { supabase } from "@/lib/supabase"
 import { getCurrentDateInColombia, formatDateForColombia, formatTimestampForColombia, getMachineDisplayName } from "@/lib/utils"
 import { Plus, Users, Package, Activity, AlertTriangle, Calendar, Clock, Loader2, Settings, FileText, Search, ChevronLeft, ChevronRight, Building2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 // Componente memoizado para evitar re-renders innecesarios
 const DashboardContent = memo(function DashboardContent() {
@@ -311,182 +312,218 @@ const DashboardContent = memo(function DashboardContent() {
     }
   }, [user, selectedInstitutionId])
 
+  // Navigation items (built dynamically based on permissions)
+  const navItems = [
+    { href: "/nuevo-procedimiento", icon: Plus, label: "Nuevo Procedimiento", primary: true },
+    { href: "/pacientes", icon: Users, label: "Pacientes" },
+    { href: "/maquinas", icon: Settings, label: "Máquinas" },
+    { href: "/inventario", icon: Package, label: "Inventario" },
+    ...(permissions.canViewReports ? [{ href: "/informes", icon: FileText, label: "Informes" }] : []),
+    ...(permissions.canViewGlobalDashboard ? [{ href: "/dashboard-global", icon: Building2, label: "Vista Global" }] : []),
+    ...(permissions.canManageAdministration ? [{ href: "/admin", icon: Settings, label: "Administración" }] : []),
+  ]
+
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Control NPWT</h1>
-              <p className="text-gray-600">Sistema de Terapia de Presión Negativa</p>
-              {user && (
-                <p className="text-sm text-blue-600 mt-1">
-                  Bienvenido, {user.name} ({user.role})
-                  {selectedInstitutionName ? ` • ${selectedInstitutionName}` : " • Sin institucion asignada"}
-                </p>
-              )}
+    <TooltipProvider delayDuration={300}>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50">
+      {/* Top Bar */}
+      <div className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-lg bg-blue-600 flex items-center justify-center">
+              <Activity className="h-5 w-5 text-white" />
             </div>
-            <div className="flex items-center gap-4">
-              <InstitutionSwitcher />
-              <div className="text-right">
-                <p className="text-sm text-gray-500">
-                  {currentTime.toLocaleDateString("es-ES", {
-                    weekday: "long",
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })}
-                </p>
-                <p className="text-lg font-semibold">{currentTime.toLocaleTimeString("es-ES")}</p>
-              </div>
-              <UserMenu />
+            <div>
+              <h1 className="text-lg font-semibold text-slate-900 leading-tight">Control NPWT</h1>
+              <p className="text-xs text-slate-500 leading-tight">Terapia de Presión Negativa</p>
             </div>
           </div>
+          <div className="flex items-center gap-3">
+            <InstitutionSwitcher />
+            <div className="hidden sm:block text-right border-l pl-3">
+              <p className="text-xs text-slate-400 capitalize">
+                {currentTime.toLocaleDateString("es-ES", {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "short",
+                })}
+              </p>
+              <p className="text-sm font-mono font-medium text-slate-700 tabular-nums">{currentTime.toLocaleTimeString("es-ES")}</p>
+            </div>
+            <UserMenu />
+          </div>
+        </div>
+      </div>
 
-          {/* Quick Actions */}
-          <div className="flex gap-4">
-            <Link href="/nuevo-procedimiento">
-              <Button size="lg" className="h-12">
-                <Plus className="mr-2 h-5 w-5" />
-                Nuevo Procedimiento
-              </Button>
-            </Link>
-            <Link href="/pacientes">
-              <Button variant="outline" size="lg" className="h-12">
-                <Users className="mr-2 h-5 w-5" />
-                Pacientes
-              </Button>
-            </Link>
-            <Link href="/maquinas">
-              <Button variant="outline" size="lg" className="h-12">
-                <Settings className="mr-2 h-5 w-5" />
-                Máquinas
-              </Button>
-            </Link>
-            <Link href="/inventario">
-              <Button variant="outline" size="lg" className="h-12">
-                <Package className="mr-2 h-5 w-5" />
-                Inventario
-              </Button>
-            </Link>
-            {/* 📊 Solo mostrar informes para administradores */}
-            {permissions.canViewReports && (
-              <Link href="/informes">
-                <Button variant="outline" size="lg" className="h-12">
-                  <FileText className="mr-2 h-5 w-5" />
-                  Informes
-                </Button>
-              </Link>
-            )}
-            {permissions.canViewGlobalDashboard && (
-              <Link href="/dashboard-global">
-                <Button variant="outline" size="lg" className="h-12">
-                  <Building2 className="mr-2 h-5 w-5" />
-                  Vista Global
-                </Button>
-              </Link>
-            )}
-            {permissions.canManageAdministration && (
-              <Link href="/admin">
-                <Button variant="outline" size="lg" className="h-12">
-                  <Settings className="mr-2 h-5 w-5" />
-                  Administración
-                </Button>
-              </Link>
-            )}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 space-y-6">
+        {/* Welcome + Nav */}
+        <div>
+          {user && (
+            <p className="text-sm text-slate-500 mb-3">
+              Bienvenido, <span className="font-medium text-slate-700">{user.name}</span>
+              {selectedInstitutionName && (
+                <span className="text-slate-400"> &mdash; {selectedInstitutionName}</span>
+              )}
+            </p>
+          )}
+
+          {/* Navigation Grid */}
+          <div className="flex flex-wrap gap-2">
+            {navItems.map((item) => {
+              const Icon = item.icon
+              return (
+                <Link key={item.href} href={item.href}>
+                  <Button
+                    variant={item.primary ? "default" : "outline"}
+                    className={`h-10 text-sm gap-2 ${
+                      item.primary
+                        ? "bg-blue-600 hover:bg-blue-700 shadow-sm shadow-blue-200"
+                        : "bg-white hover:bg-slate-50 border-slate-200"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span>{item.label}</span>
+                  </Button>
+                </Link>
+              )
+            })}
           </div>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pacientes Activos</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{activePatients}</div>
-              <p className="text-xs text-muted-foreground">En tratamiento actual</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Procedimientos Cerrados</CardTitle>
-              <Activity className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalClosedProcedures}</div>
-              <p className="text-xs text-muted-foreground">Total completados</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Máquinas Disponibles</CardTitle>
-              <Package className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{activeMachines - activeProcedures.length}</div>
-              <p className="text-xs text-muted-foreground">Listas para usar</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Alertas Inventario</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-orange-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-500">{inventoryAlerts}</div>
-              <p className="text-xs text-muted-foreground">Productos con stock bajo</p>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[
+            {
+              icon: Users,
+              iconColor: "text-blue-600",
+              iconBg: "bg-blue-50/80",
+              label: "Activos",
+              value: activePatients,
+              valueColor: "text-slate-900",
+              description: "Pacientes en tratamiento",
+            },
+            {
+              icon: Activity,
+              iconColor: "text-indigo-600",
+              iconBg: "bg-indigo-50/80",
+              label: "Cerrados",
+              value: totalClosedProcedures,
+              valueColor: "text-slate-900",
+              description: "Procedimientos completados",
+            },
+            {
+              icon: Package,
+              iconColor: "text-emerald-600",
+              iconBg: "bg-emerald-50/80",
+              label: "Disponibles",
+              value: activeMachines - activeProcedures.length,
+              valueColor: "text-emerald-600",
+              description: "Máquinas listas para usar",
+            },
+            {
+              icon: AlertTriangle,
+              iconColor: inventoryAlerts > 0 ? "text-amber-500" : "text-slate-400",
+              iconBg: inventoryAlerts > 0 ? "bg-amber-50/80" : "bg-slate-50",
+              label: "Alertas",
+              value: inventoryAlerts,
+              valueColor: inventoryAlerts > 0 ? "text-amber-500" : "text-slate-900",
+              description: "Productos con stock bajo",
+              ring: inventoryAlerts > 0,
+            },
+          ].map((stat, i) => {
+            const StatIcon = stat.icon
+            return (
+              <Card
+                key={i}
+                className={`bg-white/90 backdrop-blur-sm border-slate-200/60 shadow-sm hover:shadow transition-all ${stat.ring ? 'ring-1 ring-amber-200/60' : ''}`}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className={`h-9 w-9 rounded-xl ${stat.iconBg} flex items-center justify-center`}>
+                      <StatIcon className={`h-[18px] w-[18px] ${stat.iconColor}`} />
+                    </div>
+                    <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">{stat.label}</span>
+                  </div>
+                  <div className={`text-3xl font-semibold tracking-tight ${stat.valueColor}`}>{stat.value}</div>
+                  <p className="text-xs text-slate-400 mt-1">{stat.description}</p>
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
 
-        {/* Procedimientos Activos */}
+        {/* Active Procedures */}
         {activeProcedures.length > 0 && (
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">Procedimientos Activos</h2>
-              <Badge variant="outline" className="bg-green-50 text-green-700">
+          <div>
+            <div className="flex items-center gap-3 mb-3">
+              <h2 className="text-base font-semibold text-slate-800">Procedimientos Activos</h2>
+              <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
                 {activeProcedures.length} activo{activeProcedures.length !== 1 ? 's' : ''}
-              </Badge>
+              </span>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {activeProcedures.map((procedure: any) => (
-                <Card key={procedure.id} className="hover:shadow-md transition-shadow">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">{procedure.patient?.name || 'Sin nombre'}</CardTitle>
-                      <Badge className="bg-green-100 text-green-800">
-                        <Clock className="h-3 w-3 mr-1" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {activeProcedures.map((procedure: any) => {
+                const machineName = getMachineDisplayName(procedure.machine?.model || '', procedure.machine?.lote || '')
+                const machineLote = procedure.machine?.lote || ''
+                return (
+                <Card
+                  key={procedure.id}
+                  className="bg-white/90 backdrop-blur-sm border-slate-200/60 shadow-sm hover:shadow transition-all group"
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-slate-900 truncate">{procedure.patient?.name || 'Sin nombre'}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">ID: {procedure.patient?.identification || 'Sin ID'}</p>
+                      </div>
+                      <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20 shrink-0 ml-2">
+                        <span className="mr-1 h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                         Activo
-                      </Badge>
+                      </span>
                     </div>
-                    <CardDescription>
-                      ID: {procedure.patient?.identification || 'Sin ID'}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    <div className="text-sm">
-                      <p><span className="font-medium">Cirujano:</span> {procedure.surgeon_name}</p>
-                      <p><span className="font-medium">Fecha:</span> {formatDateForColombia(procedure.procedure_date)}</p>
-                      <p><span className="font-medium">Ubicación:</span> {procedure.location || 'No especificada'}</p>
-                      <p><span className="font-medium">Máquina:</span> {getMachineDisplayName(procedure.machine?.model || '', procedure.machine?.lote || '')}</p>
+
+                    {/* Info grid */}
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm mb-3">
+                      <div>
+                        <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wide">Cirujano</p>
+                        <p className="text-slate-700 truncate">{procedure.surgeon_name}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wide">Fecha</p>
+                        <p className="text-slate-700">{formatDateForColombia(procedure.procedure_date)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wide">Ubicación</p>
+                        <p className="text-slate-700">{procedure.location || '—'}</p>
+                      </div>
                     </div>
-                    <div className="pt-2">
-                      <Link href={`/procedimiento/${procedure.id}`}>
-                        <Button className="w-full" size="sm">
-                          <Activity className="h-4 w-4 mr-2" />
-                          Gestionar Procedimiento
-                        </Button>
-                      </Link>
+
+                    {/* Machine info — full width with tooltip showing lote */}
+                    <div className="bg-slate-50/80 rounded-lg px-3 py-2 mb-3">
+                      <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wide mb-0.5">Máquina</p>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <p className="text-sm text-slate-700 font-medium truncate cursor-default">{machineName}</p>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="max-w-xs">
+                          <div className="space-y-1">
+                            <p className="font-medium">{machineName}</p>
+                            {machineLote && <p className="text-xs text-muted-foreground">Lote: {machineLote}</p>}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
+
+                    <Link href={`/procedimiento/${procedure.id}`}>
+                      <Button className="w-full h-9 bg-blue-600 hover:bg-blue-700 shadow-sm text-sm group-hover:shadow transition-shadow">
+                        <Activity className="h-3.5 w-3.5 mr-1.5" />
+                        Gestionar
+                      </Button>
+                    </Link>
                   </CardContent>
                 </Card>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}
@@ -701,7 +738,17 @@ const DashboardContent = memo(function DashboardContent() {
                             </div>
                             <div>
                               <p className="font-medium text-gray-600">Máquina</p>
-                              <p className="text-gray-900">{getMachineDisplayName(procedure.machine?.model || '', procedure.machine?.lote || '')}</p>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <p className="text-gray-900 truncate cursor-default">{getMachineDisplayName(procedure.machine?.model || '', procedure.machine?.lote || '')}</p>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="max-w-xs">
+                                  <div className="space-y-1">
+                                    <p className="font-medium">{getMachineDisplayName(procedure.machine?.model || '', procedure.machine?.lote || '')}</p>
+                                    {procedure.machine?.lote && <p className="text-xs text-muted-foreground">Lote: {procedure.machine.lote}</p>}
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
                             </div>
                             <div>
                               <p className="font-medium text-gray-600">Finalizado</p>
@@ -797,6 +844,7 @@ const DashboardContent = memo(function DashboardContent() {
         </Tabs>
       </div>
     </div>
+    </TooltipProvider>
   )
 })
 
