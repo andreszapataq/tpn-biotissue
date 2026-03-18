@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Building2, Loader2, ShieldCheck, UserCog, Users } from "lucide-react"
+import { ArrowLeft, Building2, Eye, EyeOff, Loader2, ShieldCheck, UserCog, UserPlus, Users } from "lucide-react"
 import { ProtectedRoute } from "@/components/auth/protected-route"
 import { UserMenu } from "@/components/auth/user-menu"
 import { Button } from "@/components/ui/button"
@@ -14,6 +14,7 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabase"
 import { APP_ROLES, getRoleLabel, type AppRole } from "@/lib/roles"
@@ -88,6 +89,137 @@ export default function AdminPage() {
   const [users, setUsers] = useState<AppUser[]>([])
   const [userDrafts, setUserDrafts] = useState<Record<string, UserDraft>>({})
   const [newInstitution, setNewInstitution] = useState(DEFAULT_NEW_INSTITUTION)
+  const [showCreateUserDialog, setShowCreateUserDialog] = useState(false)
+  const [creatingUser, setCreatingUser] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [newUser, setNewUser] = useState({
+    email: "",
+    name: "",
+    password: "",
+    role: "soporte" as AppRole,
+    phone: "",
+    department: "",
+    license_number: "",
+    institution_ids: [] as string[],
+    primary_institution_id: "",
+  })
+
+  const resetNewUserForm = () => {
+    setNewUser({
+      email: "",
+      name: "",
+      password: "",
+      role: "soporte",
+      phone: "",
+      department: "",
+      license_number: "",
+      institution_ids: [],
+      primary_institution_id: "",
+    })
+    setShowPassword(false)
+  }
+
+  const toggleNewUserInstitution = (institutionId: string, checked: boolean) => {
+    setNewUser((prev) => {
+      const ids = new Set(prev.institution_ids)
+      if (checked) {
+        ids.add(institutionId)
+      } else {
+        ids.delete(institutionId)
+      }
+      const nextIds = Array.from(ids)
+      const nextPrimary = nextIds.includes(prev.primary_institution_id)
+        ? prev.primary_institution_id
+        : nextIds[0] || ""
+      return { ...prev, institution_ids: nextIds, primary_institution_id: nextPrimary }
+    })
+  }
+
+  const createUser = async () => {
+    if (!newUser.email.trim() || !newUser.name.trim() || !newUser.password || !newUser.role) {
+      toast({
+        title: "Datos incompletos",
+        description: "Email, nombre, contraseña y rol son requeridos.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (newUser.password.length < 6) {
+      toast({
+        title: "Contraseña muy corta",
+        description: "La contraseña debe tener al menos 6 caracteres.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!newUser.institution_ids.length || !newUser.primary_institution_id) {
+      toast({
+        title: "Institución requerida",
+        description: "Debes asignar al menos una institución y seleccionar una primaria.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      setCreatingUser(true)
+
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+
+      if (!token) {
+        toast({
+          title: "Sesión expirada",
+          description: "Por favor recarga la página e intenta de nuevo.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      const response = await fetch("/api/admin/create-user", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(newUser),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok && response.status !== 207) {
+        throw new Error(result.error || "Error al crear usuario")
+      }
+
+      if (response.status === 207) {
+        toast({
+          title: "Usuario creado parcialmente",
+          description: result.error,
+          variant: "destructive",
+        })
+      } else {
+        toast({
+          title: "Usuario creado",
+          description: `${newUser.name} puede iniciar sesión con el correo y contraseña asignados.`,
+        })
+      }
+
+      setShowCreateUserDialog(false)
+      resetNewUserForm()
+      await loadData()
+    } catch (error: any) {
+      console.error("Error creating user:", error)
+      toast({
+        title: "Error al crear usuario",
+        description: error.message || "No se pudo crear el usuario.",
+        variant: "destructive",
+      })
+    } finally {
+      setCreatingUser(false)
+    }
+  }
 
   const loadData = async () => {
     try {
@@ -459,9 +591,9 @@ export default function AdminPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="text-sm text-blue-900 space-y-2">
-              <p>1. El usuario se registra normalmente desde la pantalla de acceso.</p>
-              <p>2. Luego entras aquí y le cambias el rol a `gerente`.</p>
-              <p>3. Desde ese momento podrá entrar a `Vista Global`, pero no a la administración interna.</p>
+              <p>1. Crea el usuario directamente desde la pestaña <strong>Usuarios</strong> con el botón <strong>Crear Usuario</strong>.</p>
+              <p>2. Asígnale el rol que necesite (soporte, asistente, gerente o administrador) y sus instituciones.</p>
+              <p>3. El usuario podrá iniciar sesión inmediatamente con el correo y contraseña asignados.</p>
             </CardContent>
           </Card>
 
@@ -653,13 +785,18 @@ export default function AdminPage() {
               <TabsContent value="users" className="space-y-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <UserCog className="h-5 w-5" />
-                      Gestión de Usuarios
-                    </CardTitle>
+                    <div className="flex items-center justify-between gap-4">
+                      <CardTitle className="flex items-center gap-2">
+                        <UserCog className="h-5 w-5" />
+                        Gestión de Usuarios
+                      </CardTitle>
+                      <Button onClick={() => setShowCreateUserDialog(true)} className="gap-2">
+                        <UserPlus className="h-4 w-4" />
+                        Crear Usuario
+                      </Button>
+                    </div>
                     <CardDescription>
-                      Los usuarios se registran primero y aquí puedes promocionarlos a `gerente` o asignarlos a una o varias
-                      instituciones.
+                      Crea usuarios nuevos o edita rol, instituciones y estado de los existentes.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -770,6 +907,176 @@ export default function AdminPage() {
             </Tabs>
           )}
         </div>
+
+        <Dialog
+          open={showCreateUserDialog}
+          onOpenChange={(open) => {
+            setShowCreateUserDialog(open)
+            if (!open) resetNewUserForm()
+          }}
+        >
+          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Crear Nuevo Usuario</DialogTitle>
+              <DialogDescription>
+                El usuario podrá iniciar sesión inmediatamente con la contraseña asignada.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-user-name">Nombre completo *</Label>
+                <Input
+                  id="new-user-name"
+                  value={newUser.name}
+                  onChange={(e) => setNewUser((prev) => ({ ...prev, name: e.target.value }))}
+                  placeholder="María Pérez"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="new-user-email">Correo electrónico *</Label>
+                <Input
+                  id="new-user-email"
+                  type="email"
+                  value={newUser.email}
+                  onChange={(e) => setNewUser((prev) => ({ ...prev, email: e.target.value }))}
+                  placeholder="maria@clinica.com"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="new-user-password">Contraseña temporal *</Label>
+                <div className="relative">
+                  <Input
+                    id="new-user-password"
+                    type={showPassword ? "text" : "password"}
+                    value={newUser.password}
+                    onChange={(e) => setNewUser((prev) => ({ ...prev, password: e.target.value }))}
+                    placeholder="Mínimo 6 caracteres"
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Rol *</Label>
+                <Select
+                  value={newUser.role}
+                  onValueChange={(value) => setNewUser((prev) => ({ ...prev, role: value as AppRole }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {APP_ROLES.map((role) => (
+                      <SelectItem key={role} value={role}>
+                        {getRoleLabel(role)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="new-user-phone">Teléfono</Label>
+                <Input
+                  id="new-user-phone"
+                  value={newUser.phone}
+                  onChange={(e) => setNewUser((prev) => ({ ...prev, phone: e.target.value }))}
+                  placeholder="+57 300 000 0000"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="new-user-department">Departamento / Área</Label>
+                <Input
+                  id="new-user-department"
+                  value={newUser.department}
+                  onChange={(e) => setNewUser((prev) => ({ ...prev, department: e.target.value }))}
+                  placeholder="Cirugía"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="new-user-license">Número de licencia</Label>
+                <Input
+                  id="new-user-license"
+                  value={newUser.license_number}
+                  onChange={(e) => setNewUser((prev) => ({ ...prev, license_number: e.target.value }))}
+                  placeholder="Opcional"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Instituciones *</Label>
+                <div className="grid grid-cols-1 gap-2 rounded-md border p-3">
+                  {activeInstitutions.map((institution) => (
+                    <label key={institution.id} className="flex items-center gap-3 rounded-md border bg-gray-50 px-3 py-2">
+                      <Checkbox
+                        checked={newUser.institution_ids.includes(institution.id)}
+                        onCheckedChange={(checked) => toggleNewUserInstitution(institution.id, checked === true)}
+                      />
+                      <span className="text-sm">{institution.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {newUser.institution_ids.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Institución primaria *</Label>
+                  <Select
+                    value={newUser.primary_institution_id}
+                    onValueChange={(value) => setNewUser((prev) => ({ ...prev, primary_institution_id: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar institución primaria" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {activeInstitutions
+                        .filter((institution) => newUser.institution_ids.includes(institution.id))
+                        .map((institution) => (
+                          <SelectItem key={institution.id} value={institution.id}>
+                            {institution.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowCreateUserDialog(false)
+                  resetNewUserForm()
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button onClick={() => void createUser()} disabled={creatingUser}>
+                {creatingUser ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creando...
+                  </>
+                ) : (
+                  "Crear Usuario"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </ProtectedRoute>
   )

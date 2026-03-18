@@ -160,11 +160,9 @@ function LoginFormContent() {
           </form>
 
           <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
-              ¿No tienes cuenta?{" "}
-              <Link href="/auth/register" className="text-blue-600 hover:underline">
-                Solicitar acceso
-              </Link>
+            <p className="text-xs text-gray-500">
+              Las cuentas son creadas por el administrador del sistema.
+              Si necesitas acceso, contacta al administrador.
             </p>
           </div>
         </CardContent>

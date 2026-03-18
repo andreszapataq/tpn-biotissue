@@ -29,3 +29,6 @@ next-env.d.ts
 # misc
 .DS_Store
 *.pem
+
+# Claude Code local settings (personal, no compartir con el equipo)
+.claude/settings.local.json

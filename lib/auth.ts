@@ -32,10 +32,15 @@ function getBaseUrl() {
 }
 
 export class AuthService {
+  /**
+   * Registro público deshabilitado.
+   * Los usuarios son creados exclusivamente por administradores desde /admin
+   * usando la API /api/admin/create-user.
+   */
   static async signUp(
-    email: string,
-    password: string,
-    userData: {
+    _email: string,
+    _password: string,
+    _userData: {
       name: string
       role: AppRole
       phone?: string
@@ -44,23 +49,13 @@ export class AuthService {
       institution_code?: string
     },
   ) {
-    const baseUrl = getBaseUrl()
-    const safeRole = canSelfRegisterRole(userData.role) ? normalizeAppRole(userData.role) : "asistente"
-
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          ...userData,
-          role: safeRole,
-          institution_code: userData.institution_code?.trim() || undefined,
-        },
-        emailRedirectTo: `${baseUrl}/auth/callback`,
+    return {
+      data: null,
+      error: {
+        message: "El registro público está deshabilitado. Contacta al administrador.",
+        status: 403,
       },
-    })
-
-    return { data, error }
+    }
   }
 
   static async signIn(email: string, password: string) {
