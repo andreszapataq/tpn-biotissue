@@ -61,6 +61,7 @@ export default function Maquinas() {
     reference_code: "12236",
     model: "TopiVac Hand T-NPWT Classic",
     status: "active" as const,
+    remision: "",
     observations: "",
   })
 
@@ -143,6 +144,7 @@ export default function Maquinas() {
         reference_code: "12236",
         model: "TopiVac Hand T-NPWT Classic",
         status: "active",
+        remision: "",
         observations: "",
       })
     } catch (error: any) {
@@ -219,11 +221,11 @@ export default function Maquinas() {
     if (procedures && procedures.length > 0) {
       const activeProcedures = procedures.filter(p => p.status === "active")
       const completedProcedures = procedures.filter(p => p.status === "completed")
-      
-      // Si hay procedimientos asociados, ofrecer inactivar en lugar de eliminar
-      const message = activeProcedures.length > 0 
-        ? `Esta máquina tiene ${activeProcedures.length} procedimiento(s) ACTIVO(S).\n\n¿Deseas INACTIVARLA para preservar el historial médico?\n\n✅ Recomendado: Mantiene el historial\n❌ No se perderán datos médicos`
-        : `Esta máquina tiene ${completedProcedures.length} procedimiento(s) en el historial.\n\n¿Deseas INACTIVARLA para preservar el historial médico?\n\n✅ Recomendado: Mantiene el historial\n❌ No se perderán datos médicos`
+
+      // Si hay procedimientos asociados, ofrecer marcar como fuera de sede en lugar de eliminar
+      const message = activeProcedures.length > 0
+        ? `Esta máquina tiene ${activeProcedures.length} procedimiento(s) ACTIVO(S).\n\n¿Deseas marcarla como FUERA DE SEDE para preservar el historial médico?\n\n✅ Recomendado: Mantiene el historial\n❌ No se perderán datos médicos`
+        : `Esta máquina tiene ${completedProcedures.length} procedimiento(s) en el historial.\n\n¿Deseas marcarla como FUERA DE SEDE para preservar el historial médico?\n\n✅ Recomendado: Mantiene el historial\n❌ No se perderán datos médicos`
       
       if (confirm(message)) {
         await handleInactivateMachine(machineId)
@@ -244,7 +246,7 @@ export default function Maquinas() {
         if (error.code === "23503" || error.message?.includes("still referenced")) {
           toast({
             title: "Error de Integridad",
-            description: "Esta máquina está siendo referenciada por otros registros. Se inactivará en su lugar.",
+            description: "Esta máquina está siendo referenciada por otros registros. Se marcará como fuera de sede.",
             variant: "destructive",
           })
           await handleInactivateMachine(machineId)
@@ -263,7 +265,7 @@ export default function Maquinas() {
       console.error("Error deleting machine:", error)
       toast({
         title: "Error",
-        description: "No se pudo eliminar. Se inactivará la máquina en su lugar.",
+        description: "No se pudo eliminar. Se marcará la máquina como fuera de sede.",
         variant: "destructive",
       })
       await handleInactivateMachine(machineId)
@@ -283,8 +285,8 @@ export default function Maquinas() {
       if (error) throw error
 
       toast({
-        title: "Máquina Inactivada",
-        description: "La máquina se marcó como inactiva. El historial médico se preservó.",
+        title: "Máquina Fuera de Sede",
+        description: "La máquina se marcó como fuera de sede. El historial médico se preservó.",
         variant: "default",
       })
 
@@ -293,7 +295,7 @@ export default function Maquinas() {
       console.error("Error inactivating machine:", error)
       toast({
         title: "Error",
-        description: "No se pudo inactivar la máquina",
+        description: "No se pudo marcar la máquina como fuera de sede",
         variant: "destructive",
       })
     }
@@ -301,7 +303,7 @@ export default function Maquinas() {
 
   // Reactivar máquina
   const handleReactivateMachine = async (machineId: string) => {
-    if (!confirm("¿Estás seguro de que quieres reactivar esta máquina?")) return
+    if (!confirm("¿Estás seguro de que quieres reincorporar esta máquina a la sede?")) return
 
     try {
       const { error } = await supabase
@@ -315,8 +317,8 @@ export default function Maquinas() {
       if (error) throw error
 
       toast({
-        title: "Máquina Reactivada",
-        description: "La máquina está ahora disponible para nuevos procedimientos",
+        title: "Máquina Reincorporada",
+        description: "La máquina está de vuelta en sede y disponible para nuevos procedimientos",
       })
 
       await loadMachines()
@@ -336,7 +338,8 @@ export default function Maquinas() {
       // Filtro por texto de búsqueda
       const matchesSearch = machine.lote.toLowerCase().includes(searchTerm.toLowerCase()) ||
         machine.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        machine.reference_code.toLowerCase().includes(searchTerm.toLowerCase())
+        machine.reference_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (machine.remision || "").toLowerCase().includes(searchTerm.toLowerCase())
 
       // Filtro por disponibilidad/estado
       const isAvailable = machine.status === "active" && !machinesInUse.has(machine.id)
@@ -365,7 +368,7 @@ export default function Maquinas() {
       case "maintenance":
         return <Badge variant="secondary">Mantenimiento</Badge>
       case "inactive":
-        return <Badge variant="destructive">Inactiva</Badge>
+        return <Badge variant="destructive">Fuera de Sede</Badge>
       default:
         return <Badge variant="outline">{status}</Badge>
     }
@@ -402,6 +405,7 @@ export default function Maquinas() {
       reference_code: machine.reference_code,
       model: machine.model,
       status: machine.status,
+      remision: machine.remision,
       observations: machine.observations,
       last_maintenance: machine.last_maintenance,
     })
@@ -486,14 +490,14 @@ export default function Maquinas() {
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Historial</CardTitle>
+                  <CardTitle className="text-sm font-medium">Fuera de Sede</CardTitle>
                   <Trash2 className="h-4 w-4 text-gray-500" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-gray-500">
                     {machines.filter(m => m.status === "inactive").length}
                   </div>
-                  <p className="text-xs text-muted-foreground">Máquinas inactivas</p>
+                  <p className="text-xs text-muted-foreground">Máquinas retiradas</p>
                 </CardContent>
               </Card>
 
@@ -523,7 +527,7 @@ export default function Maquinas() {
                       <SelectItem value="available">Solo disponibles</SelectItem>
                       <SelectItem value="in_use">Solo en uso</SelectItem>
                       <SelectItem value="maintenance">En mantenimiento</SelectItem>
-                      <SelectItem value="inactive">Inactivas</SelectItem>
+                      <SelectItem value="inactive">Fuera de sede</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -578,6 +582,15 @@ export default function Maquinas() {
                             ))}
                           </SelectContent>
                         </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="remision">Remisión</Label>
+                        <Input
+                          id="remision"
+                          value={newMachine.remision}
+                          onChange={(e) => setNewMachine({ ...newMachine, remision: e.target.value.toUpperCase() })}
+                          placeholder="Ej: REM-2026-001"
+                        />
                       </div>
                       <div>
                         <Label htmlFor="observations">Observaciones</Label>
@@ -637,13 +650,16 @@ export default function Maquinas() {
                             <span className="font-medium">Lote:</span> {machine.lote}
                           </div>
                           <div>
+                            <span className="font-medium">Remisión:</span> {machine.remision || "Sin remisión"}
+                          </div>
+                          <div>
                             <span className="font-medium">Último Mantenimiento:</span> {machine.last_maintenance || "No registrado"}
                           </div>
                           <div>
                             <span className="font-medium">Observaciones:</span> {machine.observations || "Ninguna"}
                           </div>
                           <div>
-                            <span className="font-medium">Estado:</span> {machine.status === "active" ? "Activa" : machine.status === "maintenance" ? "Mantenimiento" : "Inactiva"}
+                            <span className="font-medium">Estado:</span> {machine.status === "active" ? "Activa" : machine.status === "maintenance" ? "Mantenimiento" : "Fuera de Sede"}
                           </div>
                           <div>
                             <span className="font-medium">Creada:</span> {machine.created_at ? formatTimestampForColombia(machine.created_at) : 'N/A'}
@@ -668,7 +684,7 @@ export default function Maquinas() {
                               onClick={() => handleReactivateMachine(machine.id)}
                               className="text-green-600 hover:text-green-700"
                             >
-                              Reactivar
+                              Reincorporar
                             </Button>
                           ) : (
                             /* Mostrar botón de eliminar/inactivar para máquinas activas */
@@ -745,10 +761,19 @@ export default function Maquinas() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="active">Activa</SelectItem>
-                      <SelectItem value="maintenance">Mantenimiento</SelectItem>
-                      <SelectItem value="inactive">Inactiva</SelectItem>
+                      <SelectItem value="maintenance">En Mantenimiento</SelectItem>
+                      <SelectItem value="inactive">Fuera de Sede</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+                <div>
+                  <Label htmlFor="edit_remision">Remisión</Label>
+                  <Input
+                    id="edit_remision"
+                    value={editMachine.remision || ""}
+                    onChange={(e) => setEditMachine({ ...editMachine, remision: e.target.value.toUpperCase() })}
+                    placeholder="Ej: REM-2026-001"
+                  />
                 </div>
                 <div>
                   <Label htmlFor="edit_observations">Observaciones</Label>

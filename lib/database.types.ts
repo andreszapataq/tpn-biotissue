@@ -269,6 +269,7 @@ export type Database = {
           model: string
           observations: string | null
           reference_code: string
+          remision: string | null
           status: string
           updated_at: string | null
         }
@@ -281,6 +282,7 @@ export type Database = {
           model?: string
           observations?: string | null
           reference_code?: string
+          remision?: string | null
           status?: string
           updated_at?: string | null
         }
@@ -293,6 +295,7 @@ export type Database = {
           model?: string
           observations?: string | null
           reference_code?: string
+          remision?: string | null
           status?: string
           updated_at?: string | null
         }

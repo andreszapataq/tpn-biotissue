@@ -174,7 +174,7 @@ export default function DashboardGlobalPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">{summary.connectedMachines}</div>
-                    <p className="text-xs text-muted-foreground">{utilization}% de utilización sobre el parque total</p>
+                    <p className="text-xs text-muted-foreground">{utilization}% de utilización sobre equipos en sede</p>
                   </CardContent>
                 </Card>
                 <Card>
@@ -306,7 +306,7 @@ export default function DashboardGlobalPage() {
                     </CardHeader>
                     <CardContent className="space-y-3 text-sm">
                       <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Total de maquinas</span>
+                        <span className="text-muted-foreground">Equipos en sede</span>
                         <span className="font-semibold">{summary.totalMachines}</span>
                       </div>
                       <div className="flex items-center justify-between">
