@@ -122,8 +122,10 @@ export type Database = {
           category: string
           code: string
           created_at: string | null
+          expiration_date: string | null
           id: string
           institution_id: string
+          is_archived: boolean
           lote: string | null
           minimum_stock: number | null
           name: string
@@ -135,8 +137,10 @@ export type Database = {
           category: string
           code: string
           created_at?: string | null
+          expiration_date?: string | null
           id?: string
           institution_id?: string
+          is_archived?: boolean
           lote?: string | null
           minimum_stock?: number | null
           name: string
@@ -148,8 +152,10 @@ export type Database = {
           category?: string
           code?: string
           created_at?: string | null
+          expiration_date?: string | null
           id?: string
           institution_id?: string
+          is_archived?: boolean
           lote?: string | null
           minimum_stock?: number | null
           name?: string

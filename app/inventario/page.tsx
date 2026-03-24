@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,7 +17,12 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, Search, Package, AlertTriangle, Plus, Minus, TrendingUp, Loader2 } from "lucide-react"
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Separator } from "@/components/ui/separator"
+import { ArrowLeft, Search, Package, AlertTriangle, Plus, Minus, TrendingUp, Loader2, Archive, ArchiveRestore, Check, ChevronsUpDown, CalendarIcon, X } from "lucide-react"
 import Link from "next/link"
 import { supabase } from "@/lib/supabase"
 import { Tables } from "@/lib/database.types"
@@ -27,6 +32,9 @@ import { InstitutionSwitcher } from "@/components/institutions/institution-switc
 import { useInstitution } from "@/components/institutions/institution-provider"
 import { usePermissions } from "@/hooks/use-permissions"
 import { useAuth } from "@/components/auth/auth-provider"
+import { formatTimestampForColombia, cn } from "@/lib/utils"
+import { format } from "date-fns"
+import { es } from "date-fns/locale"
 
 // 🇨🇴 Función para formatear moneda colombiana
 const formatCurrency = (amount: number): string => {
@@ -71,8 +79,8 @@ export default function Inventario() {
     stock: 0,
     minimum_stock: 5,
     unit_price: 0,
-    lote: "",
   })
+  const [unitPriceDisplay, setUnitPriceDisplay] = useState("")
 
   // Formulario para editar producto
   const [editProduct, setEditProduct] = useState({
@@ -84,11 +92,40 @@ export default function Inventario() {
     unit_price: 0,
     lote: "",
   })
+  const [editUnitPriceDisplay, setEditUnitPriceDisplay] = useState("")
 
   // Estados para entrada de inventario
   const [isStockEntryDialogOpen, setIsStockEntryDialogOpen] = useState(false)
   const [isProcessingEntry, setIsProcessingEntry] = useState(false)
-  const [stockEntries, setStockEntries] = useState<{[key: string]: {quantity: number, reason: string}}>({})
+  const [remision, setRemision] = useState("")
+  const [currentEntry, setCurrentEntry] = useState({
+    selectedProductCode: "",
+    selectedProductName: "",
+    selectedProductCategory: "",
+    lote: "",
+    expirationDate: "",
+    quantity: 0,
+    minimumStock: 5,
+    unitPrice: 0,
+    isNew: false,
+  })
+  const [pendingEntries, setPendingEntries] = useState<Array<{
+    id: string
+    productCode: string
+    productName: string
+    productCategory: string
+    lote: string
+    expirationDate: string
+    quantity: number
+    minimumStock: number
+    unitPrice: number
+    isNew: boolean
+    existingProductId?: string
+  }>>([])
+  const [productSearchOpen, setProductSearchOpen] = useState(false)
+
+  // Estado para filtro de archivados en Stock Bajo
+  const [showArchivedInLowStock, setShowArchivedInLowStock] = useState(false)
 
   // Estados para historial de movimientos
   const [isMovementHistoryOpen, setIsMovementHistoryOpen] = useState(false)
@@ -143,22 +180,13 @@ export default function Inventario() {
         throw new Error("El código del producto es requerido")
       }
 
-      // Verificar que la combinación código+lote no existe
-      let query = supabase
+      // Verificar que no exista un producto con el mismo código
+      const { data: existingProducts, error: checkError } = await supabase
         .from("inventory_products")
         .select("id")
         .eq("code", newProduct.code.toUpperCase())
         .eq("institution_id", selectedInstitutionId || "")
-
-      // Si se especifica un lote, verificar la combinación código+lote
-      if (newProduct.lote && newProduct.lote.trim()) {
-        query = query.eq("lote", newProduct.lote.trim())
-      } else {
-        // Si no hay lote, verificar que no exista un producto con el mismo código y sin lote
-        query = query.is("lote", null)
-      }
-
-      const { data: existingProducts, error: checkError } = await query
+        .is("lote", null)
 
       if (checkError) {
         console.error("Error checking for existing product:", checkError)
@@ -166,10 +194,7 @@ export default function Inventario() {
       }
 
       if (existingProducts && existingProducts.length > 0) {
-        const errorMsg = newProduct.lote && newProduct.lote.trim() 
-          ? `Ya existe un producto con el código ${newProduct.code.toUpperCase()} y lote ${newProduct.lote.trim()}`
-          : `Ya existe un producto con el código ${newProduct.code.toUpperCase()} sin lote especificado`
-        throw new Error(errorMsg)
+        throw new Error(`Ya existe un producto con el código ${newProduct.code.toUpperCase()}`)
       }
 
       // Obtener perfil del usuario para registrar el movimiento
@@ -192,7 +217,6 @@ export default function Inventario() {
         stock: newProduct.stock,
         minimum_stock: newProduct.minimum_stock,
         unit_price: newProduct.unit_price,
-        lote: newProduct.lote.trim() || null,
       }
 
       console.log("Creating product:", productData)
@@ -250,8 +274,8 @@ export default function Inventario() {
         stock: 0,
         minimum_stock: 5,
         unit_price: 0,
-        lote: "",
       })
+      setUnitPriceDisplay("")
     } catch (error: any) {
       console.error("Error creating product:", error)
       toast({
@@ -276,6 +300,7 @@ export default function Inventario() {
       unit_price: product.unit_price || 0,
       lote: product.lote || "",
     })
+    setEditUnitPriceDisplay(product.unit_price ? String(product.unit_price) : "")
     setIsEditDialogOpen(true)
   }
 
@@ -409,7 +434,10 @@ export default function Inventario() {
       item.code.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
-  const lowStockItems = filteredInventory.filter((item) => (item.stock || 0) <= (item.minimum_stock || 0))
+  const lowStockItems = filteredInventory.filter(
+    (item) => (item.stock || 0) <= (item.minimum_stock || 0)
+      && (showArchivedInLowStock || !item.is_archived)
+  )
   const normalStockItems = filteredInventory.filter((item) => (item.stock || 0) > (item.minimum_stock || 0))
 
   const getStockStatus = (stock: number, minimum: number) => {
@@ -420,15 +448,124 @@ export default function Inventario() {
   }
 
   const totalProducts = new Set(inventory.map(item => item.code)).size
-  const lowStockCount = lowStockItems.length
+  const lowStockCount = inventory.filter(
+    (item) => (item.stock || 0) <= (item.minimum_stock || 0) && !item.is_archived
+  ).length
   const totalValue = inventory.reduce((sum, item) => sum + (item.stock || 0) * (item.unit_price || 0), 0)
 
-  // 🔧 NUEVO: Función para entrada masiva de inventario
-  const handleBulkStockEntry = async () => {
+  // Productos únicos por código para el combobox de búsqueda
+  const uniqueProductsByCode = useMemo(() => {
+    const map = new Map<string, { code: string; name: string; category: string }>()
+    for (const product of inventory) {
+      if (product.is_archived) continue
+      if (!map.has(product.code)) {
+        map.set(product.code, {
+          code: product.code,
+          name: product.name,
+          category: product.category,
+        })
+      }
+    }
+    return Array.from(map.values())
+  }, [inventory])
+
+  const findExistingProduct = (code: string, lote: string) => {
+    return inventory.find(
+      p => p.code === code && p.lote === lote && !p.is_archived
+    )
+  }
+
+  const checkIfNewCodeLote = (code: string, lote: string): boolean => {
+    if (!code || !lote) return false
+    return !findExistingProduct(code, lote)
+  }
+
+  const resetStockEntryDialog = () => {
+    setRemision("")
+    setCurrentEntry({
+      selectedProductCode: "",
+      selectedProductName: "",
+      selectedProductCategory: "",
+      lote: "",
+      expirationDate: "",
+      quantity: 0,
+      minimumStock: 5,
+      unitPrice: 0,
+      isNew: false,
+    })
+    setPendingEntries([])
+    setProductSearchOpen(false)
+    setIsStockEntryDialogOpen(false)
+  }
+
+  const handleAddEntry = () => {
+    if (!currentEntry.selectedProductCode) {
+      toast({ title: "Error", description: "Seleccione un producto", variant: "destructive" })
+      return
+    }
+    if (!currentEntry.lote.trim()) {
+      toast({ title: "Error", description: "Ingrese el lote", variant: "destructive" })
+      return
+    }
+    if (currentEntry.quantity <= 0) {
+      toast({ title: "Error", description: "La cantidad debe ser mayor a 0", variant: "destructive" })
+      return
+    }
+
+    const duplicate = pendingEntries.find(
+      e => e.productCode === currentEntry.selectedProductCode && e.lote === currentEntry.lote.trim()
+    )
+    if (duplicate) {
+      toast({ title: "Error", description: "Ya existe una entrada pendiente con ese código y lote", variant: "destructive" })
+      return
+    }
+
+    const existingProduct = findExistingProduct(currentEntry.selectedProductCode, currentEntry.lote.trim())
+    const isNew = !existingProduct
+
+    setPendingEntries(prev => [...prev, {
+      id: crypto.randomUUID(),
+      productCode: currentEntry.selectedProductCode,
+      productName: currentEntry.selectedProductName,
+      productCategory: currentEntry.selectedProductCategory,
+      lote: currentEntry.lote.trim(),
+      expirationDate: currentEntry.expirationDate,
+      quantity: currentEntry.quantity,
+      minimumStock: isNew ? currentEntry.minimumStock : (existingProduct?.minimum_stock || 0),
+      unitPrice: isNew ? currentEntry.unitPrice : (existingProduct?.unit_price || 0),
+      isNew,
+      existingProductId: existingProduct?.id,
+    }])
+
+    setCurrentEntry({
+      selectedProductCode: "",
+      selectedProductName: "",
+      selectedProductCategory: "",
+      lote: "",
+      expirationDate: "",
+      quantity: 0,
+      minimumStock: 5,
+      unitPrice: 0,
+      isNew: false,
+    })
+  }
+
+  const handleProcessEntries = async () => {
     try {
       setIsProcessingEntry(true)
 
-      // Obtener perfil del usuario
+      if (!remision.trim()) {
+        toast({ title: "Error", description: "Ingrese el número de remisión", variant: "destructive" })
+        setIsProcessingEntry(false)
+        return
+      }
+
+      if (pendingEntries.length === 0) {
+        toast({ title: "Error", description: "No hay entradas pendientes", variant: "destructive" })
+        setIsProcessingEntry(false)
+        return
+      }
+
       let userProfile = null
       if (user?.id) {
         const { data: userData } = await supabase
@@ -439,54 +576,138 @@ export default function Inventario() {
         userProfile = userData
       }
 
-      const updates = []
-      const movements = []
+      const movements: any[] = []
+      let newProductsCreated = 0
+      let existingProductsUpdated = 0
 
-      for (const [productId, entry] of Object.entries(stockEntries)) {
-        if (entry.quantity <= 0) continue
-
-        const product = inventory.find(p => p.id === productId)
-        if (!product) continue
-
-        const oldStock = product.stock || 0
-        const newStock = oldStock + entry.quantity
-
-        // Actualización de stock
-        updates.push(
-          supabase
+      for (const entry of pendingEntries) {
+        if (entry.isNew) {
+          // Verificar si mientras tanto alguien creó el mismo code+lote
+          const { data: existingCheck } = await supabase
             .from("inventory_products")
-            .update({ 
-              stock: newStock, 
-              updated_at: new Date().toISOString() 
-            })
-            .eq("id", productId)
-        )
+            .select("id, stock")
+            .eq("code", entry.productCode)
+            .eq("lote", entry.lote)
+            .eq("institution_id", selectedInstitutionId!)
+            .maybeSingle()
 
-        // Movimiento de inventario
-        const movementData: any = {
-          product_id: productId,
-          movement_type: "in",
-          quantity: entry.quantity,
-          reference_type: "stock_entry",
-          reference_id: null,
-          institution_id: selectedInstitutionId || undefined,
-          notes: entry.reason || `Entrada de inventario: +${entry.quantity} unidades`
+          if (existingCheck) {
+            // Ya existe — actualizar en vez de crear
+            const newStock = (existingCheck.stock || 0) + entry.quantity
+            const { error: updateError } = await supabase
+              .from("inventory_products")
+              .update({
+                stock: newStock,
+                expiration_date: entry.expirationDate || null,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", existingCheck.id)
+
+            if (updateError) throw updateError
+
+            setInventory(prev => prev.map(p =>
+              p.id === existingCheck.id
+                ? { ...p, stock: newStock, expiration_date: entry.expirationDate || p.expiration_date }
+                : p
+            ))
+
+            const movementData: any = {
+              product_id: existingCheck.id,
+              movement_type: "in",
+              quantity: entry.quantity,
+              reference_type: "stock_entry",
+              reference_id: remision.trim(),
+              institution_id: selectedInstitutionId || undefined,
+              notes: `Entrada de inventario (Remisión: ${remision.trim()}): +${entry.quantity} unidades [Lote: ${entry.lote}]`,
+            }
+            if (userProfile?.id) movementData.created_by = userProfile.id
+            movements.push(movementData)
+            existingProductsUpdated++
+          } else {
+            // Crear nuevo producto
+            const productData: any = {
+              name: entry.productName,
+              code: entry.productCode,
+              category: entry.productCategory,
+              lote: entry.lote,
+              expiration_date: entry.expirationDate || null,
+              stock: entry.quantity,
+              minimum_stock: entry.minimumStock,
+              unit_price: entry.unitPrice,
+              institution_id: selectedInstitutionId || undefined,
+            }
+
+            const { data: createdProduct, error: createError } = await supabase
+              .from("inventory_products")
+              .insert([productData])
+              .select()
+              .single()
+
+            if (createError) throw createError
+
+            setInventory(prev => [...prev, createdProduct])
+
+            const movementData: any = {
+              product_id: createdProduct.id,
+              movement_type: "in",
+              quantity: entry.quantity,
+              reference_type: "stock_entry",
+              reference_id: remision.trim(),
+              institution_id: selectedInstitutionId || undefined,
+              notes: `Entrada de inventario (Remisión: ${remision.trim()}): +${entry.quantity} unidades [Nuevo - Lote: ${entry.lote}]`,
+            }
+            if (userProfile?.id) movementData.created_by = userProfile.id
+            movements.push(movementData)
+            newProductsCreated++
+          }
+        } else {
+          // Producto existente — re-consultar stock fresco
+          const { data: freshProduct, error: fetchError } = await supabase
+            .from("inventory_products")
+            .select("stock")
+            .eq("id", entry.existingProductId!)
+            .single()
+
+          if (fetchError) throw fetchError
+
+          const newStock = (freshProduct?.stock || 0) + entry.quantity
+
+          const updateData: any = {
+            stock: newStock,
+            updated_at: new Date().toISOString(),
+          }
+          if (entry.expirationDate) {
+            updateData.expiration_date = entry.expirationDate
+          }
+
+          const { error: updateError } = await supabase
+            .from("inventory_products")
+            .update(updateData)
+            .eq("id", entry.existingProductId!)
+
+          if (updateError) throw updateError
+
+          setInventory(prev => prev.map(p =>
+            p.id === entry.existingProductId
+              ? { ...p, stock: newStock, expiration_date: entry.expirationDate || p.expiration_date }
+              : p
+          ))
+
+          const movementData: any = {
+            product_id: entry.existingProductId,
+            movement_type: "in",
+            quantity: entry.quantity,
+            reference_type: "stock_entry",
+            reference_id: remision.trim(),
+            institution_id: selectedInstitutionId || undefined,
+            notes: `Entrada de inventario (Remisión: ${remision.trim()}): +${entry.quantity} unidades [Lote: ${entry.lote}]`,
+          }
+          if (userProfile?.id) movementData.created_by = userProfile.id
+          movements.push(movementData)
+          existingProductsUpdated++
         }
-
-        if (userProfile?.id) {
-          movementData.created_by = userProfile.id
-        }
-
-        movements.push(movementData)
       }
 
-      // Ejecutar todas las actualizaciones
-      for (const update of updates) {
-        const { error } = await update
-        if (error) throw error
-      }
-
-      // Registrar todos los movimientos
       if (movements.length > 0) {
         const { error: movementError } = await supabase
           .from("inventory_movements")
@@ -502,29 +723,21 @@ export default function Inventario() {
         }
       }
 
-      // Actualizar inventario local
-      const updatedInventory = inventory.map(item => {
-        const entry = stockEntries[item.id]
-        if (entry && entry.quantity > 0) {
-          return { ...item, stock: (item.stock || 0) + entry.quantity }
-        }
-        return item
-      })
-
-      setInventory(updatedInventory)
-      setStockEntries({})
-      setIsStockEntryDialogOpen(false)
-
+      const parts = []
+      if (newProductsCreated > 0) parts.push(`${newProductsCreated} nuevo(s)`)
+      if (existingProductsUpdated > 0) parts.push(`${existingProductsUpdated} actualizado(s)`)
       toast({
-        title: "Éxito",
-        description: `Entrada de inventario procesada. ${Object.keys(stockEntries).length} productos actualizados.`,
+        title: "Entrada procesada",
+        description: `Remisión ${remision.trim()}: ${parts.join(", ")}`,
       })
+
+      resetStockEntryDialog()
 
     } catch (error: any) {
       console.error("Error processing stock entry:", error)
       toast({
         title: "Error",
-        description: "No se pudo procesar la entrada de inventario",
+        description: error.message || "No se pudo procesar la entrada de inventario",
         variant: "destructive",
       })
     } finally {
@@ -604,6 +817,35 @@ export default function Inventario() {
     setSelectedProductForHistory(product)
     setIsMovementHistoryOpen(true)
     loadMovementHistory(product.id)
+  }
+
+  // Archivar / Desarchivar producto
+  const handleToggleArchive = async (product: InventoryProduct) => {
+    const newArchived = !product.is_archived
+    try {
+      const { error } = await supabase
+        .from("inventory_products")
+        .update({ is_archived: newArchived })
+        .eq("id", product.id)
+
+      if (error) throw error
+
+      setInventory(prev =>
+        prev.map(p => p.id === product.id ? { ...p, is_archived: newArchived } : p)
+      )
+
+      toast({
+        title: newArchived ? "Producto archivado" : "Producto desarchivado",
+        description: `"${product.name}" ${newArchived ? "fue archivado y no aparecerá en alertas de stock bajo" : "fue restaurado"}`,
+      })
+    } catch (error: any) {
+      console.error("Error toggling archive:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el estado del producto",
+        variant: "destructive",
+      })
+    }
   }
 
   return (
@@ -693,15 +935,6 @@ export default function Inventario() {
                       </DialogHeader>
                       <div className="space-y-4">
                         <div>
-                          <Label htmlFor="name">Nombre del Producto</Label>
-                          <Input
-                            id="name"
-                            value={newProduct.name}
-                            onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-                            placeholder="Ej: Multidress"
-                          />
-                        </div>
-                        <div>
                           <Label htmlFor="code">Código</Label>
                           <Input
                             id="code"
@@ -711,12 +944,12 @@ export default function Inventario() {
                           />
                         </div>
                         <div>
-                          <Label htmlFor="lote">Lote</Label>
+                          <Label htmlFor="name">Nombre del Producto</Label>
                           <Input
-                            id="lote"
-                            value={newProduct.lote}
-                            onChange={(e) => setNewProduct({ ...newProduct, lote: e.target.value })}
-                            placeholder="Ej: 2024001"
+                            id="name"
+                            value={newProduct.name}
+                            onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+                            placeholder="Ej: Multidress"
                           />
                         </div>
                         <div>
@@ -763,19 +996,23 @@ export default function Inventario() {
                             />
                           </div>
                         </div>
-                        {/* 🔒 Solo mostrar precio unitario para administradores */}
+                        {/* Solo mostrar precio unitario para administradores */}
                         {permissions.isAdmin && (
                           <div>
                             <Label htmlFor="unit_price">Precio Unitario (COP)</Label>
                             <Input
                               id="unit_price"
-                              type="number"
-                              step="0.01"
-                              value={newProduct.unit_price}
-                              onChange={(e) =>
-                                setNewProduct({ ...newProduct, unit_price: Number.parseFloat(e.target.value) || 0 })
-                              }
-                              min="0"
+                              type="text"
+                              inputMode="decimal"
+                              placeholder="0"
+                              value={unitPriceDisplay}
+                              onChange={(e) => {
+                                const val = e.target.value
+                                if (val === "" || /^\d*\.?\d*$/.test(val)) {
+                                  setUnitPriceDisplay(val)
+                                  setNewProduct({ ...newProduct, unit_price: Number.parseFloat(val) || 0 })
+                                }
+                              }}
                             />
                           </div>
                         )}
@@ -824,85 +1061,259 @@ export default function Inventario() {
               
               {/* 🔧 NUEVO: Botón Entrada de Inventario */}
               {permissions.canAdjustStock && (
-                <Dialog open={isStockEntryDialogOpen} onOpenChange={setIsStockEntryDialogOpen}>
+                <Dialog open={isStockEntryDialogOpen} onOpenChange={(open) => {
+                  if (!open) resetStockEntryDialog()
+                  else setIsStockEntryDialogOpen(true)
+                }}>
                   <DialogTrigger asChild>
                     <Button variant="default" className="whitespace-nowrap">
                       <Package className="h-4 w-4 mr-2" />
                       Entrada de Inventario
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                  <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle>Entrada de Inventario</DialogTitle>
                       <DialogDescription>
                         Registrar nuevas existencias que llegan a la bodega
                       </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-4">
-                      <div className="grid gap-4 max-h-96 overflow-y-auto">
-                        {inventory.map((product) => (
-                          <Card key={product.id} className="p-4">
-                            <div className="flex items-center justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="font-medium">{product.name}</span>
-                                  <Badge variant="outline">{product.code}</Badge>
-                                  <Badge variant="secondary">Stock actual: {formatNumber(product.stock || 0)}</Badge>
-                                </div>
-                                <p className="text-sm text-gray-600">
-                                  Categoría: {product.category} • Lote: <span className={`font-semibold ${product.lote ? 'text-blue-600' : 'text-gray-500'}`}>{product.lote || "N/A"}</span>
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Input
-                                  type="number"
-                                  placeholder="Cantidad"
-                                  min="0"
-                                  className="w-20"
-                                  value={stockEntries[product.id]?.quantity || ""}
-                                  onChange={(e) => {
-                                    const quantity = parseInt(e.target.value) || 0
-                                    setStockEntries(prev => ({
-                                      ...prev,
-                                      [product.id]: {
-                                        ...prev[product.id],
-                                        quantity,
-                                        reason: prev[product.id]?.reason || ""
-                                      }
-                                    }))
-                                  }}
-                                />
-                                <Input
-                                  placeholder="Motivo (opcional)"
-                                  className="w-48"
-                                  value={stockEntries[product.id]?.reason || ""}
-                                  onChange={(e) => {
-                                    setStockEntries(prev => ({
-                                      ...prev,
-                                      [product.id]: {
-                                        ...prev[product.id],
-                                        quantity: prev[product.id]?.quantity || 0,
-                                        reason: e.target.value
-                                      }
-                                    }))
-                                  }}
-                                />
-                              </div>
-                            </div>
-                          </Card>
-                        ))}
-                      </div>
+
+                    {/* Campo Remisión */}
+                    <div className="space-y-2">
+                      <Label htmlFor="remision">Remisión *</Label>
+                      <Input
+                        id="remision"
+                        placeholder="Número de remisión"
+                        value={remision}
+                        onChange={(e) => setRemision(e.target.value)}
+                      />
                     </div>
+
+                    <Separator />
+
+                    {/* Formulario de entrada */}
+                    <div className="space-y-4">
+                      <p className="text-sm font-medium text-gray-700">Agregar producto</p>
+
+                      {/* Combobox búsqueda de producto */}
+                      <div className="space-y-2">
+                        <Label>Producto (código o nombre) *</Label>
+                        <Popover open={productSearchOpen} onOpenChange={setProductSearchOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={productSearchOpen}
+                              className="w-full justify-between font-normal"
+                            >
+                              {currentEntry.selectedProductCode
+                                ? `${currentEntry.selectedProductCode} - ${currentEntry.selectedProductName}`
+                                : "Buscar producto por código o nombre..."}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder="Buscar producto..." />
+                              <CommandList>
+                                <CommandEmpty>No se encontró el producto.</CommandEmpty>
+                                <CommandGroup>
+                                  {uniqueProductsByCode.map((product) => (
+                                    <CommandItem
+                                      key={product.code}
+                                      value={`${product.code} ${product.name}`}
+                                      onSelect={() => {
+                                        const isNew = checkIfNewCodeLote(product.code, currentEntry.lote)
+                                        setCurrentEntry(prev => ({
+                                          ...prev,
+                                          selectedProductCode: product.code,
+                                          selectedProductName: product.name,
+                                          selectedProductCategory: product.category,
+                                          isNew,
+                                        }))
+                                        setProductSearchOpen(false)
+                                      }}
+                                    >
+                                      <Check className={cn("mr-2 h-4 w-4",
+                                        currentEntry.selectedProductCode === product.code ? "opacity-100" : "opacity-0"
+                                      )} />
+                                      <span className="font-medium">{product.code}</span>
+                                      <span className="ml-2 text-muted-foreground truncate">{product.name}</span>
+                                      <Badge variant="secondary" className="ml-auto text-xs">{product.category}</Badge>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+
+                      {/* Lote y Fecha de vencimiento */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="entry-lote">Lote *</Label>
+                          <Input
+                            id="entry-lote"
+                            placeholder="Número de lote"
+                            value={currentEntry.lote}
+                            onChange={(e) => {
+                              const lote = e.target.value
+                              const isNew = checkIfNewCodeLote(currentEntry.selectedProductCode, lote.trim())
+                              setCurrentEntry(prev => ({ ...prev, lote, isNew }))
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Fecha de vencimiento</Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className={cn("w-full justify-start text-left font-normal",
+                                  !currentEntry.expirationDate && "text-muted-foreground"
+                                )}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {currentEntry.expirationDate
+                                  ? format(new Date(currentEntry.expirationDate + "T00:00:00"), "PPP", { locale: es })
+                                  : "Seleccionar fecha"}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={currentEntry.expirationDate ? new Date(currentEntry.expirationDate + "T00:00:00") : undefined}
+                                onSelect={(date) => {
+                                  if (date) {
+                                    const iso = date.toISOString().split("T")[0]
+                                    setCurrentEntry(prev => ({ ...prev, expirationDate: iso }))
+                                  }
+                                }}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </div>
+
+                      {/* Cantidad */}
+                      <div className="space-y-2">
+                        <Label htmlFor="entry-quantity">Cantidad *</Label>
+                        <Input
+                          id="entry-quantity"
+                          type="number"
+                          min="1"
+                          placeholder="Cantidad a ingresar"
+                          value={currentEntry.quantity || ""}
+                          onChange={(e) => setCurrentEntry(prev => ({ ...prev, quantity: parseInt(e.target.value) || 0 }))}
+                        />
+                      </div>
+
+                      {/* Campos adicionales para producto nuevo */}
+                      {currentEntry.isNew && currentEntry.selectedProductCode && currentEntry.lote.trim() && (
+                        <div className="space-y-4 p-4 border border-blue-200 rounded-lg bg-blue-50/50">
+                          <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                            Nuevo producto (código + lote)
+                          </Badge>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="entry-min-stock">Stock Mínimo</Label>
+                              <Input
+                                id="entry-min-stock"
+                                type="number"
+                                min="0"
+                                value={currentEntry.minimumStock}
+                                onChange={(e) => setCurrentEntry(prev => ({ ...prev, minimumStock: parseInt(e.target.value) || 0 }))}
+                              />
+                            </div>
+                            {permissions.isAdmin && (
+                              <div className="space-y-2">
+                                <Label htmlFor="entry-price">Precio Unitario (COP)</Label>
+                                <Input
+                                  id="entry-price"
+                                  type="text"
+                                  inputMode="decimal"
+                                  placeholder="0"
+                                  value={currentEntry.unitPrice || ""}
+                                  onChange={(e) => {
+                                    const val = e.target.value
+                                    if (/^\d*\.?\d*$/.test(val)) {
+                                      setCurrentEntry(prev => ({ ...prev, unitPrice: parseFloat(val) || 0 }))
+                                    }
+                                  }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Botón Agregar */}
+                      <Button
+                        variant="secondary"
+                        onClick={handleAddEntry}
+                        className="w-full"
+                        disabled={!currentEntry.selectedProductCode || !currentEntry.lote.trim() || currentEntry.quantity <= 0}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Agregar entrada
+                      </Button>
+                    </div>
+
+                    {/* Lista de entradas pendientes */}
+                    {pendingEntries.length > 0 && (
+                      <>
+                        <Separator />
+                        <div className="space-y-3">
+                          <p className="text-sm font-medium text-gray-700">
+                            Entradas pendientes ({pendingEntries.length})
+                          </p>
+                          <ScrollArea className="max-h-48">
+                            <div className="space-y-2">
+                              {pendingEntries.map((entry) => (
+                                <div key={entry.id} className="flex items-center justify-between p-3 border rounded-lg bg-gray-50">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="font-medium text-sm truncate">{entry.productName}</span>
+                                      <Badge variant="outline" className="text-xs">{entry.productCode}</Badge>
+                                      <Badge variant="secondary" className="text-xs">Lote: {entry.lote}</Badge>
+                                      <Badge variant="default" className="text-xs">+{entry.quantity}</Badge>
+                                      {entry.isNew ? (
+                                        <Badge className="bg-blue-100 text-blue-700 text-xs">Nuevo</Badge>
+                                      ) : (
+                                        <Badge className="bg-green-100 text-green-700 text-xs">Existente</Badge>
+                                      )}
+                                    </div>
+                                    {entry.expirationDate && (
+                                      <p className="text-xs text-gray-500 mt-1">
+                                        Vence: {format(new Date(entry.expirationDate + "T00:00:00"), "PPP", { locale: es })}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setPendingEntries(prev => prev.filter(e => e.id !== entry.id))}
+                                  >
+                                    <X className="h-4 w-4 text-red-500" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          </ScrollArea>
+                        </div>
+                      </>
+                    )}
+
                     <DialogFooter>
-                      <Button variant="outline" onClick={() => {
-                        setIsStockEntryDialogOpen(false)
-                        setStockEntries({})
-                      }}>
+                      <Button variant="outline" onClick={resetStockEntryDialog}>
                         Cancelar
                       </Button>
                       <Button
-                        onClick={handleBulkStockEntry}
-                        disabled={isProcessingEntry || Object.values(stockEntries).every(entry => entry.quantity <= 0)}
+                        onClick={handleProcessEntries}
+                        disabled={isProcessingEntry || pendingEntries.length === 0 || !remision.trim()}
                       >
                         {isProcessingEntry ? (
                           <>
@@ -910,7 +1321,7 @@ export default function Inventario() {
                             Procesando...
                           </>
                         ) : (
-                          "Procesar Entrada"
+                          `Procesar ${pendingEntries.length} entrada(s)`
                         )}
                       </Button>
                     </DialogFooter>
@@ -950,7 +1361,7 @@ export default function Inventario() {
                     {filteredInventory.map((item) => {
                       const status = getStockStatus(item.stock || 0, item.minimum_stock || 0)
                       return (
-                        <Card key={item.id}>
+                        <Card key={item.id} className={item.is_archived ? "opacity-60" : ""}>
                           <CardContent className="pt-6">
                             <div className="flex items-center justify-between">
                               <div className="flex-1">
@@ -960,6 +1371,7 @@ export default function Inventario() {
                                   <Badge variant="secondary">{item.category}</Badge>
                                   {/* Solo mostrar badge de estado para administradores */}
                                   {permissions.isAdmin && <Badge variant={status.variant}>{status.label}</Badge>}
+                                  {item.is_archived && <Badge variant="outline" className="text-gray-500 border-gray-300">Archivado</Badge>}
                                 </div>
                                 <div className={`grid gap-4 text-sm text-gray-600 ${permissions.isAdmin ? 'grid-cols-2 md:grid-cols-5' : 'grid-cols-2 md:grid-cols-4'}`}>
                                   <div>
@@ -1002,7 +1414,7 @@ export default function Inventario() {
                                     Editar
                                   </Button>
                                 )}
-                                {/* 🔧 NUEVO: Botón de Historial */}
+                                {/* Botón de Historial */}
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -1011,6 +1423,20 @@ export default function Inventario() {
                                 >
                                   📊 Historial
                                 </Button>
+                                {permissions.canEditInventory && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleToggleArchive(item)}
+                                    title={item.is_archived ? "Desarchivar producto" : "Archivar producto"}
+                                  >
+                                    {item.is_archived ? (
+                                      <ArchiveRestore className="h-4 w-4" />
+                                    ) : (
+                                      <Archive className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                )}
                                 <span className="w-12 text-center font-medium">{item.stock || 0}</span>
                               </div>
                             </div>
@@ -1023,6 +1449,20 @@ export default function Inventario() {
               </TabsContent>
 
               <TabsContent value="bajo-stock" className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-gray-500">
+                    Productos activos con stock igual o inferior al mínimo requerido
+                  </p>
+                  <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={showArchivedInLowStock}
+                      onChange={(e) => setShowArchivedInLowStock(e.target.checked)}
+                      className="rounded border-gray-300"
+                    />
+                    Mostrar archivados
+                  </label>
+                </div>
                 {lowStockItems.length === 0 ? (
                   <Card>
                     <CardContent className="pt-6 text-center">
@@ -1035,7 +1475,7 @@ export default function Inventario() {
                     {lowStockItems.map((item) => {
                       const status = getStockStatus(item.stock || 0, item.minimum_stock || 0)
                       return (
-                        <Card key={item.id} className="border-orange-200">
+                        <Card key={item.id} className={`border-orange-200 ${item.is_archived ? "opacity-60" : ""}`}>
                           <CardContent className="pt-6">
                             <div className="flex items-center justify-between">
                               <div className="flex-1">
@@ -1045,13 +1485,14 @@ export default function Inventario() {
                                   <Badge variant="outline">{item.code}</Badge>
                                   <Badge variant="secondary">{item.category}</Badge>
                                   <Badge variant={status.variant}>{status.label}</Badge>
+                                  {item.is_archived && <Badge variant="outline" className="text-gray-500 border-gray-300">Archivado</Badge>}
                                 </div>
                                 <p className="text-sm text-gray-600">
                                   Stock actual: {item.stock || 0} • Mínimo requerido: {item.minimum_stock || 0} • Faltante:{" "}
                                   {Math.max(0, (item.minimum_stock || 0) - (item.stock || 0))}
                                 </p>
                               </div>
-                              <Button variant="default">Solicitar Reposición</Button>
+                              <Button variant="default" onClick={() => toast({ title: "Próximamente", description: "Esta funcionalidad estará disponible pronto" })}>Solicitar Reposición</Button>
                             </div>
                           </CardContent>
                         </Card>
@@ -1085,7 +1526,7 @@ export default function Inventario() {
                                   <Badge variant={status.variant}>{status.label}</Badge>
                                 </div>
                                 <p className="text-sm text-gray-600">
-                                  Stock: {item.stock} • Mínimo: {item.minimum_stock} • Precio: ${item.unit_price}
+                                  Stock: {formatNumber(item.stock || 0)} • Mínimo: {formatNumber(item.minimum_stock || 0)}{permissions.isAdmin && ` • Precio: ${formatCurrency(item.unit_price || 0)}`}
                                 </p>
                               </div>
                               <div className="flex items-center gap-2">
@@ -1181,19 +1622,23 @@ export default function Inventario() {
                     />
                   </div>
                 </div>
-                {/* 🔒 Solo mostrar precio unitario para administradores */}
+                {/* Solo mostrar precio unitario para administradores */}
                 {permissions.isAdmin && (
                   <div>
                     <Label htmlFor="edit_unit_price">Precio Unitario (COP)</Label>
                     <Input
                       id="edit_unit_price"
-                      type="number"
-                      step="0.01"
-                      value={editProduct.unit_price}
-                      onChange={(e) =>
-                        setEditProduct({ ...editProduct, unit_price: Number.parseFloat(e.target.value) || 0 })
-                      }
-                      min="0"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0"
+                      value={editUnitPriceDisplay}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        if (val === "" || /^\d*\.?\d*$/.test(val)) {
+                          setEditUnitPriceDisplay(val)
+                          setEditProduct({ ...editProduct, unit_price: Number.parseFloat(val) || 0 })
+                        }
+                      }}
                     />
                   </div>
                 )}
@@ -1297,13 +1742,7 @@ export default function Inventario() {
                                 <strong>Detalle:</strong> {movement.notes || 'Sin detalles'}
                               </p>
                               <p className="text-xs text-gray-500">
-                                {new Date(movement.created_at).toLocaleString('es-ES', {
-                                  year: 'numeric',
-                                  month: 'long',
-                                  day: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit'
-                                })}
+                                {formatTimestampForColombia(movement.created_at)}
                               </p>
                             </div>
                           </div>
