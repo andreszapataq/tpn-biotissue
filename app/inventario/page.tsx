@@ -15,6 +15,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
@@ -22,7 +23,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
-import { ArrowLeft, Search, Package, AlertTriangle, Plus, Minus, TrendingUp, Loader2, Archive, ArchiveRestore, Check, ChevronsUpDown, CalendarIcon, X } from "lucide-react"
+import { ArrowLeft, Search, Package, AlertTriangle, Plus, Minus, TrendingUp, Loader2, Check, ChevronsUpDown, CalendarIcon, Trash2, PackageX } from "lucide-react"
 import Link from "next/link"
 import { supabase } from "@/lib/supabase"
 import { Tables } from "@/lib/database.types"
@@ -123,9 +124,7 @@ export default function Inventario() {
     existingProductId?: string
   }>>([])
   const [productSearchOpen, setProductSearchOpen] = useState(false)
-
-  // Estado para filtro de archivados en Stock Bajo
-  const [showArchivedInLowStock, setShowArchivedInLowStock] = useState(false)
+  const [expirationDateInput, setExpirationDateInput] = useState("")
 
   // Estados para historial de movimientos
   const [isMovementHistoryOpen, setIsMovementHistoryOpen] = useState(false)
@@ -300,7 +299,7 @@ export default function Inventario() {
       unit_price: product.unit_price || 0,
       lote: product.lote || "",
     })
-    setEditUnitPriceDisplay(product.unit_price ? String(product.unit_price) : "")
+    setEditUnitPriceDisplay(product.unit_price ? formatNumber(product.unit_price) : "")
     setIsEditDialogOpen(true)
   }
 
@@ -434,11 +433,15 @@ export default function Inventario() {
       item.code.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
-  const lowStockItems = filteredInventory.filter(
-    (item) => (item.stock || 0) <= (item.minimum_stock || 0)
-      && (showArchivedInLowStock || !item.is_archived)
+  const availableItems = filteredInventory.filter(
+    (item) => (item.stock || 0) > (item.minimum_stock || 0) && !item.is_archived
   )
-  const normalStockItems = filteredInventory.filter((item) => (item.stock || 0) > (item.minimum_stock || 0))
+  const lowStockItems = filteredInventory.filter(
+    (item) => (item.stock || 0) > 0 && (item.stock || 0) <= (item.minimum_stock || 0) && !item.is_archived
+  )
+  const outOfStockItems = filteredInventory.filter(
+    (item) => (item.stock || 0) === 0 || item.is_archived
+  )
 
   const getStockStatus = (stock: number, minimum: number) => {
     if (stock === 0) return { variant: "destructive" as const, label: "Agotado" }
@@ -449,13 +452,16 @@ export default function Inventario() {
 
   const totalProducts = new Set(inventory.map(item => item.code)).size
   const lowStockCount = inventory.filter(
-    (item) => (item.stock || 0) <= (item.minimum_stock || 0) && !item.is_archived
+    (item) => (item.stock || 0) > 0 && (item.stock || 0) <= (item.minimum_stock || 0) && !item.is_archived
+  ).length
+  const outOfStockCount = inventory.filter(
+    (item) => (item.stock || 0) === 0 || item.is_archived
   ).length
   const totalValue = inventory.reduce((sum, item) => sum + (item.stock || 0) * (item.unit_price || 0), 0)
 
   // Productos únicos por código para el combobox de búsqueda
   const uniqueProductsByCode = useMemo(() => {
-    const map = new Map<string, { code: string; name: string; category: string }>()
+    const map = new Map<string, { code: string; name: string; category: string; minimum_stock: number; unit_price: number }>()
     for (const product of inventory) {
       if (product.is_archived) continue
       if (!map.has(product.code)) {
@@ -463,6 +469,8 @@ export default function Inventario() {
           code: product.code,
           name: product.name,
           category: product.category,
+          minimum_stock: product.minimum_stock || 5,
+          unit_price: product.unit_price || 0,
         })
       }
     }
@@ -495,6 +503,7 @@ export default function Inventario() {
     })
     setPendingEntries([])
     setProductSearchOpen(false)
+    setExpirationDateInput("")
     setIsStockEntryDialogOpen(false)
   }
 
@@ -548,6 +557,7 @@ export default function Inventario() {
       unitPrice: 0,
       isNew: false,
     })
+    setExpirationDateInput("")
   }
 
   const handleProcessEntries = async () => {
@@ -819,34 +829,6 @@ export default function Inventario() {
     loadMovementHistory(product.id)
   }
 
-  // Archivar / Desarchivar producto
-  const handleToggleArchive = async (product: InventoryProduct) => {
-    const newArchived = !product.is_archived
-    try {
-      const { error } = await supabase
-        .from("inventory_products")
-        .update({ is_archived: newArchived })
-        .eq("id", product.id)
-
-      if (error) throw error
-
-      setInventory(prev =>
-        prev.map(p => p.id === product.id ? { ...p, is_archived: newArchived } : p)
-      )
-
-      toast({
-        title: newArchived ? "Producto archivado" : "Producto desarchivado",
-        description: `"${product.name}" ${newArchived ? "fue archivado y no aparecerá en alertas de stock bajo" : "fue restaurado"}`,
-      })
-    } catch (error: any) {
-      console.error("Error toggling archive:", error)
-      toast({
-        title: "Error",
-        description: "No se pudo actualizar el estado del producto",
-        variant: "destructive",
-      })
-    }
-  }
 
   return (
     <ProtectedRoute requiredRole={["administrador", "soporte", "asistente"]}>
@@ -897,19 +879,22 @@ export default function Inventario() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">
-                    {permissions.isAdmin ? "Valor Total" : "Productos Activos"}
+                    {permissions.isAdmin ? "Valor Total" : "Sin Stock"}
                   </CardTitle>
-                  <TrendingUp className="h-4 w-4 text-green-500" />
+                  {permissions.isAdmin
+                    ? <TrendingUp className="h-4 w-4 text-green-500" />
+                    : <PackageX className="h-4 w-4 text-red-500" />
+                  }
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {permissions.isAdmin 
+                    {permissions.isAdmin
                       ? formatCurrency(totalValue)
-                      : formatNumber(inventory.filter(i => (i.stock || 0) > 0).length)
+                      : formatNumber(outOfStockCount)
                     }
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {permissions.isAdmin ? "Valor del inventario" : "Con stock disponible"}
+                    {permissions.isAdmin ? "Valor del inventario" : "Agotados o archivados"}
                   </p>
                 </CardContent>
               </Card>
@@ -1003,14 +988,15 @@ export default function Inventario() {
                             <Input
                               id="unit_price"
                               type="text"
-                              inputMode="decimal"
+                              inputMode="numeric"
                               placeholder="0"
                               value={unitPriceDisplay}
                               onChange={(e) => {
-                                const val = e.target.value
-                                if (val === "" || /^\d*\.?\d*$/.test(val)) {
-                                  setUnitPriceDisplay(val)
-                                  setNewProduct({ ...newProduct, unit_price: Number.parseFloat(val) || 0 })
+                                const raw = e.target.value.replace(/\./g, "")
+                                if (raw === "" || /^\d+$/.test(raw)) {
+                                  const num = Number(raw) || 0
+                                  setUnitPriceDisplay(raw === "" ? "" : formatNumber(num))
+                                  setNewProduct({ ...newProduct, unit_price: num })
                                 }
                               }}
                             />
@@ -1113,10 +1099,10 @@ export default function Inventario() {
                               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
                           </PopoverTrigger>
-                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start" onWheel={(e) => e.stopPropagation()}>
                             <Command>
                               <CommandInput placeholder="Buscar producto..." />
-                              <CommandList>
+                              <CommandList className="max-h-60 overflow-y-auto overscroll-contain">
                                 <CommandEmpty>No se encontró el producto.</CommandEmpty>
                                 <CommandGroup>
                                   {uniqueProductsByCode.map((product) => (
@@ -1131,6 +1117,8 @@ export default function Inventario() {
                                           selectedProductName: product.name,
                                           selectedProductCategory: product.category,
                                           isNew,
+                                          minimumStock: product.minimum_stock,
+                                          unitPrice: product.unit_price,
                                         }))
                                         setProductSearchOpen(false)
                                       }}
@@ -1161,40 +1149,72 @@ export default function Inventario() {
                             onChange={(e) => {
                               const lote = e.target.value
                               const isNew = checkIfNewCodeLote(currentEntry.selectedProductCode, lote.trim())
-                              setCurrentEntry(prev => ({ ...prev, lote, isNew }))
+                              const baseProduct = uniqueProductsByCode.find(p => p.code === currentEntry.selectedProductCode)
+                              setCurrentEntry(prev => ({
+                                ...prev,
+                                lote,
+                                isNew,
+                                ...(isNew && baseProduct ? { minimumStock: baseProduct.minimum_stock, unitPrice: baseProduct.unit_price } : {}),
+                              }))
                             }}
                           />
                         </div>
                         <div className="space-y-2">
                           <Label>Fecha de vencimiento</Label>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                className={cn("w-full justify-start text-left font-normal",
-                                  !currentEntry.expirationDate && "text-muted-foreground"
-                                )}
-                              >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {currentEntry.expirationDate
-                                  ? format(new Date(currentEntry.expirationDate + "T00:00:00"), "PPP", { locale: es })
-                                  : "Seleccionar fecha"}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar
-                                mode="single"
-                                selected={currentEntry.expirationDate ? new Date(currentEntry.expirationDate + "T00:00:00") : undefined}
-                                onSelect={(date) => {
-                                  if (date) {
-                                    const iso = date.toISOString().split("T")[0]
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="dd/mm/aaaa"
+                              value={expirationDateInput}
+                              onChange={(e) => {
+                                let val = e.target.value
+                                // Auto-insert slashes
+                                const digits = val.replace(/\D/g, "")
+                                if (digits.length <= 2) val = digits
+                                else if (digits.length <= 4) val = `${digits.slice(0, 2)}/${digits.slice(2)}`
+                                else val = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4, 8)}`
+                                setExpirationDateInput(val)
+                                // Parse dd/mm/yyyy → ISO
+                                if (/^\d{2}\/\d{2}\/\d{4}$/.test(val)) {
+                                  const [dd, mm, yyyy] = val.split("/")
+                                  const date = new Date(Number(yyyy), Number(mm) - 1, Number(dd))
+                                  if (date.getDate() === Number(dd) && date.getMonth() === Number(mm) - 1 && date.getFullYear() === Number(yyyy)) {
+                                    const iso = `${yyyy}-${mm}-${dd}`
                                     setCurrentEntry(prev => ({ ...prev, expirationDate: iso }))
+                                  } else {
+                                    setCurrentEntry(prev => ({ ...prev, expirationDate: "" }))
                                   }
-                                }}
-                                initialFocus
-                              />
-                            </PopoverContent>
-                          </Popover>
+                                } else {
+                                  setCurrentEntry(prev => ({ ...prev, expirationDate: "" }))
+                                }
+                              }}
+                              maxLength={10}
+                              className="flex-1"
+                            />
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" size="icon" className="shrink-0">
+                                  <CalendarIcon className="h-4 w-4" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="end">
+                                <Calendar
+                                  mode="single"
+                                  selected={currentEntry.expirationDate ? new Date(currentEntry.expirationDate + "T00:00:00") : undefined}
+                                  onSelect={(date) => {
+                                    if (date) {
+                                      const iso = date.toISOString().split("T")[0]
+                                      setCurrentEntry(prev => ({ ...prev, expirationDate: iso }))
+                                      const dd = String(date.getDate()).padStart(2, "0")
+                                      const mm = String(date.getMonth() + 1).padStart(2, "0")
+                                      const yyyy = date.getFullYear()
+                                      setExpirationDateInput(`${dd}/${mm}/${yyyy}`)
+                                    }
+                                  }}
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
                         </div>
                       </div>
 
@@ -1215,7 +1235,7 @@ export default function Inventario() {
                       {currentEntry.isNew && currentEntry.selectedProductCode && currentEntry.lote.trim() && (
                         <div className="space-y-4 p-4 border border-blue-200 rounded-lg bg-blue-50/50">
                           <Badge variant="secondary" className="bg-blue-100 text-blue-700">
-                            Nuevo producto (código + lote)
+                            Nuevo producto
                           </Badge>
                           <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
@@ -1234,13 +1254,13 @@ export default function Inventario() {
                                 <Input
                                   id="entry-price"
                                   type="text"
-                                  inputMode="decimal"
+                                  inputMode="numeric"
                                   placeholder="0"
-                                  value={currentEntry.unitPrice || ""}
+                                  value={currentEntry.unitPrice ? currentEntry.unitPrice.toLocaleString("es-CO") : ""}
                                   onChange={(e) => {
-                                    const val = e.target.value
-                                    if (/^\d*\.?\d*$/.test(val)) {
-                                      setCurrentEntry(prev => ({ ...prev, unitPrice: parseFloat(val) || 0 }))
+                                    const raw = e.target.value.replace(/\./g, "").replace(/,/g, "")
+                                    if (/^\d*$/.test(raw)) {
+                                      setCurrentEntry(prev => ({ ...prev, unitPrice: parseInt(raw) || 0 }))
                                     }
                                   }}
                                 />
@@ -1297,7 +1317,7 @@ export default function Inventario() {
                                     size="sm"
                                     onClick={() => setPendingEntries(prev => prev.filter(e => e.id !== entry.id))}
                                   >
-                                    <X className="h-4 w-4 text-red-500" />
+                                    <Trash2 className="h-4 w-4 text-red-500" />
                                   </Button>
                                 </div>
                               ))}
@@ -1311,19 +1331,40 @@ export default function Inventario() {
                       <Button variant="outline" onClick={resetStockEntryDialog}>
                         Cancelar
                       </Button>
-                      <Button
-                        onClick={handleProcessEntries}
-                        disabled={isProcessingEntry || pendingEntries.length === 0 || !remision.trim()}
-                      >
-                        {isProcessingEntry ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Procesando...
-                          </>
-                        ) : (
-                          `Procesar ${pendingEntries.length} entrada(s)`
-                        )}
-                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            disabled={isProcessingEntry || pendingEntries.length === 0 || !remision.trim()}
+                          >
+                            {isProcessingEntry ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Procesando...
+                              </>
+                            ) : (
+                              `Procesar ${pendingEntries.length} entrada(s)`
+                            )}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Confirmar entrada de inventario</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Se procesarán {pendingEntries.length} entrada(s) con remisión <strong className="text-foreground">{remision}</strong>.
+                              {pendingEntries.some(e => e.isNew) && (
+                                <> Se crearán {pendingEntries.filter(e => e.isNew).length} producto(s) nuevo(s).</>
+                              )}
+                              {" "}Esta acción no se puede deshacer.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleProcessEntries}>
+                              Confirmar
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
@@ -1337,19 +1378,20 @@ export default function Inventario() {
               <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
             </div>
           ) : (
-            <Tabs defaultValue="todos" className="space-y-4">
+            <Tabs defaultValue="disponibles" className="space-y-4">
               <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="todos">Todos los Productos ({formatNumber(filteredInventory.length)})</TabsTrigger>
+                <TabsTrigger value="disponibles">Disponibles ({formatNumber(availableItems.length)})</TabsTrigger>
                 <TabsTrigger value="bajo-stock">Stock Bajo ({formatNumber(lowStockItems.length)})</TabsTrigger>
-                <TabsTrigger value="normal">Stock Normal ({formatNumber(normalStockItems.length)})</TabsTrigger>
+                <TabsTrigger value="sin-stock">Sin Stock ({formatNumber(outOfStockItems.length)})</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="todos" className="space-y-4">
-                {filteredInventory.length === 0 ? (
+              {/* Tab: Disponibles — stock > mínimo, no archivado */}
+              <TabsContent value="disponibles" className="space-y-4">
+                {availableItems.length === 0 ? (
                   <Card>
                     <CardContent className="pt-6 text-center">
                       <Package className="h-12 w-12 mx-auto text-gray-300 mb-4" />
-                      <p className="text-gray-500">No hay productos en el inventario</p>
+                      <p className="text-gray-500">No hay productos disponibles con stock normal</p>
                       <Button className="mt-4" onClick={() => setIsCreateDialogOpen(true)}>
                         <Plus className="h-4 w-4 mr-2" />
                         Crear Primer Producto
@@ -1358,10 +1400,10 @@ export default function Inventario() {
                   </Card>
                 ) : (
                   <div className="grid gap-4">
-                    {filteredInventory.map((item) => {
+                    {availableItems.map((item) => {
                       const status = getStockStatus(item.stock || 0, item.minimum_stock || 0)
                       return (
-                        <Card key={item.id} className={item.is_archived ? "opacity-60" : ""}>
+                        <Card key={item.id}>
                           <CardContent className="pt-6">
                             <div className="flex items-center justify-between">
                               <div className="flex-1">
@@ -1369,9 +1411,7 @@ export default function Inventario() {
                                   <h3 className="text-lg font-semibold">{item.name}</h3>
                                   <Badge variant="outline">{item.code}</Badge>
                                   <Badge variant="secondary">{item.category}</Badge>
-                                  {/* Solo mostrar badge de estado para administradores */}
                                   {permissions.isAdmin && <Badge variant={status.variant}>{status.label}</Badge>}
-                                  {item.is_archived && <Badge variant="outline" className="text-gray-500 border-gray-300">Archivado</Badge>}
                                 </div>
                                 <div className={`grid gap-4 text-sm text-gray-600 ${permissions.isAdmin ? 'grid-cols-2 md:grid-cols-5' : 'grid-cols-2 md:grid-cols-4'}`}>
                                   <div>
@@ -1383,7 +1423,6 @@ export default function Inventario() {
                                   <div>
                                     <span className="font-medium">Stock Mínimo:</span> {formatNumber(item.minimum_stock || 0)}
                                   </div>
-                                  {/* 🔒 Solo mostrar precios para administradores */}
                                   {permissions.isAdmin ? (
                                     <>
                                       <div>
@@ -1395,7 +1434,7 @@ export default function Inventario() {
                                     </>
                                   ) : (
                                     <div>
-                                      <span className="font-medium">Estado:</span> 
+                                      <span className="font-medium">Estado:</span>
                                       <Badge variant={status.variant} className="ml-1">
                                         {status.label}
                                       </Badge>
@@ -1414,7 +1453,6 @@ export default function Inventario() {
                                     Editar
                                   </Button>
                                 )}
-                                {/* Botón de Historial */}
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -1423,20 +1461,6 @@ export default function Inventario() {
                                 >
                                   📊 Historial
                                 </Button>
-                                {permissions.canEditInventory && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleToggleArchive(item)}
-                                    title={item.is_archived ? "Desarchivar producto" : "Archivar producto"}
-                                  >
-                                    {item.is_archived ? (
-                                      <ArchiveRestore className="h-4 w-4" />
-                                    ) : (
-                                      <Archive className="h-4 w-4" />
-                                    )}
-                                  </Button>
-                                )}
                                 <span className="w-12 text-center font-medium">{item.stock || 0}</span>
                               </div>
                             </div>
@@ -1448,21 +1472,11 @@ export default function Inventario() {
                 )}
               </TabsContent>
 
+              {/* Tab: Stock Bajo — 0 < stock <= mínimo, no archivado */}
               <TabsContent value="bajo-stock" className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-gray-500">
-                    Productos activos con stock igual o inferior al mínimo requerido
-                  </p>
-                  <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={showArchivedInLowStock}
-                      onChange={(e) => setShowArchivedInLowStock(e.target.checked)}
-                      className="rounded border-gray-300"
-                    />
-                    Mostrar archivados
-                  </label>
-                </div>
+                <p className="text-sm text-gray-500">
+                  Productos con stock por debajo del mínimo requerido que necesitan reposición
+                </p>
                 {lowStockItems.length === 0 ? (
                   <Card>
                     <CardContent className="pt-6 text-center">
@@ -1475,7 +1489,7 @@ export default function Inventario() {
                     {lowStockItems.map((item) => {
                       const status = getStockStatus(item.stock || 0, item.minimum_stock || 0)
                       return (
-                        <Card key={item.id} className={`border-orange-200 ${item.is_archived ? "opacity-60" : ""}`}>
+                        <Card key={item.id} className="border-orange-200">
                           <CardContent className="pt-6">
                             <div className="flex items-center justify-between">
                               <div className="flex-1">
@@ -1485,14 +1499,41 @@ export default function Inventario() {
                                   <Badge variant="outline">{item.code}</Badge>
                                   <Badge variant="secondary">{item.category}</Badge>
                                   <Badge variant={status.variant}>{status.label}</Badge>
-                                  {item.is_archived && <Badge variant="outline" className="text-gray-500 border-gray-300">Archivado</Badge>}
                                 </div>
-                                <p className="text-sm text-gray-600">
-                                  Stock actual: {item.stock || 0} • Mínimo requerido: {item.minimum_stock || 0} • Faltante:{" "}
-                                  {Math.max(0, (item.minimum_stock || 0) - (item.stock || 0))}
-                                </p>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600">
+                                  <div>
+                                    <span className="font-medium">Lote:</span> <span className={`font-semibold ${item.lote ? 'text-blue-600' : 'text-gray-500'}`}>{item.lote || "N/A"}</span>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Stock Actual:</span> <span className="text-orange-600 font-semibold">{formatNumber(item.stock || 0)}</span>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Stock Mínimo:</span> {formatNumber(item.minimum_stock || 0)}
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Faltante:</span> <span className="text-red-600 font-semibold">{formatNumber(Math.max(0, (item.minimum_stock || 0) - (item.stock || 0)))}</span>
+                                  </div>
+                                </div>
                               </div>
-                              <Button variant="default" onClick={() => toast({ title: "Próximamente", description: "Esta funcionalidad estará disponible pronto" })}>Solicitar Reposición</Button>
+                              <div className="flex items-center gap-2">
+                                {permissions.canEditInventory && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => openEditDialog(item)}
+                                    className="mr-2"
+                                  >
+                                    Editar
+                                  </Button>
+                                )}
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openMovementHistory(item)}
+                                >
+                                  📊 Historial
+                                </Button>
+                              </div>
                             </div>
                           </CardContent>
                         </Card>
@@ -1502,41 +1543,69 @@ export default function Inventario() {
                 )}
               </TabsContent>
 
-              <TabsContent value="normal" className="space-y-4">
-                {normalStockItems.length === 0 ? (
+              {/* Tab: Sin Stock — stock === 0 o archivado */}
+              <TabsContent value="sin-stock" className="space-y-4">
+                <p className="text-sm text-gray-500">
+                  Productos agotados o archivados
+                </p>
+                {outOfStockItems.length === 0 ? (
                   <Card>
                     <CardContent className="pt-6 text-center">
-                      <Package className="h-12 w-12 mx-auto text-gray-300 mb-4" />
-                      <p className="text-gray-500">No hay productos con stock normal</p>
+                      <Package className="h-12 w-12 mx-auto text-green-500 mb-4" />
+                      <p className="text-gray-500">¡Todos los productos tienen stock!</p>
                     </CardContent>
                   </Card>
                 ) : (
                   <div className="grid gap-4">
-                    {normalStockItems.map((item) => {
-                      const status = getStockStatus(item.stock || 0, item.minimum_stock || 0)
-                      return (
-                        <Card key={item.id}>
-                          <CardContent className="pt-6">
-                            <div className="flex items-center justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-3 mb-2">
-                                  <h3 className="text-lg font-semibold">{item.name}</h3>
-                                  <Badge variant="outline">{item.code}</Badge>
-                                  <Badge variant="secondary">{item.category}</Badge>
-                                  <Badge variant={status.variant}>{status.label}</Badge>
-                                </div>
-                                <p className="text-sm text-gray-600">
-                                  Stock: {formatNumber(item.stock || 0)} • Mínimo: {formatNumber(item.minimum_stock || 0)}{permissions.isAdmin && ` • Precio: ${formatCurrency(item.unit_price || 0)}`}
-                                </p>
+                    {outOfStockItems.map((item) => (
+                      <Card key={item.id} className="border-gray-200 opacity-75">
+                        <CardContent className="pt-6">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-2">
+                                <PackageX className="h-5 w-5 text-gray-400" />
+                                <h3 className="text-lg font-semibold text-gray-600">{item.name}</h3>
+                                <Badge variant="outline">{item.code}</Badge>
+                                <Badge variant="secondary">{item.category}</Badge>
+                                <Badge variant="destructive">Agotado</Badge>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <span className="w-12 text-center font-medium">{item.stock || 0}</span>
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm text-gray-500">
+                                <div>
+                                  <span className="font-medium">Lote:</span> <span className={`font-semibold ${item.lote ? 'text-blue-600' : 'text-gray-500'}`}>{item.lote || "N/A"}</span>
+                                </div>
+                                <div>
+                                  <span className="font-medium">Stock Mínimo:</span> {formatNumber(item.minimum_stock || 0)}
+                                </div>
+                                {permissions.isAdmin && (
+                                  <div>
+                                    <span className="font-medium">Precio Unitario:</span> {formatCurrency(item.unit_price || 0)}
+                                  </div>
+                                )}
                               </div>
                             </div>
-                          </CardContent>
-                        </Card>
-                      )
-                    })}
+                            <div className="flex items-center gap-2">
+                              {permissions.canEditInventory && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openEditDialog(item)}
+                                  className="mr-2"
+                                >
+                                  Editar
+                                </Button>
+                              )}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openMovementHistory(item)}
+                              >
+                                📊 Historial
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
                   </div>
                 )}
               </TabsContent>
@@ -1629,14 +1698,15 @@ export default function Inventario() {
                     <Input
                       id="edit_unit_price"
                       type="text"
-                      inputMode="decimal"
+                      inputMode="numeric"
                       placeholder="0"
                       value={editUnitPriceDisplay}
                       onChange={(e) => {
-                        const val = e.target.value
-                        if (val === "" || /^\d*\.?\d*$/.test(val)) {
-                          setEditUnitPriceDisplay(val)
-                          setEditProduct({ ...editProduct, unit_price: Number.parseFloat(val) || 0 })
+                        const raw = e.target.value.replace(/\./g, "")
+                        if (raw === "" || /^\d+$/.test(raw)) {
+                          const num = Number(raw) || 0
+                          setEditUnitPriceDisplay(raw === "" ? "" : formatNumber(num))
+                          setEditProduct({ ...editProduct, unit_price: num })
                         }
                       }}
                     />
