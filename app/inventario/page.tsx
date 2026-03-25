@@ -434,10 +434,10 @@ export default function Inventario() {
   )
 
   const availableItems = filteredInventory.filter(
-    (item) => (item.stock || 0) > (item.minimum_stock || 0) && !item.is_archived
+    (item) => (item.stock || 0) >= (item.minimum_stock || 0) && !item.is_archived
   )
   const lowStockItems = filteredInventory.filter(
-    (item) => (item.stock || 0) > 0 && (item.stock || 0) <= (item.minimum_stock || 0) && !item.is_archived
+    (item) => (item.stock || 0) > 0 && (item.stock || 0) < (item.minimum_stock || 0) && !item.is_archived
   )
   const outOfStockItems = filteredInventory.filter(
     (item) => (item.stock || 0) === 0 || item.is_archived
@@ -445,14 +445,14 @@ export default function Inventario() {
 
   const getStockStatus = (stock: number, minimum: number) => {
     if (stock === 0) return { variant: "destructive" as const, label: "Agotado" }
-    if (stock <= minimum) return { variant: "destructive" as const, label: "Stock Bajo" }
+    if (stock < minimum) return { variant: "destructive" as const, label: "Stock Bajo" }
     if (stock <= minimum * 1.5) return { variant: "secondary" as const, label: "Stock Medio" }
     return { variant: "default" as const, label: "Stock Normal" }
   }
 
   const totalProducts = new Set(inventory.map(item => item.code)).size
   const lowStockCount = inventory.filter(
-    (item) => (item.stock || 0) > 0 && (item.stock || 0) <= (item.minimum_stock || 0) && !item.is_archived
+    (item) => (item.stock || 0) > 0 && (item.stock || 0) < (item.minimum_stock || 0) && !item.is_archived
   ).length
   const outOfStockCount = inventory.filter(
     (item) => (item.stock || 0) === 0 || item.is_archived
@@ -626,9 +626,8 @@ export default function Inventario() {
               movement_type: "in",
               quantity: entry.quantity,
               reference_type: "stock_entry",
-              reference_id: remision.trim(),
               institution_id: selectedInstitutionId || undefined,
-              notes: `Entrada de inventario (Remisión: ${remision.trim()}): +${entry.quantity} unidades [Lote: ${entry.lote}]`,
+              notes: `Remisión ${remision.trim()} - Lote: ${entry.lote}`,
             }
             if (userProfile?.id) movementData.created_by = userProfile.id
             movements.push(movementData)
@@ -662,9 +661,8 @@ export default function Inventario() {
               movement_type: "in",
               quantity: entry.quantity,
               reference_type: "stock_entry",
-              reference_id: remision.trim(),
               institution_id: selectedInstitutionId || undefined,
-              notes: `Entrada de inventario (Remisión: ${remision.trim()}): +${entry.quantity} unidades [Nuevo - Lote: ${entry.lote}]`,
+              notes: `Remisión ${remision.trim()} [Lote: ${entry.lote}]`,
             }
             if (userProfile?.id) movementData.created_by = userProfile.id
             movements.push(movementData)
@@ -708,9 +706,8 @@ export default function Inventario() {
             movement_type: "in",
             quantity: entry.quantity,
             reference_type: "stock_entry",
-            reference_id: remision.trim(),
             institution_id: selectedInstitutionId || undefined,
-            notes: `Entrada de inventario (Remisión: ${remision.trim()}): +${entry.quantity} unidades [Lote: ${entry.lote}]`,
+            notes: `Remisión ${remision.trim()} [Lote: ${entry.lote}]`,
           }
           if (userProfile?.id) movementData.created_by = userProfile.id
           movements.push(movementData)
@@ -1472,7 +1469,7 @@ export default function Inventario() {
                 )}
               </TabsContent>
 
-              {/* Tab: Stock Bajo — 0 < stock <= mínimo, no archivado */}
+              {/* Tab: Stock Bajo — 0 < stock < mínimo, no archivado */}
               <TabsContent value="bajo-stock" className="space-y-4">
                 <p className="text-sm text-gray-500">
                   Productos con stock por debajo del mínimo requerido que necesitan reposición
