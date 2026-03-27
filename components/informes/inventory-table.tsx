@@ -38,7 +38,7 @@ function StockBar({ current, minimum }: { current: number; minimum: number }) {
   const ratio = current / minimum
   const percent = Math.min(ratio * 50, 100) // 2x minimum = 100% bar
   let color = "bg-emerald-500"
-  if (ratio < 1) color = "bg-red-500"
+  if (ratio < 1) color = "bg-destructive"
   else if (ratio < 1.5) color = "bg-amber-500"
 
   return (
@@ -200,7 +200,7 @@ export function InventoryTable({ withStock, outOfStock }: InventoryTableProps) {
                   {outOfStock.map((item) => (
                     <div
                       key={item.product_id}
-                      className="flex items-center gap-2 text-sm text-muted-foreground py-1.5 px-2 rounded-md bg-red-50/50"
+                      className="flex items-center gap-2 text-sm text-muted-foreground py-1.5 px-2 rounded-md bg-destructive/5"
                     >
                       <Badge variant="outline" className="font-mono text-[10px] shrink-0">
                         {item.product_code}

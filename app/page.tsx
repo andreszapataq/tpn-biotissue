@@ -145,8 +145,8 @@ const DashboardContent = memo(function DashboardContent() {
     const endItem = Math.min(currentPage * itemsPerPage, totalItems)
 
     return (
-      <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50">
-        <div className="flex items-center text-sm text-gray-700">
+      <div className="flex items-center justify-between px-4 py-3 border-t bg-muted">
+        <div className="flex items-center text-sm text-foreground">
           <span>
             Mostrando {startItem} - {endItem} de {totalItems} registros
           </span>
@@ -344,30 +344,30 @@ const DashboardContent = memo(function DashboardContent() {
 
   return (
     <TooltipProvider delayDuration={300}>
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50">
+    <div className="min-h-screen bg-gradient-to-br from-background via-blue-50/30 to-background">
       {/* Top Bar */}
-      <div className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-10">
+      <div className="border-b bg-card/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-blue-600 flex items-center justify-center">
+            <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
               <Activity className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-semibold text-slate-900 leading-tight">Control NPWT</h1>
-              <p className="text-xs text-slate-500 leading-tight">Terapia de Presión Negativa</p>
+              <h1 className="text-lg font-semibold text-foreground leading-tight">Control NPWT</h1>
+              <p className="text-xs text-muted-foreground leading-tight">Terapia de Presión Negativa</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <InstitutionSwitcher />
             <div className="hidden sm:block text-right border-l pl-3">
-              <p className="text-xs text-slate-400 capitalize">
+              <p className="text-xs text-muted-foreground capitalize">
                 {currentTime.toLocaleDateString("es-ES", {
                   weekday: "long",
                   day: "numeric",
                   month: "short",
                 })}
               </p>
-              <p className="text-sm font-mono font-medium text-slate-700 tabular-nums">{currentTime.toLocaleTimeString("es-ES")}</p>
+              <p className="text-sm font-mono font-medium text-foreground tabular-nums">{currentTime.toLocaleTimeString("es-ES")}</p>
             </div>
             <UserMenu />
           </div>
@@ -378,10 +378,10 @@ const DashboardContent = memo(function DashboardContent() {
         {/* Welcome + Nav */}
         <div>
           {user && (
-            <p className="text-sm text-slate-500 mb-3">
-              Bienvenido, <span className="font-medium text-slate-700">{user.name}</span>
+            <p className="text-sm text-muted-foreground mb-3">
+              Bienvenido, <span className="font-medium text-foreground">{user.name}</span>
               {selectedInstitutionName && (
-                <span className="text-slate-400"> &mdash; {selectedInstitutionName}</span>
+                <span className="text-muted-foreground"> &mdash; {selectedInstitutionName}</span>
               )}
             </p>
           )}
@@ -396,8 +396,8 @@ const DashboardContent = memo(function DashboardContent() {
                     variant={item.primary ? "default" : "outline"}
                     className={`h-10 text-sm gap-2 ${
                       item.primary
-                        ? "bg-blue-600 hover:bg-blue-700 shadow-sm shadow-blue-200"
-                        : "bg-white hover:bg-slate-50 border-slate-200"
+                        ? "bg-primary hover:bg-primary/90 shadow-sm shadow-primary/20"
+                        : "bg-card hover:bg-muted border-border"
                     }`}
                   >
                     <Icon className="h-4 w-4 shrink-0" />
@@ -414,38 +414,38 @@ const DashboardContent = memo(function DashboardContent() {
           {[
             {
               icon: Users,
-              iconColor: "text-blue-600",
-              iconBg: "bg-blue-50/80",
+              iconColor: "text-primary",
+              iconBg: "bg-primary/10",
               label: "Activos",
               value: activePatients,
-              valueColor: "text-slate-900",
+              valueColor: "text-foreground",
               description: "Pacientes en tratamiento",
             },
             {
               icon: Activity,
-              iconColor: "text-indigo-600",
-              iconBg: "bg-indigo-50/80",
+              iconColor: "text-primary",
+              iconBg: "bg-primary/10",
               label: "Cerrados",
               value: totalClosedProcedures,
-              valueColor: "text-slate-900",
+              valueColor: "text-foreground",
               description: "Procedimientos completados",
             },
             {
               icon: Package,
-              iconColor: "text-emerald-600",
-              iconBg: "bg-emerald-50/80",
+              iconColor: "text-success",
+              iconBg: "bg-success/10",
               label: "Disponibles",
               value: activeMachines - machinesInUseCount,
-              valueColor: "text-emerald-600",
+              valueColor: "text-success",
               description: "Máquinas listas para usar",
             },
             {
               icon: AlertTriangle,
-              iconColor: inventoryAlerts > 0 ? "text-amber-500" : "text-slate-400",
-              iconBg: inventoryAlerts > 0 ? "bg-amber-50/80" : "bg-slate-50",
+              iconColor: inventoryAlerts > 0 ? "text-warning" : "text-muted-foreground",
+              iconBg: inventoryAlerts > 0 ? "bg-warning/10" : "bg-muted",
               label: "Alertas",
               value: inventoryAlerts,
-              valueColor: inventoryAlerts > 0 ? "text-amber-500" : "text-slate-900",
+              valueColor: inventoryAlerts > 0 ? "text-warning" : "text-foreground",
               description: "Productos con stock bajo",
               ring: inventoryAlerts > 0,
             },
@@ -454,17 +454,17 @@ const DashboardContent = memo(function DashboardContent() {
             return (
               <Card
                 key={i}
-                className={`bg-white/90 backdrop-blur-sm border-slate-200/60 shadow-sm hover:shadow transition-all ${stat.ring ? 'ring-1 ring-amber-200/60' : ''}`}
+                className={`bg-card/90 backdrop-blur-sm border-border/60 shadow-sm hover:shadow transition-all ${stat.ring ? 'ring-1 ring-warning/20' : ''}`}
               >
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div className={`h-9 w-9 rounded-xl ${stat.iconBg} flex items-center justify-center`}>
                       <StatIcon className={`h-[18px] w-[18px] ${stat.iconColor}`} />
                     </div>
-                    <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">{stat.label}</span>
+                    <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">{stat.label}</span>
                   </div>
                   <div className={`text-3xl font-semibold tracking-tight ${stat.valueColor}`}>{stat.value}</div>
-                  <p className="text-xs text-slate-400 mt-1">{stat.description}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{stat.description}</p>
                 </CardContent>
               </Card>
             )
@@ -475,8 +475,8 @@ const DashboardContent = memo(function DashboardContent() {
         {activeProcedures.length > 0 && (
           <div>
             <div className="flex items-center gap-3 mb-3">
-              <h2 className="text-base font-semibold text-slate-800">Procedimientos Activos</h2>
-              <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+              <h2 className="text-base font-semibold text-foreground">Procedimientos Activos</h2>
+              <span className="inline-flex items-center rounded-full bg-success/10 px-2.5 py-0.5 text-xs font-medium text-success ring-1 ring-inset ring-success/20">
                 {activeProcedures.length} activo{activeProcedures.length !== 1 ? 's' : ''}
               </span>
             </div>
@@ -490,16 +490,16 @@ const DashboardContent = memo(function DashboardContent() {
                 return (
                 <Card
                   key={procedure.id}
-                  className="bg-white/90 backdrop-blur-sm border-slate-200/60 shadow-sm hover:shadow transition-all group"
+                  className="bg-card/90 backdrop-blur-sm border-border/60 shadow-sm hover:shadow transition-all group"
                 >
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between mb-3">
                       <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-slate-900 truncate">{procedure.patient?.name || 'Sin nombre'}</p>
-                        <p className="text-xs text-slate-400 mt-0.5">ID: {procedure.patient?.identification || 'Sin ID'}</p>
+                        <p className="font-semibold text-foreground truncate">{procedure.patient?.name || 'Sin nombre'}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">ID: {procedure.patient?.identification || 'Sin ID'}</p>
                       </div>
-                      <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20 shrink-0 ml-2">
-                        <span className="mr-1 h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="inline-flex items-center rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success ring-1 ring-inset ring-success/20 shrink-0 ml-2">
+                        <span className="mr-1 h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
                         Activo
                       </span>
                     </div>
@@ -507,26 +507,26 @@ const DashboardContent = memo(function DashboardContent() {
                     {/* Info grid */}
                     <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm mb-3">
                       <div>
-                        <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wide">Cirujano</p>
-                        <p className="text-slate-700 truncate">{procedure.surgeon_name}</p>
+                        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Cirujano</p>
+                        <p className="text-foreground truncate">{procedure.surgeon_name}</p>
                       </div>
                       <div>
-                        <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wide">Fecha</p>
-                        <p className="text-slate-700">{formatDateForColombia(procedure.procedure_date)}</p>
+                        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Fecha</p>
+                        <p className="text-foreground">{formatDateForColombia(procedure.procedure_date)}</p>
                       </div>
                       <div>
-                        <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wide">Ubicación</p>
-                        <p className="text-slate-700">{procedure.location || '—'}</p>
+                        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Ubicación</p>
+                        <p className="text-foreground">{procedure.location || '—'}</p>
                       </div>
                     </div>
 
                     {/* Machine info — supports multiple machines */}
-                    <div className="bg-slate-50/80 rounded-lg px-3 py-2 mb-3">
-                      <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wide mb-0.5">
+                    <div className="bg-muted/80 rounded-lg px-3 py-2 mb-3">
+                      <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-0.5">
                         Máquina{procedureMachines.length !== 1 ? 's' : ''}
                       </p>
                       {procedureMachines.length === 0 ? (
-                        <p className="text-sm text-slate-400 italic">Sin máquina asignada</p>
+                        <p className="text-sm text-muted-foreground italic">Sin máquina asignada</p>
                       ) : (
                         <div className="space-y-1">
                           {procedureMachines.map((machine: any, idx: number) => {
@@ -535,7 +535,7 @@ const DashboardContent = memo(function DashboardContent() {
                             return (
                               <Tooltip key={idx}>
                                 <TooltipTrigger asChild>
-                                  <p className="text-sm text-slate-700 font-medium truncate cursor-default">{name}</p>
+                                  <p className="text-sm text-foreground font-medium truncate cursor-default">{name}</p>
                                 </TooltipTrigger>
                                 <TooltipContent side="bottom" className="max-w-xs">
                                   <div className="space-y-1">
@@ -551,7 +551,7 @@ const DashboardContent = memo(function DashboardContent() {
                     </div>
 
                     <Link href={`/procedimiento/${procedure.id}`}>
-                      <Button className="w-full h-9 bg-blue-600 hover:bg-blue-700 shadow-sm text-sm group-hover:shadow transition-shadow">
+                      <Button className="w-full h-9 bg-primary hover:bg-primary/90 shadow-sm text-sm group-hover:shadow transition-shadow">
                         <Activity className="h-3.5 w-3.5 mr-1.5" />
                         Gestionar
                       </Button>
@@ -576,7 +576,7 @@ const DashboardContent = memo(function DashboardContent() {
             {/* 🔍 Buscador Global */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="relative flex-1 w-full">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
                   placeholder="Buscar pacientes, procedimientos, cirujanos, diagnósticos..."
                   value={searchTerm}
@@ -586,7 +586,7 @@ const DashboardContent = memo(function DashboardContent() {
                 {searchTerm && (
                   <button
                     onClick={() => setSearchTerm("")}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-muted-foreground"
                   >
                     ✕
                   </button>
@@ -595,7 +595,7 @@ const DashboardContent = memo(function DashboardContent() {
               
               {/* Contador de resultados */}
               {(searchTerm || filteredPatients.length > 0 || filteredClosedProcedures.length > 0 || filteredAlerts.length > 0) && (
-                <div className="text-sm text-gray-500 whitespace-nowrap">
+                <div className="text-sm text-muted-foreground whitespace-nowrap">
                   <span className="hidden lg:inline">Encontrados: </span>
                   <span className="font-medium">
                     {filteredPatients.length} pacientes | 
@@ -609,7 +609,7 @@ const DashboardContent = memo(function DashboardContent() {
 
           {loadingData ? (
             <div className="flex items-center justify-center h-64">
-              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : (
             <>
@@ -618,10 +618,10 @@ const DashboardContent = memo(function DashboardContent() {
                   {paginatedPatients.length === 0 ? (
                     <Card>
                       <CardContent className="pt-6 text-center">
-                        <Users className="h-12 w-12 mx-auto text-gray-300 mb-4" />
+                        <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                         {searchTerm ? (
                           <div>
-                            <p className="text-gray-500 mb-2">
+                            <p className="text-muted-foreground mb-2">
                               No se encontraron pacientes que coincidan con "{searchTerm}"
                             </p>
                             <Button 
@@ -633,7 +633,7 @@ const DashboardContent = memo(function DashboardContent() {
                             </Button>
                           </div>
                         ) : (
-                          <p className="text-gray-500">No hay pacientes registrados</p>
+                          <p className="text-muted-foreground">No hay pacientes registrados</p>
                         )}
                       </CardContent>
                     </Card>
@@ -642,11 +642,11 @@ const DashboardContent = memo(function DashboardContent() {
                       const getPatientBadge = (status: string) => {
                         switch (status) {
                           case "active":
-                            return <Badge variant="default" className="bg-green-100 text-green-800">En Tratamiento</Badge>
+                            return <Badge variant="success">En Tratamiento</Badge>
                           case "completed":
-                            return <Badge variant="secondary" className="bg-blue-100 text-blue-800">Tratamiento Completado</Badge>
+                            return <Badge variant="secondary" className="bg-primary/10 text-primary">Tratamiento Completado</Badge>
                           case "inactive":
-                            return <Badge variant="outline" className="bg-gray-100 text-gray-600">Inactivo</Badge>
+                            return <Badge variant="outline" className="bg-muted text-muted-foreground">Inactivo</Badge>
                           default:
                             return <Badge variant="outline">{status}</Badge>
                         }
@@ -668,19 +668,19 @@ const DashboardContent = memo(function DashboardContent() {
                           <CardContent>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                               <div>
-                                <p className="font-medium text-gray-600">Estado</p>
+                                <p className="font-medium text-muted-foreground">Estado</p>
                                 <p className="capitalize">{patient.status === "active" ? "En tratamiento" : patient.status === "completed" ? "Completado" : "Inactivo"}</p>
                               </div>
                               <div>
-                                <p className="font-medium text-gray-600">Edad</p>
+                                <p className="font-medium text-muted-foreground">Edad</p>
                                 <p>{patient.age} años</p>
                               </div>
                               <div>
-                                <p className="font-medium text-gray-600">Identificación</p>
+                                <p className="font-medium text-muted-foreground">Identificación</p>
                                 <p>{patient.identification}</p>
                               </div>
                               <div>
-                                <p className="font-medium text-gray-600">Registrado</p>
+                                <p className="font-medium text-muted-foreground">Registrado</p>
                                 <p>{formatTimestampForColombia(patient.created_at)}</p>
                               </div>
                             </div>
@@ -706,10 +706,10 @@ const DashboardContent = memo(function DashboardContent() {
                   {paginatedProcedures.length === 0 ? (
                     <Card>
                       <CardContent className="pt-6 text-center">
-                        <Activity className="h-12 w-12 mx-auto text-gray-300 mb-4" />
+                        <Activity className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                         {searchTerm ? (
                           <div>
-                            <p className="text-gray-500 mb-2">
+                            <p className="text-muted-foreground mb-2">
                               No se encontraron procedimientos que coincidan con "{searchTerm}"
                             </p>
                             <Button 
@@ -721,7 +721,7 @@ const DashboardContent = memo(function DashboardContent() {
                             </Button>
                           </div>
                         ) : (
-                          <p className="text-gray-500">No hay procedimientos cerrados</p>
+                          <p className="text-muted-foreground">No hay procedimientos cerrados</p>
                         )}
                       </CardContent>
                     </Card>
@@ -731,18 +731,18 @@ const DashboardContent = memo(function DashboardContent() {
                         <CardContent className="pt-6">
                           <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center space-x-4">
-                              <div className="bg-blue-100 p-2 rounded-full">
-                                <Activity className="h-4 w-4 text-blue-600" />
+                              <div className="bg-primary/10 p-2 rounded-full">
+                                <Activity className="h-4 w-4 text-primary" />
                               </div>
                               <div>
                                 <p className="font-medium">{procedure.patient?.name || 'Sin nombre'}</p>
-                                <p className="text-sm text-gray-600">
+                                <p className="text-sm text-muted-foreground">
                                   Dr. {procedure.surgeon_name} • ID: {procedure.patient?.identification || 'Sin ID'}
                                 </p>
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
-                              <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                              <Badge variant="secondary" className="bg-primary/10 text-primary">
                                 Procedimiento Cerrado
                               </Badge>
                               <Link href={`/procedimiento/${procedure.id}`}>
@@ -755,36 +755,36 @@ const DashboardContent = memo(function DashboardContent() {
                           
                           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
                             <div>
-                              <p className="font-medium text-gray-600">Fecha</p>
-                              <div className="flex items-center text-gray-900">
+                              <p className="font-medium text-muted-foreground">Fecha</p>
+                              <div className="flex items-center text-foreground">
                                 <Calendar className="h-3 w-3 mr-1" />
                                 {formatDateForColombia(procedure.procedure_date)}
                               </div>
                             </div>
                             <div>
-                              <p className="font-medium text-gray-600">Hora Inicio</p>
-                              <div className="flex items-center text-gray-900">
+                              <p className="font-medium text-muted-foreground">Hora Inicio</p>
+                              <div className="flex items-center text-foreground">
                                 <Clock className="h-3 w-3 mr-1" />
                                 {procedure.start_time}
                               </div>
                             </div>
                             <div>
-                              <p className="font-medium text-gray-600">Ubicación</p>
-                              <p className="text-gray-900">{procedure.location || 'No especificada'}</p>
+                              <p className="font-medium text-muted-foreground">Ubicación</p>
+                              <p className="text-foreground">{procedure.location || 'No especificada'}</p>
                             </div>
                             <div>
-                              <p className="font-medium text-gray-600">Máquina{((procedure.procedure_machines?.length || 0) > 1) ? 's' : ''}</p>
+                              <p className="font-medium text-muted-foreground">Máquina{((procedure.procedure_machines?.length || 0) > 1) ? 's' : ''}</p>
                               {(() => {
                                 const machines = procedure.procedure_machines?.length > 0
                                   ? procedure.procedure_machines.map((pm: any) => pm.machine)
                                   : procedure.machine ? [procedure.machine] : []
                                 return machines.length === 0 ? (
-                                  <p className="text-gray-400 italic">Sin máquina</p>
+                                  <p className="text-muted-foreground italic">Sin máquina</p>
                                 ) : (
                                   machines.map((m: any, idx: number) => (
                                     <Tooltip key={idx}>
                                       <TooltipTrigger asChild>
-                                        <p className="text-gray-900 truncate cursor-default">{getMachineDisplayName(m?.model || '', m?.lote || '')}</p>
+                                        <p className="text-foreground truncate cursor-default">{getMachineDisplayName(m?.model || '', m?.lote || '')}</p>
                                       </TooltipTrigger>
                                       <TooltipContent side="bottom" className="max-w-xs">
                                         <div className="space-y-1">
@@ -798,8 +798,8 @@ const DashboardContent = memo(function DashboardContent() {
                               })()}
                             </div>
                             <div>
-                              <p className="font-medium text-gray-600">Finalizado</p>
-                              <p className="text-gray-900">
+                              <p className="font-medium text-muted-foreground">Finalizado</p>
+                              <p className="text-foreground">
                                 {procedure.updated_at ? formatTimestampForColombia(procedure.updated_at) : 'N/A'}
                               </p>
                             </div>
@@ -807,8 +807,8 @@ const DashboardContent = memo(function DashboardContent() {
                           
                           {procedure.diagnosis && (
                             <div className="mt-3 pt-3 border-t">
-                              <p className="font-medium text-gray-600 text-sm">Diagnóstico</p>
-                              <p className="text-sm text-gray-900 mt-1">{procedure.diagnosis}</p>
+                              <p className="font-medium text-muted-foreground text-sm">Diagnóstico</p>
+                              <p className="text-sm text-foreground mt-1">{procedure.diagnosis}</p>
                             </div>
                           )}
                         </CardContent>
@@ -832,10 +832,10 @@ const DashboardContent = memo(function DashboardContent() {
                   {paginatedAlerts.length === 0 ? (
                     <Card>
                       <CardContent className="pt-6 text-center">
-                        <AlertTriangle className="h-12 w-12 mx-auto text-gray-300 mb-4" />
+                        <AlertTriangle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                         {searchTerm ? (
                           <div>
-                            <p className="text-gray-500 mb-2">
+                            <p className="text-muted-foreground mb-2">
                               No se encontraron alertas que coincidan con "{searchTerm}"
                             </p>
                             <Button 
@@ -847,22 +847,22 @@ const DashboardContent = memo(function DashboardContent() {
                             </Button>
                           </div>
                         ) : (
-                          <p className="text-gray-500">No hay alertas de inventario</p>
+                          <p className="text-muted-foreground">No hay alertas de inventario</p>
                         )}
                       </CardContent>
                     </Card>
                   ) : (
                     paginatedAlerts.map((alert, index) => (
-                    <Card key={index} className="border-orange-200">
+                    <Card key={index} className="border-warning/30">
                       <CardContent className="pt-6">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-4">
-                            <div className="bg-orange-100 p-2 rounded-full">
-                              <AlertTriangle className="h-4 w-4 text-orange-600" />
+                            <div className="bg-warning-muted p-2 rounded-full">
+                              <AlertTriangle className="h-4 w-4 text-warning" />
                             </div>
                             <div>
                               <p className="font-medium">Stock Bajo: {alert.product}</p>
-                              <p className="text-sm text-gray-600">
+                              <p className="text-sm text-muted-foreground">
                                 Stock actual: {alert.stock} • Mínimo requerido: {alert.minimum}
                               </p>
                             </div>

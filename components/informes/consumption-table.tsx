@@ -136,7 +136,7 @@ export function ConsumptionTable({
                     <TableCell className="text-right tabular-nums hidden sm:table-cell">
                       {formatCurrency(item.unit_price)}
                     </TableCell>
-                    <TableCell className="text-right font-semibold tabular-nums text-red-600">
+                    <TableCell className="text-right font-semibold tabular-nums text-destructive">
                       {formatCurrency(item.total_value)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums hidden lg:table-cell">
@@ -151,7 +151,7 @@ export function ConsumptionTable({
               <TableFooter>
                 <TableRow>
                   <TableCell colSpan={5} className="font-semibold">Total</TableCell>
-                  <TableCell className="text-right font-bold tabular-nums text-red-700">
+                  <TableCell className="text-right font-bold tabular-nums text-destructive">
                     {formatCurrency(totalValue)}
                   </TableCell>
                   <TableCell colSpan={2} className="hidden lg:table-cell" />
@@ -167,7 +167,7 @@ export function ConsumptionTable({
         <Card className="border-slate-200">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
-              <Wrench className="h-4 w-4 text-slate-500" />
+              <Wrench className="h-4 w-4 text-muted-foreground" />
               Accesorios Utilizados
             </CardTitle>
             <CardDescription>

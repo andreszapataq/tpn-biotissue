@@ -42,7 +42,7 @@ export function UserMenu() {
           <div className="flex flex-col space-y-2">
             <div className="flex items-center gap-2">
               <p className="text-sm font-medium leading-none">{user.name}</p>
-              {user.mfa_enabled && <Shield className="h-3 w-3 text-green-600" />}
+              {user.mfa_enabled && <Shield className="h-3 w-3 text-success" />}
             </div>
             <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
             <Badge className={getRoleBadgeClassName(user.role)} variant="secondary">
@@ -79,7 +79,7 @@ export function UserMenu() {
           <span>Actualizar Permisos</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={signOut} className="text-red-600">
+        <DropdownMenuItem onClick={signOut} className="text-destructive">
           <LogOut className="mr-2 h-4 w-4" />
           <span>Cerrar Sesión</span>
         </DropdownMenuItem>

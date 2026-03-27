@@ -24,6 +24,26 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 221.2 83.2% 53.3%;
     --radius: 0.75rem;
+
+    /* Semantic status colors */
+    --success: 142 71% 45%;
+    --success-foreground: 144 80% 10%;
+    --success-muted: 142 76% 94%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 32 95% 12%;
+    --warning-muted: 48 96% 89%;
+    --info: 217 91% 60%;
+    --info-foreground: 221 83% 15%;
+    --info-muted: 214 95% 93%;
+    --neutral: 215 16% 47%;
+    --neutral-foreground: 222 47% 11%;
+    --neutral-muted: 210 40% 96%;
+
+    /* Shadows */
+    --shadow-xs: 0 1px 2px 0 hsl(0 0% 0% / 0.03);
+    --shadow-sm: 0 1px 3px 0 hsl(0 0% 0% / 0.04), 0 1px 2px -1px hsl(0 0% 0% / 0.04);
+    --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.05), 0 2px 4px -2px hsl(0 0% 0% / 0.05);
+    --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.05), 0 4px 6px -4px hsl(0 0% 0% / 0.05);
   }
 
   .dark {
@@ -46,6 +66,26 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 224.3 76.3% 94.1%;
+
+    /* Semantic status colors (dark) */
+    --success: 142 71% 35%;
+    --success-foreground: 142 76% 90%;
+    --success-muted: 144 40% 12%;
+    --warning: 38 92% 40%;
+    --warning-foreground: 48 96% 90%;
+    --warning-muted: 32 40% 12%;
+    --info: 217 91% 50%;
+    --info-foreground: 214 95% 90%;
+    --info-muted: 221 40% 12%;
+    --neutral: 215 16% 57%;
+    --neutral-foreground: 210 40% 90%;
+    --neutral-muted: 222 20% 14%;
+
+    /* Shadows (dark) */
+    --shadow-xs: 0 1px 2px 0 hsl(0 0% 0% / 0.1);
+    --shadow-sm: 0 1px 3px 0 hsl(0 0% 0% / 0.15), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
+    --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.2), 0 2px 4px -2px hsl(0 0% 0% / 0.15);
+    --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.25), 0 4px 6px -4px hsl(0 0% 0% / 0.2);
   }
 }
 
@@ -105,9 +145,76 @@
 
 /* Indicadores de estado offline */
 .offline-indicator {
-  @apply bg-orange-100 border-orange-200 text-orange-800;
+  @apply bg-warning-muted border-warning/30 text-warning-foreground;
 }
 
 .online-indicator {
-  @apply bg-green-100 border-green-200 text-green-800;
+  @apply bg-success-muted border-success/30 text-success-foreground;
+}
+
+/* Typography scale */
+.heading-1 {
+  @apply text-2xl font-bold tracking-tight text-foreground;
+}
+.heading-2 {
+  @apply text-lg font-semibold text-foreground;
+}
+.heading-3 {
+  @apply text-base font-semibold text-foreground;
+}
+.body-default {
+  @apply text-sm text-foreground;
+}
+.body-muted {
+  @apply text-sm text-muted-foreground;
+}
+.label-text {
+  @apply text-xs font-medium text-muted-foreground uppercase tracking-wider;
+}
+.caption {
+  @apply text-xs text-muted-foreground;
+}
+
+/* Page shell */
+.page-shell {
+  @apply min-h-screen bg-background;
+}
+.page-container {
+  @apply max-w-7xl mx-auto space-y-6 p-4;
+}
+.page-container-narrow {
+  @apply max-w-4xl mx-auto space-y-6 p-4;
+}
+.page-container-medium {
+  @apply max-w-6xl mx-auto space-y-6 p-4;
+}
+
+/* Dashboard animations */
+@keyframes countUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes barGrow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.animate-count-up {
+  animation: countUp 0.4s ease-out forwards;
+}
+
+.animate-bar-grow {
+  transform-origin: left;
+  animation: barGrow 0.6s ease-out forwards;
 }

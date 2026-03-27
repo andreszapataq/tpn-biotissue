@@ -1,9 +1,9 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import Link from "next/link"
-import { ArrowLeft, Building2, Eye, EyeOff, Loader2, ShieldCheck, UserCog, UserPlus, Users } from "lucide-react"
+import { Building2, Eye, EyeOff, Loader2, ShieldCheck, UserCog, UserPlus, Users } from "lucide-react"
 import { ProtectedRoute } from "@/components/auth/protected-route"
+import { PageHeader } from "@/components/ui/page-header"
 import { UserMenu } from "@/components/auth/user-menu"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -560,37 +560,26 @@ export default function AdminPage() {
 
   return (
     <ProtectedRoute requiredRole={["administrador"]}>
-      <div className="min-h-screen bg-gray-50 p-4">
-        <div className="max-w-7xl mx-auto space-y-6">
-          <div className="flex items-start justify-between gap-4">
-            <div className="space-y-3">
-              <Link href="/">
-                <Button variant="outline" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Volver al Dashboard
-                </Button>
-              </Link>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Administración</h1>
-                <p className="text-gray-600">
-                  Gestiona instituciones y convierte usuarios existentes en soporte, asistentes o gerencia.
-                </p>
-              </div>
-            </div>
-            <UserMenu />
-          </div>
+      <div className="page-shell">
+        <div className="page-container-medium">
+          <PageHeader
+            title="Administración"
+            subtitle="Gestiona instituciones y convierte usuarios existentes en soporte, asistentes o gerencia."
+            backHref="/"
+            actions={<UserMenu />}
+          />
 
-          <Card className="border-blue-200 bg-blue-50">
+          <Card className="border-info/30 bg-info-muted">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-blue-900">
+              <CardTitle className="flex items-center gap-2 text-info-foreground">
                 <ShieldCheck className="h-5 w-5" />
                 Cómo crear un usuario de gerencia
               </CardTitle>
-              <CardDescription className="text-blue-800">
+              <CardDescription className="text-info-foreground">
                 No necesitas crear uno para entrar hoy, porque tu usuario administrador ya ve el dashboard global.
               </CardDescription>
             </CardHeader>
-            <CardContent className="text-sm text-blue-900 space-y-2">
+            <CardContent className="text-sm text-info-foreground space-y-2">
               <p>1. Crea el usuario directamente desde la pestaña <strong>Usuarios</strong> con el botón <strong>Crear Usuario</strong>.</p>
               <p>2. Asígnale el rol que necesite (soporte, asistente, gerente o administrador) y sus instituciones.</p>
               <p>3. El usuario podrá iniciar sesión inmediatamente con el correo y contraseña asignados.</p>
@@ -599,7 +588,7 @@ export default function AdminPage() {
 
           {loading ? (
             <Card>
-              <CardContent className="pt-6 flex items-center justify-center gap-3 text-gray-600">
+              <CardContent className="pt-6 flex items-center justify-center gap-3 text-muted-foreground">
                 <Loader2 className="h-5 w-5 animate-spin" />
                 Cargando módulo administrativo...
               </CardContent>
@@ -694,11 +683,11 @@ export default function AdminPage() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                       {institutions.map((institution) => (
-                        <div key={institution.id} className="rounded-lg border bg-white p-4 space-y-4">
+                        <div key={institution.id} className="rounded-lg border bg-card p-4 space-y-4">
                           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                             <div className="space-y-1">
                               <div className="flex items-center gap-2">
-                                <p className="font-semibold text-gray-900">{institution.name}</p>
+                                <p className="font-semibold text-foreground">{institution.name}</p>
                                 {institution.code === "institucion-principal" && (
                                   <Badge variant="outline">Principal</Badge>
                                 )}
@@ -807,10 +796,10 @@ export default function AdminPage() {
                         const draft = userDrafts[user.id]
 
                         return (
-                          <div key={user.id} className="rounded-lg border bg-white p-4 space-y-4">
+                          <div key={user.id} className="rounded-lg border bg-card p-4 space-y-4">
                             <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
                               <div>
-                                <p className="font-semibold text-gray-900">{user.name}</p>
+                                <p className="font-semibold text-foreground">{user.name}</p>
                                 <p className="text-sm text-muted-foreground">{user.email}</p>
                                 <p className="text-xs text-muted-foreground">
                                   Actual: {getRoleLabel(user.role)}
@@ -848,7 +837,7 @@ export default function AdminPage() {
                                   {activeInstitutions.map((institution) => (
                                     <label
                                       key={institution.id}
-                                      className="flex items-center gap-3 rounded-md border bg-gray-50 px-3 py-2"
+                                      className="flex items-center gap-3 rounded-md border bg-muted px-3 py-2"
                                     >
                                       <Checkbox
                                         checked={draft?.institution_ids.includes(institution.id)}
@@ -957,7 +946,7 @@ export default function AdminPage() {
                   />
                   <button
                     type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     onClick={() => setShowPassword((prev) => !prev)}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -1018,7 +1007,7 @@ export default function AdminPage() {
                 <Label>Instituciones *</Label>
                 <div className="grid grid-cols-1 gap-2 rounded-md border p-3">
                   {activeInstitutions.map((institution) => (
-                    <label key={institution.id} className="flex items-center gap-3 rounded-md border bg-gray-50 px-3 py-2">
+                    <label key={institution.id} className="flex items-center gap-3 rounded-md border bg-muted px-3 py-2">
                       <Checkbox
                         checked={newUser.institution_ids.includes(institution.id)}
                         onCheckedChange={(checked) => toggleNewUserInstitution(institution.id, checked === true)}

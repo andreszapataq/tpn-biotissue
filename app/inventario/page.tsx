@@ -23,8 +23,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
-import { ArrowLeft, Search, Package, AlertTriangle, Plus, Minus, TrendingUp, Loader2, Check, ChevronsUpDown, CalendarIcon, Trash2, PackageX } from "lucide-react"
-import Link from "next/link"
+import { Search, Package, AlertTriangle, Plus, Minus, TrendingUp, Loader2, Check, ChevronsUpDown, CalendarIcon, Trash2, PackageX } from "lucide-react"
+import { PageHeader } from "@/components/ui/page-header"
 import { supabase } from "@/lib/supabase"
 import { Tables } from "@/lib/database.types"
 import { useToast } from "@/hooks/use-toast"
@@ -829,25 +829,17 @@ export default function Inventario() {
 
   return (
     <ProtectedRoute requiredRole={["administrador", "soporte", "asistente"]}>
-      <div className="min-h-screen bg-gray-50 p-4">
-        <div className="max-w-6xl mx-auto">
+      <div className="page-shell">
+        <div className="page-container-medium">
           {/* Header */}
-          <div className="mb-6">
-            <div className="flex flex-col gap-4 mb-4 md:flex-row md:items-center md:justify-between">
-              <div className="flex items-center gap-4">
-                <Link href="/">
-                  <Button variant="outline" size="sm">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Volver al Dashboard
-                  </Button>
-                </Link>
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-900">Gestión de Inventario</h1>
-                  <p className="text-gray-600">Control de stock de productos NPWT</p>
-                </div>
-              </div>
-              <InstitutionSwitcher />
-            </div>
+          <PageHeader
+            title="Gestión de Inventario"
+            subtitle="Control de stock de productos NPWT"
+            backHref="/"
+            actions={<InstitutionSwitcher />}
+          />
+
+          <div>
 
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -865,10 +857,10 @@ export default function Inventario() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Stock Bajo</CardTitle>
-                  <AlertTriangle className="h-4 w-4 text-orange-500" />
+                  <AlertTriangle className="h-4 w-4 text-warning" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-orange-500">{formatNumber(lowStockCount)}</div>
+                  <div className="text-2xl font-bold text-warning">{formatNumber(lowStockCount)}</div>
                   <p className="text-xs text-muted-foreground">Requieren reposición</p>
                 </CardContent>
               </Card>
@@ -879,8 +871,8 @@ export default function Inventario() {
                     {permissions.isAdmin ? "Valor Total" : "Sin Stock"}
                   </CardTitle>
                   {permissions.isAdmin
-                    ? <TrendingUp className="h-4 w-4 text-green-500" />
-                    : <PackageX className="h-4 w-4 text-red-500" />
+                    ? <TrendingUp className="h-4 w-4 text-success" />
+                    : <PackageX className="h-4 w-4 text-destructive" />
                   }
                 </CardHeader>
                 <CardContent>
@@ -899,7 +891,7 @@ export default function Inventario() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Acciones</CardTitle>
-                  <Plus className="h-4 w-4 text-blue-500" />
+                  <Plus className="h-4 w-4 text-primary" />
                 </CardHeader>
                 <CardContent>
                   {permissions.canEditInventory ? (
@@ -1022,8 +1014,8 @@ export default function Inventario() {
                   </Dialog>
                   ) : (
                     <div className="text-center py-2">
-                      <p className="text-sm text-gray-500">Solo administradores</p>
-                      <p className="text-xs text-gray-400">pueden crear productos</p>
+                      <p className="text-sm text-muted-foreground">Solo administradores</p>
+                      <p className="text-xs text-muted-foreground">pueden crear productos</p>
                     </div>
                   )}
                 </CardContent>
@@ -1033,7 +1025,7 @@ export default function Inventario() {
             {/* Search */}
             <div className="flex items-center justify-between gap-4">
               <div className="relative max-w-md flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
                   placeholder="Buscar productos..."
                   value={searchTerm}
@@ -1077,7 +1069,7 @@ export default function Inventario() {
 
                     {/* Formulario de entrada */}
                     <div className="space-y-4">
-                      <p className="text-sm font-medium text-gray-700">Agregar producto</p>
+                      <p className="text-sm font-medium text-foreground">Agregar producto</p>
 
                       {/* Combobox búsqueda de producto */}
                       <div className="space-y-2">
@@ -1230,8 +1222,8 @@ export default function Inventario() {
 
                       {/* Campos adicionales para producto nuevo */}
                       {currentEntry.isNew && currentEntry.selectedProductCode && currentEntry.lote.trim() && (
-                        <div className="space-y-4 p-4 border border-blue-200 rounded-lg bg-blue-50/50">
-                          <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                        <div className="space-y-4 p-4 border border-info/30 rounded-lg bg-info-muted/50">
+                          <Badge variant="secondary" className="bg-info-muted text-info-foreground">
                             Nuevo producto
                           </Badge>
                           <div className="grid grid-cols-2 gap-4">
@@ -1284,13 +1276,13 @@ export default function Inventario() {
                       <>
                         <Separator />
                         <div className="space-y-3">
-                          <p className="text-sm font-medium text-gray-700">
+                          <p className="text-sm font-medium text-foreground">
                             Entradas pendientes ({pendingEntries.length})
                           </p>
                           <ScrollArea className="max-h-48">
                             <div className="space-y-2">
                               {pendingEntries.map((entry) => (
-                                <div key={entry.id} className="flex items-center justify-between p-3 border rounded-lg bg-gray-50">
+                                <div key={entry.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted">
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 flex-wrap">
                                       <span className="font-medium text-sm truncate">{entry.productName}</span>
@@ -1298,13 +1290,13 @@ export default function Inventario() {
                                       <Badge variant="secondary" className="text-xs">Lote: {entry.lote}</Badge>
                                       <Badge variant="default" className="text-xs">+{entry.quantity}</Badge>
                                       {entry.isNew ? (
-                                        <Badge className="bg-blue-100 text-blue-700 text-xs">Nuevo</Badge>
+                                        <Badge className="bg-info-muted text-info-foreground text-xs">Nuevo</Badge>
                                       ) : (
-                                        <Badge className="bg-green-100 text-green-700 text-xs">Existente</Badge>
+                                        <Badge variant="success" className="text-xs">Existente</Badge>
                                       )}
                                     </div>
                                     {entry.expirationDate && (
-                                      <p className="text-xs text-gray-500 mt-1">
+                                      <p className="text-xs text-muted-foreground mt-1">
                                         Vence: {format(new Date(entry.expirationDate + "T00:00:00"), "PPP", { locale: es })}
                                       </p>
                                     )}
@@ -1314,7 +1306,7 @@ export default function Inventario() {
                                     size="sm"
                                     onClick={() => setPendingEntries(prev => prev.filter(e => e.id !== entry.id))}
                                   >
-                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                    <Trash2 className="h-4 w-4 text-destructive" />
                                   </Button>
                                 </div>
                               ))}
@@ -1372,7 +1364,7 @@ export default function Inventario() {
           {/* Inventory Tabs */}
           {loading ? (
             <div className="flex items-center justify-center h-64">
-              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : (
             <Tabs defaultValue="disponibles" className="space-y-4">
@@ -1387,8 +1379,8 @@ export default function Inventario() {
                 {availableItems.length === 0 ? (
                   <Card>
                     <CardContent className="pt-6 text-center">
-                      <Package className="h-12 w-12 mx-auto text-gray-300 mb-4" />
-                      <p className="text-gray-500">No hay productos disponibles con stock normal</p>
+                      <Package className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+                      <p className="text-muted-foreground">No hay productos disponibles con stock normal</p>
                       <Button className="mt-4" onClick={() => setIsCreateDialogOpen(true)}>
                         <Plus className="h-4 w-4 mr-2" />
                         Crear Primer Producto
@@ -1410,9 +1402,9 @@ export default function Inventario() {
                                   <Badge variant="secondary">{item.category}</Badge>
                                   {permissions.isAdmin && <Badge variant={status.variant}>{status.label}</Badge>}
                                 </div>
-                                <div className={`grid gap-4 text-sm text-gray-600 ${permissions.isAdmin ? 'grid-cols-2 md:grid-cols-5' : 'grid-cols-2 md:grid-cols-4'}`}>
+                                <div className={`grid gap-4 text-sm text-muted-foreground ${permissions.isAdmin ? 'grid-cols-2 md:grid-cols-5' : 'grid-cols-2 md:grid-cols-4'}`}>
                                   <div>
-                                    <span className="font-medium">Lote:</span> <span className={`font-semibold ${item.lote ? 'text-blue-600' : 'text-gray-500'}`}>{item.lote || "N/A"}</span>
+                                    <span className="font-medium">Lote:</span> <span className={`font-semibold ${item.lote ? 'text-primary' : 'text-muted-foreground'}`}>{item.lote || "N/A"}</span>
                                   </div>
                                   <div>
                                     <span className="font-medium">Stock Actual:</span> {formatNumber(item.stock || 0)}
@@ -1471,14 +1463,14 @@ export default function Inventario() {
 
               {/* Tab: Stock Bajo — 0 < stock < mínimo, no archivado */}
               <TabsContent value="bajo-stock" className="space-y-4">
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   Productos con stock por debajo del mínimo requerido que necesitan reposición
                 </p>
                 {lowStockItems.length === 0 ? (
                   <Card>
                     <CardContent className="pt-6 text-center">
-                      <AlertTriangle className="h-12 w-12 mx-auto text-green-500 mb-4" />
-                      <p className="text-gray-500">¡Excelente! No hay productos con stock bajo</p>
+                      <AlertTriangle className="h-12 w-12 mx-auto text-success mb-4" />
+                      <p className="text-muted-foreground">¡Excelente! No hay productos con stock bajo</p>
                     </CardContent>
                   </Card>
                 ) : (
@@ -1491,24 +1483,24 @@ export default function Inventario() {
                             <div className="flex items-center justify-between">
                               <div className="flex-1">
                                 <div className="flex items-center gap-3 mb-2">
-                                  <AlertTriangle className="h-5 w-5 text-orange-500" />
+                                  <AlertTriangle className="h-5 w-5 text-warning" />
                                   <h3 className="text-lg font-semibold">{item.name}</h3>
                                   <Badge variant="outline">{item.code}</Badge>
                                   <Badge variant="secondary">{item.category}</Badge>
                                   <Badge variant={status.variant}>{status.label}</Badge>
                                 </div>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground">
                                   <div>
-                                    <span className="font-medium">Lote:</span> <span className={`font-semibold ${item.lote ? 'text-blue-600' : 'text-gray-500'}`}>{item.lote || "N/A"}</span>
+                                    <span className="font-medium">Lote:</span> <span className={`font-semibold ${item.lote ? 'text-primary' : 'text-muted-foreground'}`}>{item.lote || "N/A"}</span>
                                   </div>
                                   <div>
-                                    <span className="font-medium">Stock Actual:</span> <span className="text-orange-600 font-semibold">{formatNumber(item.stock || 0)}</span>
+                                    <span className="font-medium">Stock Actual:</span> <span className="text-warning font-semibold">{formatNumber(item.stock || 0)}</span>
                                   </div>
                                   <div>
                                     <span className="font-medium">Stock Mínimo:</span> {formatNumber(item.minimum_stock || 0)}
                                   </div>
                                   <div>
-                                    <span className="font-medium">Faltante:</span> <span className="text-red-600 font-semibold">{formatNumber(Math.max(0, (item.minimum_stock || 0) - (item.stock || 0)))}</span>
+                                    <span className="font-medium">Faltante:</span> <span className="text-destructive font-semibold">{formatNumber(Math.max(0, (item.minimum_stock || 0) - (item.stock || 0)))}</span>
                                   </div>
                                 </div>
                               </div>
@@ -1542,33 +1534,33 @@ export default function Inventario() {
 
               {/* Tab: Sin Stock — stock === 0 o archivado */}
               <TabsContent value="sin-stock" className="space-y-4">
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   Productos agotados o archivados
                 </p>
                 {outOfStockItems.length === 0 ? (
                   <Card>
                     <CardContent className="pt-6 text-center">
-                      <Package className="h-12 w-12 mx-auto text-green-500 mb-4" />
-                      <p className="text-gray-500">¡Todos los productos tienen stock!</p>
+                      <Package className="h-12 w-12 mx-auto text-success mb-4" />
+                      <p className="text-muted-foreground">¡Todos los productos tienen stock!</p>
                     </CardContent>
                   </Card>
                 ) : (
                   <div className="grid gap-4">
                     {outOfStockItems.map((item) => (
-                      <Card key={item.id} className="border-gray-200 opacity-75">
+                      <Card key={item.id} className="border-border opacity-75">
                         <CardContent className="pt-6">
                           <div className="flex items-center justify-between">
                             <div className="flex-1">
                               <div className="flex items-center gap-3 mb-2">
-                                <PackageX className="h-5 w-5 text-gray-400" />
-                                <h3 className="text-lg font-semibold text-gray-600">{item.name}</h3>
+                                <PackageX className="h-5 w-5 text-muted-foreground" />
+                                <h3 className="text-lg font-semibold text-muted-foreground">{item.name}</h3>
                                 <Badge variant="outline">{item.code}</Badge>
                                 <Badge variant="secondary">{item.category}</Badge>
                                 <Badge variant="destructive">Agotado</Badge>
                               </div>
-                              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm text-gray-500">
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm text-muted-foreground">
                                 <div>
-                                  <span className="font-medium">Lote:</span> <span className={`font-semibold ${item.lote ? 'text-blue-600' : 'text-gray-500'}`}>{item.lote || "N/A"}</span>
+                                  <span className="font-medium">Lote:</span> <span className={`font-semibold ${item.lote ? 'text-primary' : 'text-muted-foreground'}`}>{item.lote || "N/A"}</span>
                                 </div>
                                 <div>
                                   <span className="font-medium">Stock Mínimo:</span> {formatNumber(item.minimum_stock || 0)}
@@ -1745,36 +1737,36 @@ export default function Inventario() {
               
               {loadingHistory ? (
                 <div className="flex items-center justify-center h-32">
-                  <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
               ) : movementHistory.length === 0 ? (
                 <div className="text-center py-8">
-                  <Package className="h-12 w-12 mx-auto text-gray-300 mb-4" />
-                  <p className="text-gray-500">No hay movimientos registrados para este producto</p>
+                  <Package className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+                  <p className="text-muted-foreground">No hay movimientos registrados para este producto</p>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {/* Resumen */}
-                  <Card className="bg-blue-50">
+                  <Card className="bg-info-muted">
                     <CardContent className="pt-4">
                       <div className="grid grid-cols-3 gap-4 text-center">
                         <div>
-                          <div className="text-2xl font-bold text-green-600">
+                          <div className="text-2xl font-bold text-success">
                             +{formatNumber(movementHistory.filter(m => m.movement_type === 'in').reduce((sum, m) => sum + m.quantity, 0))}
                           </div>
-                          <p className="text-sm text-gray-600">Total Entradas</p>
+                          <p className="text-sm text-muted-foreground">Total Entradas</p>
                         </div>
                         <div>
-                          <div className="text-2xl font-bold text-red-600">
+                          <div className="text-2xl font-bold text-destructive">
                             -{formatNumber(movementHistory.filter(m => m.movement_type === 'out').reduce((sum, m) => sum + Math.abs(m.quantity), 0))}
                           </div>
-                          <p className="text-sm text-gray-600">Total Salidas</p>
+                          <p className="text-sm text-muted-foreground">Total Salidas</p>
                         </div>
                         <div>
-                          <div className="text-2xl font-bold text-blue-600">
+                          <div className="text-2xl font-bold text-primary">
                             {formatNumber(selectedProductForHistory?.stock || 0)}
                           </div>
-                          <p className="text-sm text-gray-600">Stock Actual</p>
+                          <p className="text-sm text-muted-foreground">Stock Actual</p>
                         </div>
                       </div>
                     </CardContent>
@@ -1805,10 +1797,10 @@ export default function Inventario() {
                                    movement.reference_type}
                                 </Badge>
                               </div>
-                              <p className="text-sm text-gray-600 mb-1">
+                              <p className="text-sm text-muted-foreground mb-1">
                                 <strong>Detalle:</strong> {movement.notes || 'Sin detalles'}
                               </p>
-                              <p className="text-xs text-gray-500">
+                              <p className="text-xs text-muted-foreground">
                                 {formatTimestampForColombia(movement.created_at)}
                               </p>
                             </div>

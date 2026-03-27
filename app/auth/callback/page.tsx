@@ -145,34 +145,34 @@ function CallbackContent() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardContent className="pt-6 text-center space-y-4">
           {status === "loading" && (
             <>
-              <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-600" />
-              <p className="text-gray-600">Procesando confirmación...</p>
-              <p className="text-xs text-gray-400">Verificando tu email</p>
+              <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+              <p className="text-muted-foreground">Procesando confirmación...</p>
+              <p className="text-xs text-muted-foreground">Verificando tu email</p>
             </>
           )}
 
           {status === "success" && (
             <>
-              <CheckCircle className="h-8 w-8 mx-auto text-green-600" />
-              <p className="text-green-600 font-medium">{message}</p>
-              <p className="text-sm text-gray-600">Redirigiendo al dashboard...</p>
+              <CheckCircle className="h-8 w-8 mx-auto text-success" />
+              <p className="text-success font-medium">{message}</p>
+              <p className="text-sm text-muted-foreground">Redirigiendo al dashboard...</p>
             </>
           )}
 
           {status === "error" && (
             <>
-              <AlertCircle className="h-8 w-8 mx-auto text-red-600" />
+              <AlertCircle className="h-8 w-8 mx-auto text-destructive" />
               <Alert variant="destructive">
                 <AlertDescription>{message}</AlertDescription>
               </Alert>
               <button
                 onClick={handleRetry}
-                className="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition-colors"
+                className="w-full bg-primary text-primary-foreground py-2 px-4 rounded hover:bg-primary/90 transition-colors"
               >
                 Ir al Login
               </button>
@@ -188,11 +188,11 @@ export default function AuthCallback() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <div className="min-h-screen flex items-center justify-center bg-background p-4">
           <Card className="w-full max-w-md">
             <CardContent className="pt-6 text-center">
-              <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-600" />
-              <p className="mt-4 text-gray-600">Cargando...</p>
+              <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+              <p className="mt-4 text-muted-foreground">Cargando...</p>
             </CardContent>
           </Card>
         </div>

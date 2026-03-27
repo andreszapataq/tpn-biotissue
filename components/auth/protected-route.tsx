@@ -21,8 +21,8 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-xl font-bold text-red-600">Acceso Denegado</h2>
-          <p className="text-gray-600">No tienes permisos para esta página</p>
+          <h2 className="text-xl font-bold text-destructive">Acceso Denegado</h2>
+          <p className="text-muted-foreground">No tienes permisos para esta página</p>
         </div>
       </div>
     )

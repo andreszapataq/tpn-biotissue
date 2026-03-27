@@ -50,17 +50,17 @@ export function ConsumptionTab({ data, loading }: ConsumptionTabProps) {
           value={formatCurrency(summary.total_value)}
           subtitle="Valor del período"
           icon={TrendingDown}
-          iconColor="text-red-600"
-          iconBg="bg-red-50"
-          valueColor="text-red-600"
+          iconColor="text-destructive"
+          iconBg="bg-destructive/10"
+          valueColor="text-destructive"
         />
         <StatCard
           title="Procedimientos"
           value={formatNumber(summary.total_procedures)}
           subtitle="Realizados en el período"
           icon={Activity}
-          iconColor="text-blue-600"
-          iconBg="bg-blue-50"
+          iconColor="text-primary"
+          iconBg="bg-primary/10"
         />
         <StatCard
           title="Costo Promedio"

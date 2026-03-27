@@ -14,8 +14,8 @@ export function InstitutionSwitcher() {
 
   if (!canSelectInstitution) {
     return (
-      <div className="inline-flex items-center gap-2 rounded-md border bg-white px-3 py-2 text-sm text-gray-700">
-        <Building2 className="h-4 w-4 text-gray-500" />
+      <div className="inline-flex items-center gap-2 rounded-md border bg-card px-3 py-2 text-sm text-foreground">
+        <Building2 className="h-4 w-4 text-muted-foreground" />
         <span>{selectedInstitutionName}</span>
       </div>
     )

@@ -43,11 +43,11 @@ export default function ForgotPassword() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-              <CheckCircle className="h-6 w-6 text-green-600" />
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-success-muted">
+              <CheckCircle className="h-6 w-6 text-success" />
             </div>
             <CardTitle>Correo Enviado</CardTitle>
             <CardDescription>Revisa tu bandeja de entrada</CardDescription>
@@ -62,7 +62,7 @@ export default function ForgotPassword() {
             </Alert>
 
             <div className="space-y-2">
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-muted-foreground">
                 El enlace de recuperación expirará en 1 hora.
               </p>
               <Button onClick={() => router.push("/auth/login")} className="w-full">
@@ -70,7 +70,7 @@ export default function ForgotPassword() {
               </Button>
             </div>
 
-            <div className="text-xs text-gray-500 mt-4">
+            <div className="text-xs text-muted-foreground mt-4">
               <p>¿No recibiste el correo? Revisa tu carpeta de spam o intenta nuevamente.</p>
             </div>
           </CardContent>
@@ -80,7 +80,7 @@ export default function ForgotPassword() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
@@ -101,7 +101,7 @@ export default function ForgotPassword() {
             <div>
               <Label htmlFor="email">Correo Electrónico</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
                   id="email"
                   type="email"
@@ -113,7 +113,7 @@ export default function ForgotPassword() {
                   disabled={isLoading}
                 />
               </div>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 Ingresa el correo asociado a tu cuenta
               </p>
             </div>

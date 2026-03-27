@@ -122,11 +122,11 @@ export default function RegisterForm() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-              <CheckCircle className="h-6 w-6 text-green-600" />
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-success-muted">
+              <CheckCircle className="h-6 w-6 text-success" />
             </div>
             <CardTitle>¡Registro Exitoso!</CardTitle>
             <CardDescription>Tu cuenta ha sido creada correctamente</CardDescription>
@@ -141,7 +141,7 @@ export default function RegisterForm() {
             </Alert>
 
             <div className="space-y-2">
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-muted-foreground">
                 Una vez que confirmes tu email, podrás iniciar sesión con tus credenciales.
               </p>
               <Button onClick={() => router.push("/auth/login")} className="w-full">
@@ -149,7 +149,7 @@ export default function RegisterForm() {
               </Button>
             </div>
 
-            <div className="text-xs text-gray-500 mt-4">
+            <div className="text-xs text-muted-foreground mt-4">
               <p>¿No recibiste el correo? Revisa tu carpeta de spam o intenta registrarte nuevamente.</p>
             </div>
           </CardContent>
@@ -159,7 +159,7 @@ export default function RegisterForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
@@ -183,7 +183,7 @@ export default function RegisterForm() {
               <div>
                 <Label htmlFor="name">Nombre Completo</Label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                   <Input
                     id="name"
                     type="text"
@@ -219,7 +219,7 @@ export default function RegisterForm() {
             <div>
               <Label htmlFor="email">Correo Electrónico</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
                   id="email"
                   type="email"
@@ -236,7 +236,7 @@ export default function RegisterForm() {
               <div>
                 <Label htmlFor="phone">Teléfono</Label>
                 <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                   <Input
                     id="phone"
                     type="tel"
@@ -251,7 +251,7 @@ export default function RegisterForm() {
               <div>
                 <Label htmlFor="department">Departamento / Área</Label>
                 <div className="relative">
-                  <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                   <Input
                     id="department"
                     type="text"
@@ -267,7 +267,7 @@ export default function RegisterForm() {
             <div>
               <Label htmlFor="institution_code">Código de Institución</Label>
               <div className="relative">
-                <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
                   id="institution_code"
                   type="text"
@@ -279,7 +279,7 @@ export default function RegisterForm() {
                   className="pl-10"
                 />
               </div>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 Opcional. Si tu administrador te compartio un codigo, tu cuenta quedara asociada automaticamente.
               </p>
             </div>
@@ -287,7 +287,7 @@ export default function RegisterForm() {
             <div>
               <Label htmlFor="license_number">Número de Licencia</Label>
               <div className="relative">
-                <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
                   id="license_number"
                   type="text"
@@ -314,7 +314,7 @@ export default function RegisterForm() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -324,42 +324,42 @@ export default function RegisterForm() {
                 <div className="mt-2 space-y-1">
                   <div className="text-xs space-y-1">
                     <div
-                      className={`flex items-center gap-1 ${passwordValidation.minLength ? "text-green-600" : "text-red-600"}`}
+                      className={`flex items-center gap-1 ${passwordValidation.minLength ? "text-success" : "text-destructive"}`}
                     >
                       <div
-                        className={`w-1 h-1 rounded-full ${passwordValidation.minLength ? "bg-green-600" : "bg-red-600"}`}
+                        className={`w-1 h-1 rounded-full ${passwordValidation.minLength ? "bg-success" : "bg-destructive"}`}
                       />
                       Mínimo 8 caracteres
                     </div>
                     <div
-                      className={`flex items-center gap-1 ${passwordValidation.hasUpper ? "text-green-600" : "text-red-600"}`}
+                      className={`flex items-center gap-1 ${passwordValidation.hasUpper ? "text-success" : "text-destructive"}`}
                     >
                       <div
-                        className={`w-1 h-1 rounded-full ${passwordValidation.hasUpper ? "bg-green-600" : "bg-red-600"}`}
+                        className={`w-1 h-1 rounded-full ${passwordValidation.hasUpper ? "bg-success" : "bg-destructive"}`}
                       />
                       Una mayúscula
                     </div>
                     <div
-                      className={`flex items-center gap-1 ${passwordValidation.hasLower ? "text-green-600" : "text-red-600"}`}
+                      className={`flex items-center gap-1 ${passwordValidation.hasLower ? "text-success" : "text-destructive"}`}
                     >
                       <div
-                        className={`w-1 h-1 rounded-full ${passwordValidation.hasLower ? "bg-green-600" : "bg-red-600"}`}
+                        className={`w-1 h-1 rounded-full ${passwordValidation.hasLower ? "bg-success" : "bg-destructive"}`}
                       />
                       Una minúscula
                     </div>
                     <div
-                      className={`flex items-center gap-1 ${passwordValidation.hasNumber ? "text-green-600" : "text-red-600"}`}
+                      className={`flex items-center gap-1 ${passwordValidation.hasNumber ? "text-success" : "text-destructive"}`}
                     >
                       <div
-                        className={`w-1 h-1 rounded-full ${passwordValidation.hasNumber ? "bg-green-600" : "bg-red-600"}`}
+                        className={`w-1 h-1 rounded-full ${passwordValidation.hasNumber ? "bg-success" : "bg-destructive"}`}
                       />
                       Un número
                     </div>
                     <div
-                      className={`flex items-center gap-1 ${passwordValidation.hasSpecial ? "text-green-600" : "text-red-600"}`}
+                      className={`flex items-center gap-1 ${passwordValidation.hasSpecial ? "text-success" : "text-destructive"}`}
                     >
                       <div
-                        className={`w-1 h-1 rounded-full ${passwordValidation.hasSpecial ? "bg-green-600" : "bg-red-600"}`}
+                        className={`w-1 h-1 rounded-full ${passwordValidation.hasSpecial ? "bg-success" : "bg-destructive"}`}
                       />
                       Un carácter especial
                     </div>
@@ -383,13 +383,13 @@ export default function RegisterForm() {
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
                   {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
               {formData.confirmPassword && formData.password !== formData.confirmPassword && (
-                <p className="text-xs text-red-600 mt-1">Las contraseñas no coinciden</p>
+                <p className="text-xs text-destructive mt-1">Las contraseñas no coinciden</p>
               )}
             </div>
 
@@ -400,14 +400,14 @@ export default function RegisterForm() {
             >
               {isLoading ? "Creando cuenta..." : "Crear Cuenta"}
             </Button>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               Los roles administrativos y de gerencia no se asignan por autoregistro y deben ser habilitados por un
               administrador.
             </p>
           </form>
 
           <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-muted-foreground">
               ¿Ya tienes cuenta?{" "}
               <Link href="/auth/login" className="text-blue-600 hover:underline">
                 Iniciar sesión

@@ -4,10 +4,11 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/ui/status-badge"
+import { PageHeader } from "@/components/ui/page-header"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
-import { ArrowLeft, Search, Eye, Activity, Loader2, Plus, FileText, Clock, CheckCircle, ExternalLink, X } from "lucide-react"
+import { Search, Eye, Activity, Loader2, Plus, FileText, ExternalLink, X } from "lucide-react"
 import Link from "next/link"
 import { supabase, type Patient } from "@/lib/supabase"
 import { formatTimestampForColombia } from "@/lib/utils"
@@ -160,55 +161,44 @@ export default function Pacientes() {
 
   return (
     <ProtectedRoute requiredRole={["administrador", "soporte", "asistente"]}>
-      <div className="min-h-screen bg-gray-50 p-4">
-        <div className="max-w-6xl mx-auto">
+      <div className="page-shell">
+        <div className="page-container-medium">
           {/* Header */}
-          <div className="mb-6">
-            <div className="flex flex-col gap-4 mb-4 md:flex-row md:items-center md:justify-between">
-              <div className="flex items-center gap-4">
-                <Link href="/">
-                  <Button variant="outline" size="sm">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Volver al Dashboard
-                  </Button>
-                </Link>
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-900">Gestión de Pacientes</h1>
-                  <p className="text-gray-600">Control y seguimiento de pacientes en terapia NPWT</p>
-                </div>
-              </div>
-              <InstitutionSwitcher />
-            </div>
+          <PageHeader
+            title="Gestión de Pacientes"
+            subtitle="Control y seguimiento de pacientes en terapia NPWT"
+            backHref="/"
+            actions={<InstitutionSwitcher />}
+          />
 
-            {/* Search */}
-            <div className="relative max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                placeholder="Buscar por nombre o identificación..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-9"
-              />
-              {searchTerm && (
-                <button
-                  onClick={() => setSearchTerm("")}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
+          {/* Search */}
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Input
+              placeholder="Buscar por nombre o identificación..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 pr-9"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm("")}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
 
           {loading ? (
             <div className="flex items-center justify-center h-64">
-              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : filteredPatients.length === 0 ? (
             <Card>
               <CardContent className="pt-6 text-center">
-                <Activity className="h-12 w-12 mx-auto text-gray-300 mb-4" />
-                <p className="text-gray-500">No hay pacientes registrados</p>
+                <Activity className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+                <p className="text-muted-foreground">No hay pacientes registrados</p>
                 <Link href="/nuevo-procedimiento">
                   <Button className="mt-4">
                     <Plus className="h-4 w-4 mr-2" />
@@ -231,8 +221,8 @@ export default function Pacientes() {
                     {activePatients.length === 0 ? (
                       <Card>
                         <CardContent className="pt-6 text-center">
-                          <Activity className="h-12 w-12 mx-auto text-gray-300 mb-4" />
-                          <p className="text-gray-500">No hay pacientes activos</p>
+                          <Activity className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+                          <p className="text-muted-foreground">No hay pacientes activos</p>
                         </CardContent>
                       </Card>
                     ) : (
@@ -242,12 +232,12 @@ export default function Pacientes() {
                             <div className="flex items-center justify-between mb-4">
                               <div>
                                 <h3 className="text-lg font-semibold">{patient.name}</h3>
-                                <p className="text-sm text-gray-600">
+                                <p className="text-sm text-muted-foreground">
                                   ID: {patient.identification} • {patient.age} años
                                 </p>
                               </div>
                               <div className="flex items-center gap-2">
-                                <Badge variant="default">Activo</Badge>
+                                <StatusBadge status="active" />
                                 <Button variant="outline" size="sm" onClick={() => setSelectedPatient(patient)}>
                                   <Eye className="h-3 w-3 mr-1" />
                                   Ver Detalles
@@ -257,16 +247,16 @@ export default function Pacientes() {
 
                             <div className="grid grid-cols-2 gap-4 text-sm">
                               <div>
-                                <p className="font-medium text-gray-600">Registrado</p>
+                                <p className="font-medium text-muted-foreground">Registrado</p>
                                 <p>{formatTimestampForColombia(patient.created_at)}</p>
                               </div>
                               <div>
-                                <p className="font-medium text-gray-600">Procedimientos Activos</p>
+                                <p className="font-medium text-muted-foreground">Procedimientos Activos</p>
                                 <p>{patient.procedureSummary.activeProcedures}</p>
                               </div>
                             </div>
                             {patient.procedureSummary.totalProcedures > 0 && (
-                              <p className="text-xs text-gray-500 mt-2">
+                              <p className="text-xs text-muted-foreground mt-2">
                                 {patient.procedureSummary.totalProcedures} procedimiento{patient.procedureSummary.totalProcedures !== 1 ? "s" : ""} en total
                               </p>
                             )}
@@ -280,8 +270,8 @@ export default function Pacientes() {
                     {completedPatients.length === 0 ? (
                       <Card>
                         <CardContent className="pt-6 text-center">
-                          <Activity className="h-12 w-12 mx-auto text-gray-300 mb-4" />
-                          <p className="text-gray-500">No hay tratamientos completados</p>
+                          <Activity className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+                          <p className="text-muted-foreground">No hay tratamientos completados</p>
                         </CardContent>
                       </Card>
                     ) : (
@@ -291,12 +281,12 @@ export default function Pacientes() {
                             <div className="flex items-center justify-between mb-4">
                               <div>
                                 <h3 className="text-lg font-semibold">{patient.name}</h3>
-                                <p className="text-sm text-gray-600">
+                                <p className="text-sm text-muted-foreground">
                                   ID: {patient.identification} • {patient.age} años
                                 </p>
                               </div>
                               <div className="flex items-center gap-2">
-                                <Badge variant="default" className="bg-green-600 hover:bg-green-700">Completado</Badge>
+                                <StatusBadge status="completed" />
                                 <Button variant="outline" size="sm" onClick={() => setSelectedPatient(patient)}>
                                   <Eye className="h-3 w-3 mr-1" />
                                   Ver Historial
@@ -306,20 +296,20 @@ export default function Pacientes() {
 
                             <div className="grid grid-cols-2 gap-4 text-sm">
                               <div>
-                                <p className="font-medium text-gray-600">Último Cierre</p>
+                                <p className="font-medium text-muted-foreground">Último Cierre</p>
                                 <p>{patient.procedureSummary.lastClosedAt
                                   ? formatTimestampForColombia(patient.procedureSummary.lastClosedAt)
                                   : "Sin fecha de cierre"}</p>
                               </div>
                               <div>
-                                <p className="font-medium text-gray-600">Registrado</p>
+                                <p className="font-medium text-muted-foreground">Registrado</p>
                                 <p>{formatTimestampForColombia(patient.created_at)}</p>
                               </div>
                             </div>
                             {patient.procedureSummary.totalProcedures > 0 && (
                               <div className="flex items-center gap-2 mt-3 pt-3 border-t">
-                                <FileText className="h-4 w-4 text-gray-400" />
-                                <span className="text-sm font-medium text-gray-700">
+                                <FileText className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-sm font-medium text-foreground">
                                   {patient.procedureSummary.totalProcedures} procedimiento{patient.procedureSummary.totalProcedures !== 1 ? "s" : ""} en total
                                 </span>
                               </div>
@@ -355,10 +345,7 @@ export default function Pacientes() {
                           </p>
                           <div className="flex items-center gap-2">
                             <span className="font-medium">Estado:</span>
-                            <Badge variant="default"
-                                   className={selectedPatient.status === "completed" ? "bg-green-600 hover:bg-green-700" : ""}>
-                              {selectedPatient.status === "active" ? "Activo" : "Completado"}
-                            </Badge>
+                            <StatusBadge status={selectedPatient.status === "completed" ? "completed" : "active"} />
                           </div>
                           <p>
                             <span className="font-medium">Registrado:</span> {formatTimestampForColombia(selectedPatient.created_at)}
@@ -371,14 +358,14 @@ export default function Pacientes() {
                           <p>
                             <span className="font-medium">Procedimientos:</span>{" "}
                             {selectedPatient.procedureSummary.activeProcedures > 0 && (
-                              <span className="text-blue-600">{selectedPatient.procedureSummary.activeProcedures} activo{selectedPatient.procedureSummary.activeProcedures !== 1 ? "s" : ""}</span>
+                              <span className="text-primary">{selectedPatient.procedureSummary.activeProcedures} activo{selectedPatient.procedureSummary.activeProcedures !== 1 ? "s" : ""}</span>
                             )}
                             {selectedPatient.procedureSummary.activeProcedures > 0 && selectedPatient.procedureSummary.completedProcedures > 0 && ", "}
                             {selectedPatient.procedureSummary.completedProcedures > 0 && (
-                              <span className="text-green-600">{selectedPatient.procedureSummary.completedProcedures} completado{selectedPatient.procedureSummary.completedProcedures !== 1 ? "s" : ""}</span>
+                              <span className="text-success">{selectedPatient.procedureSummary.completedProcedures} completado{selectedPatient.procedureSummary.completedProcedures !== 1 ? "s" : ""}</span>
                             )}
                             {selectedPatient.procedureSummary.totalProcedures === 0 && (
-                              <span className="text-gray-500">Sin procedimientos</span>
+                              <span className="text-muted-foreground">Sin procedimientos</span>
                             )}
                           </p>
                         </div>
@@ -397,28 +384,18 @@ export default function Pacientes() {
                               {selectedPatient.procedureSummary.procedures.map((proc) => (
                                 <div key={proc.id} className="border rounded-lg p-3 text-sm space-y-1">
                                   <div className="flex items-center justify-between">
-                                    <Badge
-                                      className={proc.status === "active"
-                                        ? "bg-green-100 text-green-800"
-                                        : "bg-blue-100 text-blue-800"}
-                                    >
-                                      {proc.status === "active" ? (
-                                        <><Clock className="h-3 w-3 mr-1" />Activo</>
-                                      ) : (
-                                        <><CheckCircle className="h-3 w-3 mr-1" />Completado</>
-                                      )}
-                                    </Badge>
+                                    <StatusBadge status={proc.status === "active" ? "active" : "completed"} />
                                     <Link href={`/procedimiento/${proc.id}`}>
                                       <Button variant="ghost" size="sm" className="h-7 px-2">
                                         <ExternalLink className="h-3 w-3" />
                                       </Button>
                                     </Link>
                                   </div>
-                                  <p className="text-gray-600">
+                                  <p className="text-muted-foreground">
                                     {formatTimestampForColombia(proc.procedure_date)}
                                   </p>
-                                  <p className="text-gray-800 line-clamp-2">{proc.diagnosis}</p>
-                                  <p className="text-gray-500 text-xs">Dr. {proc.surgeon_name}</p>
+                                  <p className="text-foreground line-clamp-2">{proc.diagnosis}</p>
+                                  <p className="text-muted-foreground text-xs">Dr. {proc.surgeon_name}</p>
                                 </div>
                               ))}
                             </div>
@@ -429,8 +406,8 @@ export default function Pacientes() {
                   </Card>
                 ) : (
                   <Card className="sticky top-4">
-                    <CardContent className="pt-6 text-center text-gray-500">
-                      <Activity className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                    <CardContent className="pt-6 text-center text-muted-foreground">
+                      <Activity className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
                       <p>Selecciona un paciente para ver sus detalles</p>
                     </CardContent>
                   </Card>

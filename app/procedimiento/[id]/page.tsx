@@ -29,8 +29,9 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowLeft, Plus, Minus, Save, Loader2, CheckCircle, XCircle, Clock, Package, Settings, Edit, Search, X } from "lucide-react"
-import Link from "next/link"
+import { Plus, Minus, Save, Loader2, CheckCircle, XCircle, Clock, Package, Settings, Edit, Search, X } from "lucide-react"
+import { PageHeader } from "@/components/ui/page-header"
+import { StatusBadge } from "@/components/ui/status-badge"
 import { supabase } from "@/lib/supabase"
 import { Tables } from "@/lib/database.types"
 import { formatDateForColombia, formatTimestampWithTimeForColombia, getMachineDisplayName } from "@/lib/utils"
@@ -722,13 +723,11 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "active":
-        return <Badge className="bg-green-100 text-green-800"><Clock className="h-3 w-3 mr-1" />Activo</Badge>
+        return <StatusBadge status="active" label="Activo" />
       case "completed":
-        return <Badge className="bg-blue-100 text-blue-800"><CheckCircle className="h-3 w-3 mr-1" />Completado</Badge>
+        return <StatusBadge status="completed" label="Completado" />
       case "cancelled":
-        return <Badge className="bg-red-100 text-red-800"><XCircle className="h-3 w-3 mr-1" />Cancelado</Badge>
-      case "unknown":
-        return <Badge variant="outline" className="bg-gray-100 text-gray-800">Estado Desconocido</Badge>
+        return <StatusBadge status="cancelled" label="Cancelado" />
       default:
         return <Badge variant="outline">{status}</Badge>
     }
@@ -741,10 +740,10 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
   if (loading) {
     return (
       <ProtectedRoute requiredRole={["administrador", "soporte", "asistente"]}>
-        <div className="min-h-screen bg-gray-50 p-4">
-          <div className="max-w-6xl mx-auto">
+        <div className="page-shell">
+          <div className="page-container-medium">
             <div className="flex items-center justify-center h-64">
-              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           </div>
         </div>
@@ -755,13 +754,13 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
   if (!procedure) {
     return (
       <ProtectedRoute requiredRole={["administrador", "soporte", "asistente"]}>
-        <div className="min-h-screen bg-gray-50 p-4">
-          <div className="max-w-6xl mx-auto">
+        <div className="page-shell">
+          <div className="page-container-medium">
             <div className="text-center py-12">
-              <h1 className="text-2xl font-bold text-gray-900 mb-4">Procedimiento no encontrado</h1>
-              <Link href="/">
+              <h1 className="heading-1 mb-4">Procedimiento no encontrado</h1>
+              <a href="/">
                 <Button>Volver al Dashboard</Button>
-              </Link>
+              </a>
             </div>
           </div>
         </div>
@@ -771,31 +770,26 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
 
   return (
     <ProtectedRoute requiredRole={["administrador", "soporte", "asistente"]}>
-      <div className="min-h-screen bg-gray-50 p-3 md:p-4">
-        <div className="max-w-7xl mx-auto">
+      <div className="page-shell">
+        <div className="page-container">
           {/* Header */}
           <div className="mb-4 md:mb-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
-              <div className="flex items-center gap-3 md:gap-4">
-                <Link href="/">
-                  <Button variant="outline" size="sm" className="touch-manipulation">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Volver
-                  </Button>
-                </Link>
-                <div>
-                  <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Detalle del Procedimiento</h1>
-                  <p className="text-sm md:text-base text-gray-600">Gestión de terapia NPWT</p>
-                </div>
-              </div>
+              <PageHeader
+                title="Detalle del Procedimiento"
+                subtitle="Gestión de terapia NPWT"
+                backHref="/"
+                backLabel="Volver"
+              />
               <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap justify-end">
                 <InstitutionSwitcher />
                 {getStatusBadge(procedure.status || "unknown")}
                 {procedure.status === "active" && (
-                  <Button 
+                  <Button
                     onClick={handleCloseProcedure}
                     disabled={closing}
-                    className="bg-red-600 hover:bg-red-700 touch-manipulation w-full sm:w-auto"
+                    variant="destructive"
+                    className="touch-manipulation w-full sm:w-auto"
                     size="sm"
                   >
                     {closing ? (
@@ -835,29 +829,29 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div>
-                      <Label className="text-sm font-medium text-gray-500">Fecha del Procedimiento</Label>
+                      <Label className="text-sm font-medium text-muted-foreground">Fecha del Procedimiento</Label>
                       <p className="text-lg font-semibold">{formatDateForColombia(procedure.procedure_date)}</p>
                     </div>
                     <div>
-                      <Label className="text-sm font-medium text-gray-500">Hora de Inicio</Label>
+                      <Label className="text-sm font-medium text-muted-foreground">Hora de Inicio</Label>
                       <p className="text-lg font-semibold">{procedure.start_time}</p>
                     </div>
                     <div>
-                      <Label className="text-sm font-medium text-gray-500">Ubicación</Label>
+                      <Label className="text-sm font-medium text-muted-foreground">Ubicación</Label>
                       <p className="text-lg font-semibold">{procedure.location || "No especificada"}</p>
                     </div>
                     <div>
-                      <Label className="text-sm font-medium text-gray-500">Cirujano Líder</Label>
+                      <Label className="text-sm font-medium text-muted-foreground">Cirujano Líder</Label>
                       <p className="text-lg font-semibold">{procedure.surgeon_name}</p>
                     </div>
                     <div>
-                      <Label className="text-sm font-medium text-gray-500">Asistente</Label>
+                      <Label className="text-sm font-medium text-muted-foreground">Asistente</Label>
                       <p className="text-lg font-semibold">{procedure.assistant_name || "N/A"}</p>
                     </div>
                   </div>
                   <Separator className="my-4" />
                   <div>
-                    <Label className="text-sm font-medium text-gray-500">Diagnóstico Preoperatorio</Label>
+                    <Label className="text-sm font-medium text-muted-foreground">Diagnóstico Preoperatorio</Label>
                     <p className="text-lg mt-1">{procedure.diagnosis}</p>
                   </div>
                 </CardContent>
@@ -879,15 +873,15 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                          <div>
-                       <Label className="text-sm font-medium text-gray-500">Nombre Completo</Label>
+                       <Label className="text-sm font-medium text-muted-foreground">Nombre Completo</Label>
                        <p className="text-lg font-semibold">{procedure.patient.name || 'Sin nombre'}</p>
                      </div>
                      <div>
-                       <Label className="text-sm font-medium text-gray-500">Identificación</Label>
+                       <Label className="text-sm font-medium text-muted-foreground">Identificación</Label>
                        <p className="text-lg font-semibold">{procedure.patient.identification || 'Sin identificación'}</p>
                      </div>
                      <div>
-                       <Label className="text-sm font-medium text-gray-500">Edad</Label>
+                       <Label className="text-sm font-medium text-muted-foreground">Edad</Label>
                        <p className="text-lg font-semibold">{procedure.patient.age || 0} años</p>
                      </div>
                   </div>
@@ -918,9 +912,9 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                             <div>
                               <Label htmlFor="new-machine">Máquina a Agregar</Label>
                               {availableMachines.length === 0 ? (
-                                <div className="p-3 border border-orange-200 rounded bg-orange-50">
-                                  <p className="text-sm text-orange-800">No hay máquinas disponibles</p>
-                                  <p className="text-xs text-orange-600 mt-1">
+                                <div className="p-3 border border-warning/30 rounded bg-warning-muted">
+                                  <p className="text-sm text-warning-foreground">No hay máquinas disponibles</p>
+                                  <p className="text-xs text-warning mt-1">
                                     Todas las demás máquinas están en uso o no están disponibles
                                   </p>
                                 </div>
@@ -937,7 +931,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                                           <Badge variant="outline" className="text-xs">
                                             Lote: {machine.lote}
                                           </Badge>
-                                          <Badge variant="default" className="bg-green-100 text-green-800 text-xs">
+                                          <Badge variant="default" className="bg-success-muted text-success-foreground text-xs">
                                             Disponible
                                           </Badge>
                                         </div>
@@ -992,9 +986,9 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                     if (machines.length === 0) {
                       return (
                         <div className="text-center py-8">
-                          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                            <p className="text-blue-800 font-medium">Sin máquina asignada</p>
-                            <p className="text-blue-600 text-sm mt-1">
+                          <div className="bg-info-muted p-4 rounded-lg border border-info/30">
+                            <p className="text-info-foreground font-medium">Sin máquina asignada</p>
+                            <p className="text-primary text-sm mt-1">
                               Este procedimiento no tiene equipo NPWT asignado
                             </p>
                           </div>
@@ -1005,14 +999,14 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                     return (
                       <div className="space-y-3">
                         {machines.map((machine, idx) => (
-                          <div key={machineIds[idx] || idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
+                          <div key={machineIds[idx] || idx} className="flex items-center justify-between p-3 bg-muted rounded-lg border">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1">
                               <div>
-                                <Label className="text-sm font-medium text-gray-500">Modelo</Label>
+                                <Label className="text-sm font-medium text-muted-foreground">Modelo</Label>
                                 <p className="text-lg font-semibold">{getMachineDisplayName(machine.model, machine.lote)}</p>
                               </div>
                               <div>
-                                <Label className="text-sm font-medium text-gray-500">Lote</Label>
+                                <Label className="text-sm font-medium text-muted-foreground">Lote</Label>
                                 <p className="text-lg font-semibold">{machine.lote}</p>
                               </div>
                             </div>
@@ -1020,7 +1014,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50 ml-2"
+                                className="text-destructive hover:text-destructive/80 hover:bg-destructive/5 ml-2"
                                 onClick={() => setMachineToRemove(machineIds[idx])}
                                 disabled={changingMachine}
                               >
@@ -1035,8 +1029,8 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                   {procedure.status === "active" && permissions.canEditMachines && (
                     <div className="mt-4 pt-4 border-t">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600">Máquinas disponibles para agregar:</span>
-                        <Badge variant="outline" className={availableMachines.length > 0 ? "text-green-700" : "text-orange-700"}>
+                        <span className="text-muted-foreground">Máquinas disponibles para agregar:</span>
+                        <Badge variant="outline" className={availableMachines.length > 0 ? "text-success" : "text-warning"}>
                           {availableMachines.length} disponibles
                         </Badge>
                       </div>
@@ -1057,7 +1051,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
                     <AlertDialogAction
-                      className="bg-red-600 hover:bg-red-700"
+                      className="bg-destructive hover:bg-destructive/90"
                       onClick={() => {
                         if (machineToRemove) {
                           handleRemoveMachine(machineToRemove)
@@ -1084,8 +1078,8 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                 </CardHeader>
                 <CardContent>
                   <div className="text-center">
-                    <div className="text-3xl font-bold text-blue-600">{getTotalProductsUsed()}</div>
-                    <p className="text-sm text-gray-500">Total de insumos utilizados</p>
+                    <div className="text-3xl font-bold text-primary">{getTotalProductsUsed()}</div>
+                    <p className="text-sm text-muted-foreground">Total de insumos utilizados</p>
                   </div>
                 </CardContent>
               </Card>
@@ -1100,7 +1094,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                   <div className="space-y-3 max-h-64 overflow-y-auto">
                     {productUsage.length > 0 ? (
                       productUsage.map((usage, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                           <div className="flex-1">
                             <div className="flex items-center justify-between mb-1">
                               <p className="font-medium text-sm">{usage.product.name}</p>
@@ -1109,9 +1103,9 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                               </Badge>
                             </div>
                             <div className="flex items-center gap-2">
-                              <p className="text-xs text-gray-500">{usage.product.code}</p>
-                              <span className="text-xs text-gray-400">•</span>
-                              <p className="text-xs text-gray-500">
+                              <p className="text-xs text-muted-foreground">{usage.product.code}</p>
+                              <span className="text-xs text-muted-foreground">•</span>
+                              <p className="text-xs text-muted-foreground">
                                 Agregado: {usage.created_at ? formatTimestampWithTimeForColombia(usage.created_at) : "Fecha no disponible"}
                               </p>
                             </div>
@@ -1119,7 +1113,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                         </div>
                       ))
                     ) : (
-                      <p className="text-sm text-gray-500 text-center py-4">No hay insumos registrados</p>
+                      <p className="text-sm text-muted-foreground text-center py-4">No hay insumos registrados</p>
                     )}
                   </div>
                 </CardContent>
@@ -1134,7 +1128,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
                         placeholder="Buscar por nombre, código o lote..."
                         value={addProductSearch}
@@ -1145,7 +1139,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                         <button
                           type="button"
                           onClick={() => setAddProductSearch("")}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-muted-foreground transition-colors"
                         >
                           <X className="h-4 w-4" />
                         </button>
@@ -1171,16 +1165,16 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                           key={product.id}
                           className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
                             isSelected
-                              ? "border-blue-300 bg-blue-50/70 shadow-sm"
-                              : "border-gray-200 hover:border-gray-300"
+                              ? "border-primary/30 bg-info-muted/70 shadow-sm"
+                              : "border-border hover:border-border"
                           }`}
                         >
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-sm truncate">{product.name}</p>
                             <div className="flex items-center gap-1.5 mt-1">
                               <Badge variant="outline" className="text-xs">{product.code}</Badge>
-                              <span className="text-xs text-gray-400">|</span>
-                              <span className="text-xs text-gray-500">{product.stock} disp.</span>
+                              <span className="text-xs text-muted-foreground">|</span>
+                              <span className="text-xs text-muted-foreground">{product.stock} disp.</span>
                             </div>
                           </div>
                           <div className="flex items-center gap-1 ml-2">
@@ -1191,13 +1185,13 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                                   variant="outline"
                                   size="sm"
                                   onClick={() => handleProductQuantityChange(product.id, -1)}
-                                  className="h-8 w-8 p-0 touch-manipulation border-blue-300 hover:bg-blue-100"
+                                  className="h-8 w-8 p-0 touch-manipulation border-primary/30 hover:bg-primary/10"
                                 >
                                   <Minus className="h-3.5 w-3.5" />
                                 </Button>
                                 <div className="flex flex-col items-center w-10">
-                                  <span className="text-sm font-bold text-blue-700 leading-none">{qty}</span>
-                                  <span className="text-[10px] text-blue-500 leading-tight">uds.</span>
+                                  <span className="text-sm font-bold text-primary leading-none">{qty}</span>
+                                  <span className="text-[10px] text-primary/70 leading-tight">uds.</span>
                                 </div>
                                 <Button
                                   type="button"
@@ -1205,7 +1199,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                                   size="sm"
                                   onClick={() => handleProductQuantityChange(product.id, 1)}
                                   disabled={qty >= (product.stock || 0)}
-                                  className="h-8 w-8 p-0 touch-manipulation border-blue-300 hover:bg-blue-100"
+                                  className="h-8 w-8 p-0 touch-manipulation border-primary/30 hover:bg-primary/10"
                                 >
                                   <Plus className="h-3.5 w-3.5" />
                                 </Button>
@@ -1216,7 +1210,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleProductQuantityChange(product.id, 1)}
-                                className="h-8 px-3 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 touch-manipulation"
+                                className="h-8 px-3 text-xs text-primary hover:text-primary hover:bg-info-muted touch-manipulation"
                               >
                                 <Plus className="h-3.5 w-3.5 mr-1" />
                                 Agregar

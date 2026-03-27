@@ -57,8 +57,8 @@ export function InventoryTab({ data, loading }: InventoryTabProps) {
           value={formatNumber(data.productsWithStockCount)}
           subtitle="Tipos de producto activos"
           icon={Package}
-          iconColor="text-blue-600"
-          iconBg="bg-blue-50"
+          iconColor="text-primary"
+          iconBg="bg-primary/10"
         />
         <StatCard
           title="Stock Bajo"

@@ -37,7 +37,7 @@ export function ReportFilters({
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
-          <Calendar className="h-4 w-4 text-blue-600" />
+          <Calendar className="h-4 w-4 text-primary" />
           Período del Reporte
         </CardTitle>
       </CardHeader>
@@ -81,7 +81,7 @@ export function ReportFilters({
           )}
 
           <div className="flex items-end gap-2">
-            <Button onClick={onGenerate} disabled={loading} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={onGenerate} disabled={loading} className="bg-primary hover:bg-primary/90">
               {loading ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (

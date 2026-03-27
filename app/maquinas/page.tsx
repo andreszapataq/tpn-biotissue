@@ -17,8 +17,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowLeft, Search, Settings, Plus, Edit, Trash2, Loader2, Filter } from "lucide-react"
-import Link from "next/link"
+import { Search, Settings, Plus, Edit, Trash2, Loader2, Filter } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { Tables } from "@/lib/database.types"
 import { formatTimestampForColombia, getMachineDisplayName } from "@/lib/utils"
@@ -27,6 +26,9 @@ import { ProtectedRoute } from "@/components/auth/protected-route"
 import { InstitutionSwitcher } from "@/components/institutions/institution-switcher"
 import { useInstitution } from "@/components/institutions/institution-provider"
 import { usePermissions } from "@/hooks/use-permissions"
+import { PageHeader } from "@/components/ui/page-header"
+import { StatusBadge } from "@/components/ui/status-badge"
+import { KpiCard } from "@/components/ui/kpi-card"
 
 type Machine = Tables<"machines">
 
@@ -361,40 +363,20 @@ export default function Maquinas() {
     }
   )
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "active":
-        return <Badge variant="default">Activa</Badge>
-      case "maintenance":
-        return <Badge variant="secondary">Mantenimiento</Badge>
-      case "inactive":
-        return <Badge variant="destructive">Fuera de Sede</Badge>
-      default:
-        return <Badge variant="outline">{status}</Badge>
-    }
-  }
-
-  // Nueva función para mostrar el estado de uso
   const getUsageBadge = (machineId: string, machineStatus: string) => {
     // Solo mostrar estado de uso si la máquina está activa
     if (machineStatus !== "active") {
+      if (machineStatus === "maintenance") return <StatusBadge status="maintenance" />
+      if (machineStatus === "inactive") return <StatusBadge status="off_site" label="Fuera de Sede" />
       return null
     }
 
     const isInUse = machinesInUse.has(machineId)
-    
+
     if (isInUse) {
-      return (
-        <Badge variant="secondary" className="bg-orange-100 text-orange-800">
-          En Uso
-        </Badge>
-      )
+      return <StatusBadge status="in_use" />
     } else {
-      return (
-        <Badge variant="default" className="bg-green-100 text-green-800">
-          Disponible
-        </Badge>
-      )
+      return <StatusBadge status="available" />
     }
   }
 
@@ -414,101 +396,68 @@ export default function Maquinas() {
 
   return (
     <ProtectedRoute requiredRole={["administrador", "soporte", "asistente"]}>
-      <div className="min-h-screen bg-gray-50 p-4">
-        <div className="max-w-6xl mx-auto">
+      <div className="page-shell">
+        <div className="page-container-medium">
           {/* Header */}
-          <div className="mb-6">
-            <div className="flex flex-col gap-4 mb-4 md:flex-row md:items-center md:justify-between">
-              <div className="flex items-center gap-4">
-                <Link href="/">
-                  <Button variant="outline" size="sm">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Volver al Dashboard
-                  </Button>
-                </Link>
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-900">Gestión de Máquinas</h1>
-                  <p className="text-gray-600">Control y administración de equipos NPWT</p>
-                </div>
-              </div>
-              <InstitutionSwitcher />
-            </div>
+          <div>
+            <PageHeader
+              title="Gestión de Máquinas"
+              subtitle="Control y administración de equipos NPWT"
+              backHref="/"
+              actions={<InstitutionSwitcher />}
+            />
 
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Capacidad Operativa</CardTitle>
-                  <Settings className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {machines.filter(m => m.status === "active" || m.status === "maintenance").length}
-                  </div>
-                  <p className="text-xs text-muted-foreground">Máquinas en servicio</p>
-                </CardContent>
-              </Card>
+              <KpiCard
+                title="Capacidad Operativa"
+                value={machines.filter(m => m.status === "active" || m.status === "maintenance").length}
+                subtitle="Máquinas en servicio"
+                icon={Settings}
+              />
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Disponibles</CardTitle>
-                  <Settings className="h-4 w-4 text-green-500" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-green-500">
-                    {machines.filter(m => m.status === "active" && !machinesInUse.has(m.id)).length}
-                  </div>
-                  <p className="text-xs text-muted-foreground">Listas para usar</p>
-                </CardContent>
-              </Card>
+              <KpiCard
+                title="Disponibles"
+                value={machines.filter(m => m.status === "active" && !machinesInUse.has(m.id)).length}
+                subtitle="Listas para usar"
+                icon={Settings}
+                iconColor="text-success"
+                iconBg="bg-success/10"
+              />
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">En Uso</CardTitle>
-                  <Settings className="h-4 w-4 text-orange-500" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-orange-500">
-                    {machines.filter(m => m.status === "active" && machinesInUse.has(m.id)).length}
-                  </div>
-                  <p className="text-xs text-muted-foreground">En procedimientos</p>
-                </CardContent>
-              </Card>
+              <KpiCard
+                title="En Uso"
+                value={machines.filter(m => m.status === "active" && machinesInUse.has(m.id)).length}
+                subtitle="En procedimientos"
+                icon={Settings}
+                iconColor="text-warning"
+                iconBg="bg-warning/10"
+              />
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Mantenimiento</CardTitle>
-                  <Settings className="h-4 w-4 text-yellow-500" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-yellow-500">
-                    {machines.filter(m => m.status === "maintenance").length}
-                  </div>
-                  <p className="text-xs text-muted-foreground">En mantenimiento</p>
-                </CardContent>
-              </Card>
+              <KpiCard
+                title="Mantenimiento"
+                value={machines.filter(m => m.status === "maintenance").length}
+                subtitle="En mantenimiento"
+                icon={Settings}
+                iconColor="text-warning"
+                iconBg="bg-warning/10"
+              />
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Fuera de Sede</CardTitle>
-                  <Trash2 className="h-4 w-4 text-gray-500" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-gray-500">
-                    {machines.filter(m => m.status === "inactive").length}
-                  </div>
-                  <p className="text-xs text-muted-foreground">Máquinas retiradas</p>
-                </CardContent>
-              </Card>
-
-
+              <KpiCard
+                title="Fuera de Sede"
+                value={machines.filter(m => m.status === "inactive").length}
+                subtitle="Máquinas retiradas"
+                icon={Trash2}
+                iconColor="text-neutral"
+                iconBg="bg-neutral/10"
+              />
             </div>
 
             {/* Search and Filters */}
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
               <div className="flex gap-4 flex-1 max-w-2xl">
                 <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                   <Input
                     placeholder="Buscar máquinas..."
                     value={searchTerm}
@@ -517,7 +466,7 @@ export default function Maquinas() {
                   />
                 </div>
                 <div className="relative">
-                  <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 z-10" />
+                  <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4 z-10" />
                   <Select value={availabilityFilter} onValueChange={setAvailabilityFilter}>
                     <SelectTrigger className="w-48 pl-10">
                       <SelectValue placeholder="Filtrar por estado" />
@@ -620,13 +569,13 @@ export default function Maquinas() {
           {/* Machines List */}
           {loading ? (
             <div className="flex items-center justify-center h-64">
-              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : filteredMachines.length === 0 ? (
             <Card>
               <CardContent className="pt-6 text-center">
-                <Settings className="h-12 w-12 mx-auto text-gray-300 mb-4" />
-                <p className="text-gray-500">No hay máquinas registradas</p>
+                <Settings className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+                <p className="text-muted-foreground">No hay máquinas registradas</p>
                 <Button className="mt-4" onClick={() => setIsCreateDialogOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Crear Primera Máquina
@@ -645,7 +594,7 @@ export default function Maquinas() {
                           <Badge variant="outline">{machine.reference_code}</Badge>
                           {getUsageBadge(machine.id, machine.status)}
                         </div>
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm text-gray-600">
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm text-muted-foreground">
                           <div>
                             <span className="font-medium">Lote:</span> {machine.lote}
                           </div>
@@ -682,7 +631,7 @@ export default function Maquinas() {
                               variant="outline"
                               size="sm"
                               onClick={() => handleReactivateMachine(machine.id)}
-                              className="text-green-600 hover:text-green-700"
+                              className="text-success hover:text-success/80"
                             >
                               Reincorporar
                             </Button>
@@ -693,7 +642,7 @@ export default function Maquinas() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleDeleteMachine(machine.id)}
-                                className="text-red-600 hover:text-red-700"
+                                className="text-destructive hover:text-destructive/80"
                               >
                                 <Trash2 className="h-3 w-3" />
                               </Button>
