@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { ArrowLeft, TrendingDown, Package, AlertTriangle } from "lucide-react"
 import Link from "next/link"
+import { PageHeader } from "@/components/ui/page-header"
 import { useToast } from "@/hooks/use-toast"
 import { ProtectedRoute } from "@/components/auth/protected-route"
 import { InstitutionSwitcher } from "@/components/institutions/institution-switcher"
@@ -97,22 +98,12 @@ export default function Informes() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50">
         <div className="max-w-7xl mx-auto px-4 py-6">
           {/* Header */}
-          <div className="flex flex-col gap-4 mb-6 md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center gap-4">
-              <Link href="/">
-                <Button variant="outline" size="icon" className="h-9 w-9 shrink-0">
-                  <ArrowLeft className="h-4 w-4" />
-                </Button>
-              </Link>
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight text-foreground">Informes</h1>
-                <p className="text-sm text-muted-foreground">
-                  Reportes de consumo e inventario
-                </p>
-              </div>
-            </div>
-            <InstitutionSwitcher />
-          </div>
+          <PageHeader
+            title="Informes"
+            subtitle="Reportes de consumo e inventario"
+            backHref="/"
+            actions={<InstitutionSwitcher />}
+          />
 
           {/* Filters */}
           <div className="mb-6">
