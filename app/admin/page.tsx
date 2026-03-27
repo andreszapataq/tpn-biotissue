@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Building2, Eye, EyeOff, Loader2, ShieldCheck, UserCog, UserPlus, Users } from "lucide-react"
+import { Building2, Eye, EyeOff, Loader2, UserCog, UserPlus, Users } from "lucide-react"
 import { ProtectedRoute } from "@/components/auth/protected-route"
 import { PageHeader } from "@/components/ui/page-header"
 import { UserMenu } from "@/components/auth/user-menu"
@@ -568,23 +568,6 @@ export default function AdminPage() {
             backHref="/"
             actions={<UserMenu />}
           />
-
-          <Card className="border-info/30 bg-info-muted">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-info-foreground">
-                <ShieldCheck className="h-5 w-5" />
-                Cómo crear un usuario de gerencia
-              </CardTitle>
-              <CardDescription className="text-info-foreground">
-                No necesitas crear uno para entrar hoy, porque tu usuario administrador ya ve el dashboard global.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="text-sm text-info-foreground space-y-2">
-              <p>1. Crea el usuario directamente desde la pestaña <strong>Usuarios</strong> con el botón <strong>Crear Usuario</strong>.</p>
-              <p>2. Asígnale el rol que necesite (soporte, asistente, gerente o administrador) y sus instituciones.</p>
-              <p>3. El usuario podrá iniciar sesión inmediatamente con el correo y contraseña asignados.</p>
-            </CardContent>
-          </Card>
 
           {loading ? (
             <Card>
