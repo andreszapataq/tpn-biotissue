@@ -32,6 +32,7 @@ const DashboardContent = memo(function DashboardContent() {
   const [machinesInUseCount, setMachinesInUseCount] = useState(0)
   const [closedProcedures, setClosedProcedures] = useState<any[]>([])
   const [activeProcedures, setActiveProcedures] = useState<any[]>([])
+  const [activePatientIds, setActivePatientIds] = useState<Set<string>>(new Set())
   const [patients, setPatients] = useState<any[]>([])
   const [alerts, setAlerts] = useState<any[]>([])
   const [loadingData, setLoadingData] = useState(true)
@@ -49,13 +50,14 @@ const DashboardContent = memo(function DashboardContent() {
   const filteredPatients = patients.filter(patient => {
     if (!searchTerm) return true
     const term = searchTerm.toLowerCase()
+    const effectiveStatus = activePatientIds.has(patient.id) ? "active" : (patient.status || "inactive")
     return (
       patient.name?.toLowerCase().includes(term) ||
       patient.identification?.toLowerCase().includes(term) ||
-      patient.status?.toLowerCase().includes(term) ||
-      (patient.status === "active" && "en tratamiento".includes(term)) ||
-      (patient.status === "completed" && ("completado".includes(term) || "cerrado".includes(term))) ||
-      (patient.status === "inactive" && "inactivo".includes(term))
+      effectiveStatus.toLowerCase().includes(term) ||
+      (effectiveStatus === "active" && "en tratamiento".includes(term)) ||
+      (effectiveStatus === "completed" && ("completado".includes(term) || "cerrado".includes(term))) ||
+      (effectiveStatus === "inactive" && "inactivo".includes(term))
     )
   })
 
@@ -221,12 +223,7 @@ const DashboardContent = memo(function DashboardContent() {
       }
 
       // Cargar contadores
-      const [patientsResult, closedProceduresResult, inventoryResult] = await Promise.all([
-        supabase
-          .from("patients")
-          .select("*", { count: "exact" })
-          .eq("institution_id", selectedInstitutionId)
-          .eq("status", "active"),
+      const [closedProceduresResult, inventoryResult] = await Promise.all([
         supabase
           .from("procedures")
           .select("*", { count: "exact" })
@@ -242,7 +239,6 @@ const DashboardContent = memo(function DashboardContent() {
         .eq("institution_id", selectedInstitutionId)
         .order("created_at", { ascending: false })
 
-      setActivePatients(patientsResult.count || 0)
       setTotalClosedProcedures(closedProceduresResult.count || 0)
       // Filtrar solo productos con stock bajo (stock > 0 y stock < minimum_stock)
       // para coincidir con la lógica del inventario (excluir agotados y stock >= mínimo)
@@ -298,19 +294,26 @@ const DashboardContent = memo(function DashboardContent() {
         .eq("status", "completed")
         .order("updated_at", { ascending: false })
 
+      // Derivar pacientes activos desde procedimientos activos (más confiable que patients.status)
+      const uniqueActivePatients = new Set<string>(activeProceduresData?.map((p: any) => p.patient_id) || [])
+      setActivePatientIds(uniqueActivePatients)
+      setActivePatients(uniqueActivePatients.size)
+
+      if (closedProceduresData) setClosedProcedures(closedProceduresData)
+      if (activeProceduresData) setActiveProcedures(activeProceduresData)
+
       // Cargar datos para las tabs — ordenar pacientes: activos primero, luego por fecha de registro
       if (allPatientsData) {
         const statusOrder: Record<string, number> = { active: 0, completed: 1, inactive: 2 }
+        const getEffectiveStatus = (p: any) => uniqueActivePatients.has(p.id) ? "active" : (p.status ?? '')
         allPatientsData.sort((a, b) => {
-          const aOrder = statusOrder[a.status ?? ''] ?? 3
-          const bOrder = statusOrder[b.status ?? ''] ?? 3
+          const aOrder = statusOrder[getEffectiveStatus(a)] ?? 3
+          const bOrder = statusOrder[getEffectiveStatus(b)] ?? 3
           if (aOrder !== bOrder) return aOrder - bOrder
           return new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()
         })
         setPatients(allPatientsData)
       }
-      if (closedProceduresData) setClosedProcedures(closedProceduresData)
-      if (activeProceduresData) setActiveProcedures(activeProceduresData)
       if (inventoryResult.data) {
         setAlerts(
           inventoryResult.data
@@ -655,6 +658,7 @@ const DashboardContent = memo(function DashboardContent() {
                     </Card>
                   ) : (
                     paginatedPatients.map((patient) => {
+                      const effectiveStatus = activePatientIds.has(patient.id) ? "active" : (patient.status || "inactive")
                       const getPatientBadge = (status: string) => {
                         switch (status) {
                           case "active":
@@ -678,14 +682,14 @@ const DashboardContent = memo(function DashboardContent() {
                                   ID: {patient.identification} • Edad: {patient.age} años
                                 </CardDescription>
                               </div>
-                              {getPatientBadge(patient.status || "inactive")}
+                              {getPatientBadge(effectiveStatus)}
                             </div>
                           </CardHeader>
                           <CardContent>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                               <div>
                                 <p className="font-medium text-muted-foreground">Estado</p>
-                                <p className="capitalize">{patient.status === "active" ? "En tratamiento" : patient.status === "completed" ? "Completado" : "Inactivo"}</p>
+                                <p className="capitalize">{effectiveStatus === "active" ? "En tratamiento" : effectiveStatus === "completed" ? "Completado" : "Inactivo"}</p>
                               </div>
                               <div>
                                 <p className="font-medium text-muted-foreground">Edad</p>
