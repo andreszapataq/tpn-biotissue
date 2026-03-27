@@ -1,4 +1,5 @@
 import { useAuth } from "@/components/auth/auth-provider"
+import { useInstitution } from "@/components/institutions/institution-provider"
 
 export interface UserPermissions {
   canManageAdministration: boolean
@@ -15,6 +16,7 @@ export interface UserPermissions {
 
 export function usePermissions(): UserPermissions {
   const { user } = useAuth()
+  const { selectedInstitutionId } = useInstitution()
 
   if (!user) {
     return {
@@ -31,10 +33,17 @@ export function usePermissions(): UserPermissions {
     }
   }
 
-  const isAdmin = user.role === "administrador"
-  const isManager = user.role === "gerente"
-  const isSupport = user.role === "soporte"
-  const isAssistant = user.role === "asistente"
+  // Use the role for the currently selected institution if available,
+  // otherwise fall back to the user's global role
+  const membership = selectedInstitutionId
+    ? user.memberships.find((m) => m.institution_id === selectedInstitutionId)
+    : null
+  const effectiveRole = membership?.role || user.role
+
+  const isAdmin = effectiveRole === "administrador"
+  const isManager = effectiveRole === "gerente"
+  const isSupport = effectiveRole === "soporte"
+  const isAssistant = effectiveRole === "asistente"
 
   return {
     canManageAdministration: isAdmin,
@@ -48,4 +57,4 @@ export function usePermissions(): UserPermissions {
     canViewAll: true,
     isAdmin,
   }
-} 
+}

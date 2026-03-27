@@ -56,29 +56,9 @@ export function formatTimestampWithTimeForColombia(timestamp: string): string {
 }
 
 /**
- * Función para determinar el nombre de visualización de una máquina
- * basándose en el modelo y el lote. Agrega (C) para cassette o (P) para punta
- * a las máquinas de irrigación según los últimos 4 dígitos del lote.
+ * Retorna el nombre de visualización de una máquina.
+ * El subtipo (C)/(P) ya está incluido en el campo model desde la creación.
  */
-export function getMachineDisplayName(model: string, lote: string): string {
-  // Solo aplicar a máquinas de irrigación
-  if (!model.includes("Irrigation")) {
-    return model
-  }
-  
-  // Obtener los últimos 4 dígitos del lote
-  const lastFourDigits = lote.slice(-4)
-  
-  // Definir los números para cada tipo
-  const cassetteNumbers = ["0895", "0896", "0897", "0898"]
-  const puntaNumbers = ["0903", "0910", "0911", "0914", "0916"]
-  
-  if (cassetteNumbers.includes(lastFourDigits)) {
-    return `${model} (C)`
-  } else if (puntaNumbers.includes(lastFourDigits)) {
-    return `${model} (P)`
-  }
-  
-  // Si no coincide con ningún patrón, mostrar solo el modelo
+export function getMachineDisplayName(model: string, _lote?: string): string {
   return model
 }

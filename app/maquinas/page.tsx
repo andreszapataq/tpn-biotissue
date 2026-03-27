@@ -17,7 +17,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Search, Settings, Plus, Edit, Trash2, Loader2, Filter } from "lucide-react"
+import { Search, Settings, Plus, Trash2, Loader2, Filter, ArrowRightLeft, History } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { Tables } from "@/lib/database.types"
 import { formatTimestampForColombia, getMachineDisplayName } from "@/lib/utils"
@@ -29,8 +29,24 @@ import { usePermissions } from "@/hooks/use-permissions"
 import { PageHeader } from "@/components/ui/page-header"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { KpiCard } from "@/components/ui/kpi-card"
+import { TransferDialog } from "@/components/machines/transfer-dialog"
 
 type Machine = Tables<"machines">
+
+interface TransferHistoryEntry {
+  id: string
+  machine_id: string
+  from_institution_id: string | null
+  to_institution_id: string
+  transfer_date: string
+  remision: string | null
+  notes: string | null
+  created_at: string
+  machine: { lote: string; model: string } | null
+  from_institution: { name: string } | null
+  to_institution: { name: string } | null
+  transferred_by_user: { name: string } | null
+}
 
 export default function Maquinas() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -43,14 +59,21 @@ export default function Maquinas() {
   const [isCreating, setIsCreating] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null)
+  const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false)
+  const [transferMachine, setTransferMachine] = useState<Machine | null>(null)
+  const [transferHistory, setTransferHistory] = useState<TransferHistoryEntry[]>([])
+  const [showTransferHistory, setShowTransferHistory] = useState(false)
   const { toast } = useToast()
   const permissions = usePermissions()
-  const { selectedInstitutionId } = useInstitution()
+  const { selectedInstitutionId, selectedInstitutionName, availableInstitutions } = useInstitution()
+  const currentInstitutionCode = availableInstitutions.find(i => i.id === selectedInstitutionId)?.code || ""
+  const isBodega = currentInstitutionCode === "bodega-biotissue"
 
   // Modelos de máquinas NPWT disponibles con códigos de referencia
   const machineModels = [
     { code: "12236", name: "TopiVac Hand T-NPWT Classic" },
-    { code: "12229", name: "TopiVac Hand T-NPWT Irrigation" }, 
+    { code: "12229", name: "TopiVac Hand T-NPWT Irrigation (C)", subtitle: "Cassette" },
+    { code: "12229", name: "TopiVac Hand T-NPWT Irrigation (P)", subtitle: "Peristáltica" },
     { code: "13066", name: "TopiVac Handy Careoxi NPWT" },
     { code: "12212", name: "TopiVac Medium Clinic V4" }
   ]
@@ -63,7 +86,6 @@ export default function Maquinas() {
     reference_code: "12236",
     model: "TopiVac Hand T-NPWT Classic",
     status: "active" as const,
-    remision: "",
     observations: "",
   })
 
@@ -86,6 +108,7 @@ export default function Maquinas() {
           .from("machines")
           .select("*")
           .eq("institution_id", selectedInstitutionId)
+          .neq("status", "inactive")
           .order("lote", { ascending: true }),
         supabase
           .from("procedure_machines")
@@ -120,6 +143,39 @@ export default function Maquinas() {
     void loadMachines()
   }, [selectedInstitutionId])
 
+  // Cargar historial de transferencias
+  const loadTransferHistory = async () => {
+    if (!selectedInstitutionId) return
+
+    const { data, error } = await supabase
+      .from("machine_transfers")
+      .select(`
+        *,
+        machine:machines(lote, model),
+        from_institution:institutions!machine_transfers_from_institution_id_fkey(name),
+        to_institution:institutions!machine_transfers_to_institution_id_fkey(name),
+        transferred_by_user:users!machine_transfers_transferred_by_fkey(name)
+      `)
+      .or(`from_institution_id.eq.${selectedInstitutionId},to_institution_id.eq.${selectedInstitutionId}`)
+      .order("transfer_date", { ascending: false })
+      .limit(50)
+
+    if (!error && data) {
+      setTransferHistory(data as unknown as TransferHistoryEntry[])
+    }
+  }
+
+  useEffect(() => {
+    if (showTransferHistory) {
+      void loadTransferHistory()
+    }
+  }, [showTransferHistory, selectedInstitutionId])
+
+  const openTransferDialog = (machine: Machine) => {
+    setTransferMachine(machine)
+    setIsTransferDialogOpen(true)
+  }
+
   // Crear nueva máquina
   const handleCreateMachine = async () => {
     try {
@@ -146,14 +202,16 @@ export default function Maquinas() {
         reference_code: "12236",
         model: "TopiVac Hand T-NPWT Classic",
         status: "active",
-        remision: "",
         observations: "",
       })
     } catch (error: any) {
       console.error("Error creating machine:", error)
+      const description = error?.code === "23505"
+        ? "Ya existe una máquina con ese número de lote"
+        : error.message || "No se pudo crear la máquina"
       toast({
         title: "Error",
-        description: error.message || "No se pudo crear la máquina",
+        description,
         variant: "destructive",
       })
     } finally {
@@ -199,140 +257,37 @@ export default function Maquinas() {
     }
   }
 
-  // Eliminar máquina
-  const handleDeleteMachine = async (machineId: string) => {
-    // Verificar si la máquina está siendo usada en procedimientos (via procedure_machines)
-    const { data: pmData } = await supabase
-      .from("procedure_machines")
-      .select("procedure_id, procedure:procedures!inner(id, status, procedure_date, patient:patients(name))")
-      .eq("machine_id", machineId)
-
-    const procedures = pmData?.map((pm: any) => pm.procedure) || []
-
-    // Fallback: también verificar via legacy machine_id
-    if (procedures.length === 0) {
-      const { data: legacyProcs } = await supabase
-        .from("procedures")
-        .select("id, patient:patients(name), procedure_date, status")
-        .eq("machine_id", machineId)
-      if (legacyProcs && legacyProcs.length > 0) {
-        procedures.push(...legacyProcs)
-      }
-    }
-
-    if (procedures && procedures.length > 0) {
-      const activeProcedures = procedures.filter(p => p.status === "active")
-      const completedProcedures = procedures.filter(p => p.status === "completed")
-
-      // Si hay procedimientos asociados, ofrecer marcar como fuera de sede en lugar de eliminar
-      const message = activeProcedures.length > 0
-        ? `Esta máquina tiene ${activeProcedures.length} procedimiento(s) ACTIVO(S).\n\n¿Deseas marcarla como FUERA DE SEDE para preservar el historial médico?\n\n✅ Recomendado: Mantiene el historial\n❌ No se perderán datos médicos`
-        : `Esta máquina tiene ${completedProcedures.length} procedimiento(s) en el historial.\n\n¿Deseas marcarla como FUERA DE SEDE para preservar el historial médico?\n\n✅ Recomendado: Mantiene el historial\n❌ No se perderán datos médicos`
-      
-      if (confirm(message)) {
-        await handleInactivateMachine(machineId)
-      }
-      return
-    }
-
-    // Si no hay procedimientos, permitir eliminación física
-    if (!confirm("Esta máquina no tiene procedimientos asociados.\n\n¿Estás seguro de que quieres ELIMINAR PERMANENTEMENTE esta máquina?")) return
+  // Retirar máquina (soft delete — solo desde Bodega)
+  const handleRetireMachine = async (machineId: string) => {
+    if (!confirm("¿Estás seguro de que quieres retirar esta máquina?\n\nSe marcará como inactiva pero el historial de procedimientos y transferencias se preservará.")) return
 
     try {
       const { error } = await supabase
         .from("machines")
-        .delete()
-        .eq("id", machineId)
-
-      if (error) {
-        if (error.code === "23503" || error.message?.includes("still referenced")) {
-          toast({
-            title: "Error de Integridad",
-            description: "Esta máquina está siendo referenciada por otros registros. Se marcará como fuera de sede.",
-            variant: "destructive",
-          })
-          await handleInactivateMachine(machineId)
-          return
-        }
-        throw error
-      }
-
-      toast({
-        title: "Éxito",
-        description: "Máquina eliminada permanentemente",
-      })
-
-      await loadMachines()
-    } catch (error: any) {
-      console.error("Error deleting machine:", error)
-      toast({
-        title: "Error",
-        description: "No se pudo eliminar. Se marcará la máquina como fuera de sede.",
-        variant: "destructive",
-      })
-      await handleInactivateMachine(machineId)
-    }
-  }
-
-  const handleInactivateMachine = async (machineId: string) => {
-    try {
-      const { error } = await supabase
-        .from("machines")
-        .update({ 
+        .update({
           status: "inactive",
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
         .eq("id", machineId)
 
       if (error) throw error
 
       toast({
-        title: "Máquina Fuera de Sede",
-        description: "La máquina se marcó como fuera de sede. El historial médico se preservó.",
-        variant: "default",
+        title: "Máquina Retirada",
+        description: "La máquina fue retirada del inventario. El historial se preservó.",
       })
 
       await loadMachines()
     } catch (error: any) {
-      console.error("Error inactivating machine:", error)
+      console.error("Error retiring machine:", error)
       toast({
         title: "Error",
-        description: "No se pudo marcar la máquina como fuera de sede",
+        description: "No se pudo retirar la máquina",
         variant: "destructive",
       })
     }
   }
 
-  // Reactivar máquina
-  const handleReactivateMachine = async (machineId: string) => {
-    if (!confirm("¿Estás seguro de que quieres reincorporar esta máquina a la sede?")) return
-
-    try {
-      const { error } = await supabase
-        .from("machines")
-        .update({ 
-          status: "active",
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", machineId)
-
-      if (error) throw error
-
-      toast({
-        title: "Máquina Reincorporada",
-        description: "La máquina está de vuelta en sede y disponible para nuevos procedimientos",
-      })
-
-      await loadMachines()
-    } catch (error: any) {
-      console.error("Error reactivating machine:", error)
-      toast({
-        title: "Error",
-        description: "No se pudo reactivar la máquina",
-        variant: "destructive",
-      })
-    }
-  }
 
   // Filtrar máquinas
   const filteredMachines = machines.filter(
@@ -355,8 +310,6 @@ export default function Maquinas() {
         matchesAvailability = isInUse
       } else if (availabilityFilter === "maintenance") {
         matchesAvailability = isInMaintenance
-      } else if (availabilityFilter === "inactive") {
-        matchesAvailability = machine.status === "inactive"
       }
 
       return matchesSearch && matchesAvailability
@@ -364,20 +317,12 @@ export default function Maquinas() {
   )
 
   const getUsageBadge = (machineId: string, machineStatus: string) => {
-    // Solo mostrar estado de uso si la máquina está activa
-    if (machineStatus !== "active") {
-      if (machineStatus === "maintenance") return <StatusBadge status="maintenance" />
-      if (machineStatus === "inactive") return <StatusBadge status="off_site" label="Fuera de Sede" />
-      return null
-    }
+    if (machineStatus === "maintenance") return <StatusBadge status="maintenance" />
+    if (machineStatus !== "active") return null
 
-    const isInUse = machinesInUse.has(machineId)
-
-    if (isInUse) {
-      return <StatusBadge status="in_use" />
-    } else {
-      return <StatusBadge status="available" />
-    }
+    return machinesInUse.has(machineId)
+      ? <StatusBadge status="in_use" />
+      : <StatusBadge status="available" />
   }
 
   const openEditDialog = (machine: Machine) => {
@@ -408,11 +353,11 @@ export default function Maquinas() {
             />
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
               <KpiCard
-                title="Capacidad Operativa"
-                value={machines.filter(m => m.status === "active" || m.status === "maintenance").length}
-                subtitle="Máquinas en servicio"
+                title="Total"
+                value={machines.length}
+                subtitle="Máquinas en sede"
                 icon={Settings}
               />
 
@@ -442,15 +387,6 @@ export default function Maquinas() {
                 iconColor="text-warning"
                 iconBg="bg-warning/10"
               />
-
-              <KpiCard
-                title="Fuera de Sede"
-                value={machines.filter(m => m.status === "inactive").length}
-                subtitle="Máquinas retiradas"
-                icon={Trash2}
-                iconColor="text-neutral"
-                iconBg="bg-neutral/10"
-              />
             </div>
 
             {/* Search and Filters */}
@@ -476,7 +412,6 @@ export default function Maquinas() {
                       <SelectItem value="available">Solo disponibles</SelectItem>
                       <SelectItem value="in_use">Solo en uso</SelectItem>
                       <SelectItem value="maintenance">En mantenimiento</SelectItem>
-                      <SelectItem value="inactive">Fuera de sede</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -525,21 +460,12 @@ export default function Maquinas() {
                           </SelectTrigger>
                           <SelectContent>
                             {machineModels.map((model) => (
-                              <SelectItem key={model.code} value={model.name}>
+                              <SelectItem key={model.name} value={model.name}>
                                 {model.code} - {model.name}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
-                      </div>
-                      <div>
-                        <Label htmlFor="remision">Remisión</Label>
-                        <Input
-                          id="remision"
-                          value={newMachine.remision}
-                          onChange={(e) => setNewMachine({ ...newMachine, remision: e.target.value.toUpperCase() })}
-                          placeholder="Ej: REM-2026-001"
-                        />
                       </div>
                       <div>
                         <Label htmlFor="observations">Observaciones</Label>
@@ -608,7 +534,7 @@ export default function Maquinas() {
                             <span className="font-medium">Observaciones:</span> {machine.observations || "Ninguna"}
                           </div>
                           <div>
-                            <span className="font-medium">Estado:</span> {machine.status === "active" ? "Activa" : machine.status === "maintenance" ? "Mantenimiento" : "Fuera de Sede"}
+                            <span className="font-medium">Estado:</span> {machine.status === "active" ? "Activa" : "Mantenimiento"}
                           </div>
                           <div>
                             <span className="font-medium">Creada:</span> {machine.created_at ? formatTimestampForColombia(machine.created_at) : 'N/A'}
@@ -617,6 +543,16 @@ export default function Maquinas() {
                       </div>
                       {permissions.canEditMachines && (
                         <div className="flex items-center gap-2">
+                          {availableInstitutions.length > 1 && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openTransferDialog(machine)}
+                            >
+                              <ArrowRightLeft className="h-3 w-3 mr-1" />
+                              Transferir
+                            </Button>
+                          )}
                           <Button
                             variant="outline"
                             size="sm"
@@ -625,28 +561,16 @@ export default function Maquinas() {
                             Editar
                           </Button>
                           
-                          {/* Mostrar botón de reactivar para máquinas inactivas */}
-                          {machine.status === "inactive" ? (
+                          {/* Retirar máquina — solo visible desde Bodega */}
+                          {isBodega && permissions.canDeleteMachines && (
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleReactivateMachine(machine.id)}
-                              className="text-success hover:text-success/80"
+                              onClick={() => handleRetireMachine(machine.id)}
+                              className="text-destructive hover:text-destructive/80"
                             >
-                              Reincorporar
+                              <Trash2 className="h-3 w-3" />
                             </Button>
-                          ) : (
-                            /* Mostrar botón de eliminar/inactivar para máquinas activas */
-                            permissions.canDeleteMachines && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleDeleteMachine(machine.id)}
-                                className="text-destructive hover:text-destructive/80"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            )
                           )}
                         </div>
                       )}
@@ -692,7 +616,7 @@ export default function Maquinas() {
                     </SelectTrigger>
                     <SelectContent>
                       {machineModels.map((model) => (
-                        <SelectItem key={model.code} value={model.name}>
+                        <SelectItem key={model.name} value={model.name}>
                           {model.code} - {model.name}
                         </SelectItem>
                       ))}
@@ -711,7 +635,6 @@ export default function Maquinas() {
                     <SelectContent>
                       <SelectItem value="active">Activa</SelectItem>
                       <SelectItem value="maintenance">En Mantenimiento</SelectItem>
-                      <SelectItem value="inactive">Fuera de Sede</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -764,8 +687,92 @@ export default function Maquinas() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+
+          {/* Transfer Dialog */}
+          <TransferDialog
+            machine={transferMachine}
+            currentInstitutionId={selectedInstitutionId || ""}
+            currentInstitutionName={selectedInstitutionName || ""}
+            availableInstitutions={availableInstitutions}
+            open={isTransferDialogOpen}
+            onOpenChange={setIsTransferDialogOpen}
+            onTransferComplete={() => {
+              loadMachines()
+              if (showTransferHistory) loadTransferHistory()
+            }}
+          />
+
+          {/* Transfer History Section */}
+          {permissions.canEditMachines && (
+            <div className="mt-8">
+              <Button
+                variant="outline"
+                onClick={() => setShowTransferHistory(!showTransferHistory)}
+                className="mb-4"
+              >
+                <History className="h-4 w-4 mr-2" />
+                {showTransferHistory ? "Ocultar" : "Ver"} Historial de Transferencias
+              </Button>
+
+              {showTransferHistory && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <ArrowRightLeft className="h-5 w-5" />
+                      Historial de Transferencias
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {transferHistory.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        No hay transferencias registradas para esta institución
+                      </p>
+                    ) : (
+                      <div className="space-y-3">
+                        {transferHistory.map((transfer) => (
+                          <div
+                            key={transfer.id}
+                            className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0"
+                          >
+                            <div className="flex-1">
+                              <p className="font-medium text-sm">
+                                {transfer.machine
+                                  ? getMachineDisplayName(transfer.machine.model, transfer.machine.lote)
+                                  : "Máquina eliminada"}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {transfer.from_institution?.name || "—"}{" "}
+                                <ArrowRightLeft className="h-3 w-3 inline mx-1" />{" "}
+                                {transfer.to_institution?.name || "—"}
+                              </p>
+                              {transfer.remision && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  <span className="font-medium">Remisión:</span> {transfer.remision}
+                                </p>
+                              )}
+                              {transfer.notes && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {transfer.notes}
+                                </p>
+                              )}
+                            </div>
+                            <div className="text-right text-sm text-muted-foreground">
+                              <p>{transfer.transfer_date}</p>
+                              {transfer.transferred_by_user && (
+                                <p className="text-xs">{transfer.transferred_by_user.name}</p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </ProtectedRoute>
   )
-} 
+}

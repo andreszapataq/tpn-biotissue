@@ -8,7 +8,6 @@ type DomainStatus =
   | "in_use"
   | "maintenance"
   | "inactive"
-  | "off_site"
   | "active"
   | "completed"
   | "cancelled"
@@ -30,7 +29,6 @@ const statusConfig: Record<DomainStatus, { variant: "success" | "warning" | "inf
   idle: { variant: "info", label: "Inactiva" },
   stock_low: { variant: "warning", label: "Stock Bajo" },
   inactive: { variant: "neutral", label: "Sin actividad" },
-  off_site: { variant: "neutral", label: "Fuera de sede" },
   never_used: { variant: "neutral", label: "Nunca usada" },
   cancelled: { variant: "destructive", label: "Cancelado" },
   stock_out: { variant: "destructive", label: "Sin Stock" },
