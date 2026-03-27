@@ -52,6 +52,11 @@ export function UserMenu() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem>
+          <User className="mr-2 h-4 w-4" />
+          <span>Perfil</span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem>
           <Key className="mr-2 h-4 w-4" />
           <span>Cambiar Contraseña</span>
         </DropdownMenuItem>
@@ -61,11 +66,6 @@ export function UserMenu() {
             <span>Habilitar MFA</span>
           </DropdownMenuItem>
         )}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem>
-          <User className="mr-2 h-4 w-4" />
-          <span>Perfil</span>
-        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={signOut} className="text-destructive">
           <LogOut className="mr-2 h-4 w-4" />

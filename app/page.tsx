@@ -244,7 +244,12 @@ const DashboardContent = memo(function DashboardContent() {
 
       setActivePatients(patientsResult.count || 0)
       setTotalClosedProcedures(closedProceduresResult.count || 0)
-      setInventoryAlerts(inventoryResult.data?.length || 0)
+      // Filtrar solo productos con stock bajo (stock > 0 y stock < minimum_stock)
+      // para coincidir con la lógica del inventario (excluir agotados y stock >= mínimo)
+      const lowStockProducts = (inventoryResult.data || []).filter(
+        (item: any) => (item.stock || 0) > 0 && (item.stock || 0) < (item.minimum_stock || 0)
+      )
+      setInventoryAlerts(lowStockProducts.length)
       
       // Cargar máquinas activas y máquinas en uso
       const [machinesDataResult, usedMachinesResult] = await Promise.all([
@@ -308,11 +313,13 @@ const DashboardContent = memo(function DashboardContent() {
       if (activeProceduresData) setActiveProcedures(activeProceduresData)
       if (inventoryResult.data) {
         setAlerts(
-          inventoryResult.data.map((item: any) => ({
-            product: item.name,
-            stock: item.stock,
-            minimum: item.minimum_stock,
-          })),
+          inventoryResult.data
+            .filter((item: any) => (item.stock || 0) > 0 && (item.stock || 0) < (item.minimum_stock || 0))
+            .map((item: any) => ({
+              product: item.name,
+              stock: item.stock,
+              minimum: item.minimum_stock,
+            })),
         )
       }
     } catch (error) {

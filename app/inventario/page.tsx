@@ -23,7 +23,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
-import { Search, Package, AlertTriangle, Plus, Minus, TrendingUp, Loader2, Check, ChevronsUpDown, CalendarIcon, Trash2, PackageX } from "lucide-react"
+import { Search, Package, AlertTriangle, Plus, Minus, TrendingUp, Loader2, Check, ChevronsUpDown, CalendarIcon, Trash2, PackageX, X } from "lucide-react"
 import { PageHeader } from "@/components/ui/page-header"
 import { supabase } from "@/lib/supabase"
 import { Tables } from "@/lib/database.types"
@@ -1030,8 +1030,16 @@ export default function Inventario() {
                   placeholder="Buscar productos..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 pr-9"
                 />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm("")}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
               </div>
               
               {/* 🔧 NUEVO: Botón Entrada de Inventario */}
