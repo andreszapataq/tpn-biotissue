@@ -675,17 +675,28 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
 
       if (procedureError) throw procedureError
 
-      // Actualizar el estado del paciente a "completed"
+      // Solo marcar paciente como "completed" si no tiene otros procedimientos activos
       if (procedure.patient_id) {
-        const { error: patientError } = await supabase
-          .from("patients")
-          .update({ 
-            status: "completed",
-            updated_at: new Date().toISOString()
-          })
-          .eq("id", procedure.patient_id)
+        const { count, error: countError } = await supabase
+          .from("procedures")
+          .select("id", { count: "exact", head: true })
+          .eq("patient_id", procedure.patient_id)
+          .eq("status", "active")
+          .neq("id", procedure.id)
 
-        if (patientError) throw patientError
+        if (countError) throw countError
+
+        if (count === 0) {
+          const { error: patientError } = await supabase
+            .from("patients")
+            .update({
+              status: "completed",
+              updated_at: new Date().toISOString()
+            })
+            .eq("id", procedure.patient_id)
+
+          if (patientError) throw patientError
+        }
       }
 
       toast({

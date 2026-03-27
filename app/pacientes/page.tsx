@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ArrowLeft, Search, Eye, Calendar, Activity, Loader2, Plus } from "lucide-react"
+import { Separator } from "@/components/ui/separator"
+import { ArrowLeft, Search, Eye, Activity, Loader2, Plus, FileText, Clock, CheckCircle, ExternalLink, X } from "lucide-react"
 import Link from "next/link"
 import { supabase, type Patient } from "@/lib/supabase"
 import { formatTimestampForColombia } from "@/lib/utils"
@@ -15,15 +16,76 @@ import { ProtectedRoute } from "@/components/auth/protected-route"
 import { InstitutionSwitcher } from "@/components/institutions/institution-switcher"
 import { useInstitution } from "@/components/institutions/institution-provider"
 
+interface ProcedureInfo {
+  id: string
+  patient_id: string | null
+  status: string | null
+  updated_at: string | null
+  procedure_date: string
+  diagnosis: string
+  surgeon_name: string
+}
+
+interface PatientProcedureSummary {
+  totalProcedures: number
+  activeProcedures: number
+  completedProcedures: number
+  lastClosedAt: string | null
+  procedures: ProcedureInfo[]
+}
+
+interface PatientWithProcedures extends Patient {
+  procedureSummary: PatientProcedureSummary
+}
+
+const emptyProcedureSummary: PatientProcedureSummary = {
+  totalProcedures: 0,
+  activeProcedures: 0,
+  completedProcedures: 0,
+  lastClosedAt: null,
+  procedures: [],
+}
+
+function buildProcedureSummaryMap(procedures: ProcedureInfo[]): Map<string, PatientProcedureSummary> {
+  const map = new Map<string, PatientProcedureSummary>()
+
+  for (const proc of procedures) {
+    if (!proc.patient_id) continue
+
+    let summary = map.get(proc.patient_id)
+    if (!summary) {
+      summary = {
+        totalProcedures: 0,
+        activeProcedures: 0,
+        completedProcedures: 0,
+        lastClosedAt: null,
+        procedures: [],
+      }
+      map.set(proc.patient_id, summary)
+    }
+
+    summary.totalProcedures++
+    if (proc.status === "active") summary.activeProcedures++
+    if (proc.status === "completed") {
+      summary.completedProcedures++
+      if (proc.updated_at && (!summary.lastClosedAt || proc.updated_at > summary.lastClosedAt)) {
+        summary.lastClosedAt = proc.updated_at
+      }
+    }
+    summary.procedures.push(proc)
+  }
+
+  return map
+}
+
 export default function Pacientes() {
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
-  const [patients, setPatients] = useState<Patient[]>([])
+  const [selectedPatient, setSelectedPatient] = useState<PatientWithProcedures | null>(null)
+  const [patients, setPatients] = useState<PatientWithProcedures[]>([])
   const [loading, setLoading] = useState(true)
   const { toast } = useToast()
   const { selectedInstitutionId } = useInstitution()
 
-  // Cargar pacientes desde la base de datos
   const loadPatients = async () => {
     try {
       setLoading(true)
@@ -40,7 +102,6 @@ export default function Pacientes() {
 
       if (error) throw error
 
-      // Filtrar y mapear datos para asegurar tipos correctos
       const validPatients = (data || []).map(patient => ({
         ...patient,
         status: (patient.status as "active" | "completed" | "inactive") || "inactive",
@@ -48,7 +109,30 @@ export default function Pacientes() {
         updated_at: patient.updated_at || new Date().toISOString()
       }))
 
-      setPatients(validPatients)
+      const patientIds = validPatients.map(p => p.id)
+
+      let summaryMap = new Map<string, PatientProcedureSummary>()
+
+      if (patientIds.length > 0) {
+        const { data: proceduresData, error: procError } = await supabase
+          .from("procedures")
+          .select("id, patient_id, status, updated_at, procedure_date, diagnosis, surgeon_name")
+          .in("patient_id", patientIds)
+          .order("procedure_date", { ascending: false })
+
+        if (procError) {
+          console.error("Error loading procedures:", procError)
+        } else {
+          summaryMap = buildProcedureSummaryMap(proceduresData || [])
+        }
+      }
+
+      const patientsWithProcedures: PatientWithProcedures[] = validPatients.map(p => ({
+        ...p,
+        procedureSummary: summaryMap.get(p.id) || emptyProcedureSummary,
+      }))
+
+      setPatients(patientsWithProcedures)
     } catch (error: any) {
       console.error("Error loading patients:", error)
       toast({
@@ -67,7 +151,7 @@ export default function Pacientes() {
 
   const filteredPatients = patients.filter(
     (patient) =>
-      patient.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       patient.identification.includes(searchTerm),
   )
 
@@ -103,8 +187,16 @@ export default function Pacientes() {
                 placeholder="Buscar por nombre o identificación..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 pr-9"
               />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm("")}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -165,14 +257,19 @@ export default function Pacientes() {
 
                             <div className="grid grid-cols-2 gap-4 text-sm">
                               <div>
-                                <p className="font-medium text-gray-600">Creado</p>
+                                <p className="font-medium text-gray-600">Registrado</p>
                                 <p>{formatTimestampForColombia(patient.created_at)}</p>
                               </div>
                               <div>
-                                <p className="font-medium text-gray-600">Última Actualización</p>
-                                <p>{formatTimestampForColombia(patient.updated_at)}</p>
+                                <p className="font-medium text-gray-600">Procedimientos Activos</p>
+                                <p>{patient.procedureSummary.activeProcedures}</p>
                               </div>
                             </div>
+                            {patient.procedureSummary.totalProcedures > 0 && (
+                              <p className="text-xs text-gray-500 mt-2">
+                                {patient.procedureSummary.totalProcedures} procedimiento{patient.procedureSummary.totalProcedures !== 1 ? "s" : ""} en total
+                              </p>
+                            )}
                           </CardContent>
                         </Card>
                       ))
@@ -209,14 +306,24 @@ export default function Pacientes() {
 
                             <div className="grid grid-cols-2 gap-4 text-sm">
                               <div>
-                                <p className="font-medium text-gray-600">Finalizado</p>
-                                <p>{formatTimestampForColombia(patient.updated_at)}</p>
+                                <p className="font-medium text-gray-600">Último Cierre</p>
+                                <p>{patient.procedureSummary.lastClosedAt
+                                  ? formatTimestampForColombia(patient.procedureSummary.lastClosedAt)
+                                  : "Sin fecha de cierre"}</p>
                               </div>
                               <div>
-                                <p className="font-medium text-gray-600">Creado</p>
+                                <p className="font-medium text-gray-600">Registrado</p>
                                 <p>{formatTimestampForColombia(patient.created_at)}</p>
                               </div>
                             </div>
+                            {patient.procedureSummary.totalProcedures > 0 && (
+                              <div className="flex items-center gap-2 mt-3 pt-3 border-t">
+                                <FileText className="h-4 w-4 text-gray-400" />
+                                <span className="text-sm font-medium text-gray-700">
+                                  {patient.procedureSummary.totalProcedures} procedimiento{patient.procedureSummary.totalProcedures !== 1 ? "s" : ""} en total
+                                </span>
+                              </div>
+                            )}
                           </CardContent>
                         </Card>
                       ))
@@ -248,19 +355,76 @@ export default function Pacientes() {
                           </p>
                           <div className="flex items-center gap-2">
                             <span className="font-medium">Estado:</span>
-                            <Badge variant={selectedPatient.status === "active" ? "default" : "default"} 
+                            <Badge variant="default"
                                    className={selectedPatient.status === "completed" ? "bg-green-600 hover:bg-green-700" : ""}>
                               {selectedPatient.status === "active" ? "Activo" : "Completado"}
                             </Badge>
                           </div>
                           <p>
-                            <span className="font-medium">Creado:</span> {formatTimestampForColombia(selectedPatient.created_at)}
+                            <span className="font-medium">Registrado:</span> {formatTimestampForColombia(selectedPatient.created_at)}
                           </p>
+                          {selectedPatient.procedureSummary.lastClosedAt && (
+                            <p>
+                              <span className="font-medium">Último Cierre:</span> {formatTimestampForColombia(selectedPatient.procedureSummary.lastClosedAt)}
+                            </p>
+                          )}
                           <p>
-                            <span className="font-medium">Actualizado:</span> {formatTimestampForColombia(selectedPatient.updated_at)}
+                            <span className="font-medium">Procedimientos:</span>{" "}
+                            {selectedPatient.procedureSummary.activeProcedures > 0 && (
+                              <span className="text-blue-600">{selectedPatient.procedureSummary.activeProcedures} activo{selectedPatient.procedureSummary.activeProcedures !== 1 ? "s" : ""}</span>
+                            )}
+                            {selectedPatient.procedureSummary.activeProcedures > 0 && selectedPatient.procedureSummary.completedProcedures > 0 && ", "}
+                            {selectedPatient.procedureSummary.completedProcedures > 0 && (
+                              <span className="text-green-600">{selectedPatient.procedureSummary.completedProcedures} completado{selectedPatient.procedureSummary.completedProcedures !== 1 ? "s" : ""}</span>
+                            )}
+                            {selectedPatient.procedureSummary.totalProcedures === 0 && (
+                              <span className="text-gray-500">Sin procedimientos</span>
+                            )}
                           </p>
                         </div>
                       </div>
+
+                      {/* Historial de Procedimientos */}
+                      {selectedPatient.procedureSummary.procedures.length > 0 && (
+                        <>
+                          <Separator />
+                          <div>
+                            <h4 className="font-semibold mb-3 flex items-center gap-2">
+                              <FileText className="h-4 w-4" />
+                              Historial de Procedimientos
+                            </h4>
+                            <div className="max-h-[400px] overflow-y-auto space-y-3 pr-1">
+                              {selectedPatient.procedureSummary.procedures.map((proc) => (
+                                <div key={proc.id} className="border rounded-lg p-3 text-sm space-y-1">
+                                  <div className="flex items-center justify-between">
+                                    <Badge
+                                      className={proc.status === "active"
+                                        ? "bg-green-100 text-green-800"
+                                        : "bg-blue-100 text-blue-800"}
+                                    >
+                                      {proc.status === "active" ? (
+                                        <><Clock className="h-3 w-3 mr-1" />Activo</>
+                                      ) : (
+                                        <><CheckCircle className="h-3 w-3 mr-1" />Completado</>
+                                      )}
+                                    </Badge>
+                                    <Link href={`/procedimiento/${proc.id}`}>
+                                      <Button variant="ghost" size="sm" className="h-7 px-2">
+                                        <ExternalLink className="h-3 w-3" />
+                                      </Button>
+                                    </Link>
+                                  </div>
+                                  <p className="text-gray-600">
+                                    {formatTimestampForColombia(proc.procedure_date)}
+                                  </p>
+                                  <p className="text-gray-800 line-clamp-2">{proc.diagnosis}</p>
+                                  <p className="text-gray-500 text-xs">Dr. {proc.surgeon_name}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </CardContent>
                   </Card>
                 ) : (
