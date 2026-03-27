@@ -293,8 +293,17 @@ const DashboardContent = memo(function DashboardContent() {
         .eq("status", "completed")
         .order("updated_at", { ascending: false })
 
-      // Cargar datos para las tabs
-      if (allPatientsData) setPatients(allPatientsData)
+      // Cargar datos para las tabs — ordenar pacientes: activos primero, luego por fecha de registro
+      if (allPatientsData) {
+        const statusOrder: Record<string, number> = { active: 0, completed: 1, inactive: 2 }
+        allPatientsData.sort((a, b) => {
+          const aOrder = statusOrder[a.status ?? ''] ?? 3
+          const bOrder = statusOrder[b.status ?? ''] ?? 3
+          if (aOrder !== bOrder) return aOrder - bOrder
+          return new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()
+        })
+        setPatients(allPatientsData)
+      }
       if (closedProceduresData) setClosedProcedures(closedProceduresData)
       if (activeProceduresData) setActiveProcedures(activeProceduresData)
       if (inventoryResult.data) {
@@ -387,21 +396,21 @@ const DashboardContent = memo(function DashboardContent() {
           )}
 
           {/* Navigation Grid */}
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-flow-col lg:auto-cols-fr gap-2">
             {navItems.map((item) => {
               const Icon = item.icon
               return (
                 <Link key={item.href} href={item.href}>
                   <Button
                     variant={item.primary ? "default" : "outline"}
-                    className={`h-10 text-sm gap-2 ${
+                    className={`h-11 w-full text-[13px] gap-2 ${
                       item.primary
                         ? "bg-primary hover:bg-primary/90 shadow-sm shadow-primary/20"
                         : "bg-card hover:bg-muted border-border"
                     }`}
                   >
                     <Icon className="h-4 w-4 shrink-0" />
-                    <span>{item.label}</span>
+                    <span className="whitespace-nowrap">{item.label}</span>
                   </Button>
                 </Link>
               )
@@ -447,7 +456,7 @@ const DashboardContent = memo(function DashboardContent() {
               value: inventoryAlerts,
               valueColor: inventoryAlerts > 0 ? "text-warning" : "text-foreground",
               description: "Productos con stock bajo",
-              ring: inventoryAlerts > 0,
+              ring: false,
             },
           ].map((stat, i) => {
             const StatIcon = stat.icon
@@ -567,10 +576,10 @@ const DashboardContent = memo(function DashboardContent() {
         {/* Main Content */}
         <Tabs defaultValue="pacientes" className="space-y-4">
           <div className="flex flex-col space-y-4">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="pacientes">Últimos Pacientes</TabsTrigger>
-              <TabsTrigger value="procedimientos">Procedimientos Cerrados</TabsTrigger>
-              <TabsTrigger value="alertas">Alertas</TabsTrigger>
+            <TabsList className="inline-flex h-10 w-full items-center justify-start gap-1 rounded-md bg-muted p-1">
+              <TabsTrigger value="pacientes" className="flex-1 px-4">Últimos Pacientes</TabsTrigger>
+              <TabsTrigger value="procedimientos" className="flex-1 px-4">Procedimientos Cerrados</TabsTrigger>
+              <TabsTrigger value="alertas" className="flex-1 px-4">Alertas</TabsTrigger>
             </TabsList>
             
             {/* 🔍 Buscador Global */}

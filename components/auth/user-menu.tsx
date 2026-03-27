@@ -10,12 +10,12 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { User, Settings, Shield, LogOut, Key, RefreshCw, Building2, Globe } from "lucide-react"
+import { User, Shield, LogOut, Key } from "lucide-react"
 import { useAuth } from "./auth-provider"
 import { getRoleBadgeClassName, getRoleLabel } from "@/lib/roles"
 
 export function UserMenu() {
-  const { user, signOut, refreshUser } = useAuth()
+  const { user, signOut } = useAuth()
 
   if (!user) return null
 
@@ -48,21 +48,9 @@ export function UserMenu() {
             <Badge className={getRoleBadgeClassName(user.role)} variant="secondary">
               {getRoleLabel(user.role)}
             </Badge>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              {user.has_global_visibility ? <Globe className="h-3 w-3" /> : <Building2 className="h-3 w-3" />}
-              <span>{user.institution_name || "Sin institucion asignada"}</span>
-            </div>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>
-          <User className="mr-2 h-4 w-4" />
-          <span>Perfil</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          <Settings className="mr-2 h-4 w-4" />
-          <span>Configuración</span>
-        </DropdownMenuItem>
         <DropdownMenuItem>
           <Key className="mr-2 h-4 w-4" />
           <span>Cambiar Contraseña</span>
@@ -74,9 +62,9 @@ export function UserMenu() {
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={refreshUser}>
-          <RefreshCw className="mr-2 h-4 w-4" />
-          <span>Actualizar Permisos</span>
+        <DropdownMenuItem>
+          <User className="mr-2 h-4 w-4" />
+          <span>Perfil</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={signOut} className="text-destructive">
