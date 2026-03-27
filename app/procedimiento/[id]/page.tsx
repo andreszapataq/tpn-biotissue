@@ -40,7 +40,7 @@ import { useToast } from "@/hooks/use-toast"
 import { ProtectedRoute } from "@/components/auth/protected-route"
 import { useAuth } from "@/components/auth/auth-provider"
 import { usePermissions } from "@/hooks/use-permissions"
-import { InstitutionSwitcher } from "@/components/institutions/institution-switcher"
+
 
 type Procedure = Tables<"procedures">
 type Patient = Tables<"patients">
@@ -57,6 +57,7 @@ interface ProcedureDetails extends Procedure {
   patient: Patient
   machine: Machine | null
   procedure_machines: ProcedureMachineRow[]
+  institution: { name: string } | null
 }
 
 interface ProductUsage extends ProcedureProduct {
@@ -118,7 +119,8 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
           *,
           patient:patients(*),
           machine:machines(*),
-          procedure_machines(machine_id, machine:machines(*))
+          procedure_machines(machine_id, machine:machines(*)),
+          institution:institutions(name)
         `)
         .eq("id", resolvedParams.id)
         .single()
@@ -782,7 +784,11 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                 backLabel="Volver"
               />
               <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap justify-end">
-                <InstitutionSwitcher />
+                {procedure.institution?.name && (
+                  <span className="text-sm text-muted-foreground truncate max-w-[200px]">
+                    {procedure.institution.name}
+                  </span>
+                )}
                 {getStatusBadge(procedure.status || "unknown")}
                 {procedure.status === "active" && (
                   <Button
