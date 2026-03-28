@@ -1,17 +1,16 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Activity, Building2, Clock3, Loader2, MonitorSmartphone, ShieldAlert, Users } from "lucide-react"
+import { Loader2, ShieldAlert } from "lucide-react"
 import { ProtectedRoute } from "@/components/auth/protected-route"
 import { UserMenu } from "@/components/auth/user-menu"
 import { usePermissions } from "@/hooks/use-permissions"
 import { supabase } from "@/lib/supabase"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { PageHeader } from "@/components/ui/page-header"
-import { KpiCard } from "@/components/ui/kpi-card"
-import { StatusBadge } from "@/components/ui/status-badge"
-import { UtilizationBar } from "@/components/ui/utilization-bar"
-import { Badge } from "@/components/ui/badge"
+import { KpiStrip } from "@/components/dashboard-global/kpi-strip"
+import { InstitutionList } from "@/components/dashboard-global/institution-list"
+import { RetirablesPanel } from "@/components/dashboard-global/retirables-panel"
 
 type InstitutionStatus = {
   institution_id: string
@@ -38,11 +37,15 @@ type IdleMachine = {
   never_used: boolean
 }
 
+type FilterTab = "todos" | "en_uso" | "disponibles" | "retirables"
+
 export default function DashboardGlobalPage() {
   const permissions = usePermissions()
   const [loading, setLoading] = useState(true)
   const [institutionStats, setInstitutionStats] = useState<InstitutionStatus[]>([])
   const [idleMachines, setIdleMachines] = useState<IdleMachine[]>([])
+  const [searchTerm, setSearchTerm] = useState("")
+  const [activeFilter, setActiveFilter] = useState<FilterTab>("todos")
 
   const loadDashboard = async () => {
     try {
@@ -97,6 +100,7 @@ export default function DashboardGlobalPage() {
     }
   }, [permissions.canViewGlobalDashboard])
 
+  // Aggregated summary
   const summary = useMemo(() => {
     return institutionStats.reduce(
       (acc, institution) => {
@@ -120,6 +124,62 @@ export default function DashboardGlobalPage() {
   }, [institutionStats])
 
   const utilization = summary.totalMachines > 0 ? Math.round((summary.connectedMachines / summary.totalMachines) * 100) : 0
+
+  // Group idle machines by institution
+  const retirablesByInstitution = useMemo(() => {
+    const map = new Map<string, IdleMachine[]>()
+    for (const m of idleMachines) {
+      const arr = map.get(m.institution_id) || []
+      arr.push(m)
+      map.set(m.institution_id, arr)
+    }
+    return map
+  }, [idleMachines])
+
+  // Filtered institutions based on search + tab
+  const filteredInstitutions = useMemo(() => {
+    let result = institutionStats
+
+    // Text search
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase()
+      result = result.filter((inst) =>
+        inst.institution_name.toLowerCase().includes(term) ||
+        inst.institution_code.toLowerCase().includes(term) ||
+        (retirablesByInstitution.get(inst.institution_id) || []).some(
+          (m) =>
+            m.machine_model.toLowerCase().includes(term) ||
+            m.machine_lote.toLowerCase().includes(term)
+        )
+      )
+    }
+
+    // Tab filter
+    switch (activeFilter) {
+      case "en_uso":
+        result = result.filter((inst) => inst.connected_machines > 0)
+        break
+      case "disponibles":
+        result = result.filter((inst) => inst.available_machines > 0)
+        break
+      case "retirables":
+        result = result.filter((inst) => retirablesByInstitution.has(inst.institution_id))
+        break
+    }
+
+    return result
+  }, [institutionStats, searchTerm, activeFilter, retirablesByInstitution])
+
+  // Tab counts (computed from unfiltered data so counts stay stable)
+  const tabCounts = useMemo(
+    () => ({
+      todos: institutionStats.length,
+      en_uso: institutionStats.filter((i) => i.connected_machines > 0).length,
+      disponibles: institutionStats.filter((i) => i.available_machines > 0).length,
+      retirables: institutionStats.filter((i) => retirablesByInstitution.has(i.institution_id)).length,
+    }),
+    [institutionStats, retirablesByInstitution],
+  )
 
   return (
     <ProtectedRoute requiredRole={["administrador", "gerente"]}>
@@ -149,7 +209,7 @@ export default function DashboardGlobalPage() {
               <CardContent className="pt-6 text-center">
                 <ShieldAlert className="h-12 w-12 mx-auto text-warning mb-4" />
                 <h2 className="heading-2">Acceso restringido</h2>
-                <p className="body-muted mt-2">Esta vista está disponible solo para gerencia y administración.</p>
+                <p className="body-muted mt-2">Esta vista esta disponible solo para gerencia y administracion.</p>
               </CardContent>
             </Card>
           ) : loading ? (
@@ -161,209 +221,32 @@ export default function DashboardGlobalPage() {
             </Card>
           ) : (
             <>
-              {/* KPI Cards */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <KpiCard
-                  title="Instituciones Activas"
-                  value={summary.institutions}
-                  subtitle="Con actividad o equipos asignados"
-                  icon={Building2}
-                  iconColor="text-primary"
-                  iconBg="bg-primary/10"
-                  valueSize="large"
-                  className="bg-card/90 backdrop-blur-sm shadow-sm hover:shadow-md transition-all"
-                  animationDelay="0s"
-                />
-                <KpiCard
-                  title="Maquinas Conectadas"
-                  value={summary.connectedMachines}
-                  subtitle={`${utilization}% de utilización sobre equipos en sede`}
-                  icon={MonitorSmartphone}
-                  iconColor="text-info"
-                  iconBg="bg-info/10"
-                  valueSize="large"
-                  className="bg-card/90 backdrop-blur-sm shadow-sm hover:shadow-md transition-all"
-                  animationDelay="0.1s"
-                />
-                <KpiCard
-                  title="Pacientes Activos"
-                  value={summary.activePatients}
-                  subtitle="Casos abiertos en todas las instituciones"
-                  icon={Users}
-                  iconColor="text-success"
-                  iconBg="bg-success/10"
-                  valueSize="large"
-                  className="bg-card/90 backdrop-blur-sm shadow-sm hover:shadow-md transition-all"
-                  animationDelay="0.2s"
-                />
-                <KpiCard
-                  title="Maquinas Retirables"
-                  value={idleMachines.length}
-                  subtitle="Sin uso por más de 72 horas o nunca usadas"
-                  icon={Clock3}
-                  iconColor="text-warning"
-                  iconBg="bg-warning/10"
-                  valueSize="large"
-                  ring={idleMachines.length > 0 ? "ring-1 ring-warning/30" : undefined}
-                  className="bg-card/90 backdrop-blur-sm shadow-sm hover:shadow-md transition-all"
-                  animationDelay="0.3s"
-                />
-              </div>
+              {/* KPI Strip */}
+              <KpiStrip
+                totalMachines={summary.totalMachines}
+                connectedMachines={summary.connectedMachines}
+                availableMachines={summary.availableMachines}
+                activePatients={summary.activePatients}
+                institutionCount={summary.institutions}
+                utilization={utilization}
+                idleMachinesCount={idleMachines.length}
+              />
 
               {/* Main Content Grid */}
               <div className="grid grid-cols-1 xl:grid-cols-[2fr,1fr] gap-6">
-                {/* Institution Scoreboard */}
-                <Card className="bg-card/90 backdrop-blur-sm">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Building2 className="h-5 w-5 text-primary" />
-                      Marcador por Institución
-                    </CardTitle>
-                    <CardDescription>Estado consolidado de pacientes, equipos conectados y disponibilidad.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {institutionStats.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No hay instituciones visibles para este usuario.</p>
-                    ) : (
-                      institutionStats.map((institution, index) => {
-                        const institutionUtilization =
-                          institution.total_machines > 0
-                            ? Math.round((institution.connected_machines / institution.total_machines) * 100)
-                            : 0
+                {/* Left: Institutions */}
+                <InstitutionList
+                  filteredInstitutions={filteredInstitutions}
+                  retirablesByInstitution={retirablesByInstitution}
+                  searchTerm={searchTerm}
+                  onSearchChange={setSearchTerm}
+                  activeFilter={activeFilter}
+                  onFilterChange={setActiveFilter}
+                  tabCounts={tabCounts}
+                />
 
-                        return (
-                          <div
-                            key={institution.institution_id}
-                            className="rounded-xl border bg-card p-5 space-y-4 hover:shadow-sm transition-all animate-fade-in-up"
-                            style={{ animationDelay: `${index * 0.05}s` }}
-                          >
-                            <div className="flex items-start justify-between gap-4">
-                              <div>
-                                <h3 className="font-semibold text-foreground">{institution.institution_name}</h3>
-                                <p className="text-xs font-mono text-muted-foreground">{institution.institution_code}</p>
-                              </div>
-                              <StatusBadge
-                                status={institution.connected_machines > 0 ? "active" : "inactive"}
-                                label={institution.connected_machines > 0 ? "Con actividad" : "Sin actividad"}
-                              />
-                            </div>
-
-                            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
-                              <div>
-                                <p className="label-text">Pacientes</p>
-                                <p className="font-semibold text-foreground">{institution.active_patients}</p>
-                              </div>
-                              <div>
-                                <p className="label-text">Procedimientos</p>
-                                <p className="font-semibold text-foreground">{institution.active_procedures}</p>
-                              </div>
-                              <div>
-                                <p className="label-text">Conectadas</p>
-                                <p className="font-semibold text-foreground">{institution.connected_machines}</p>
-                              </div>
-                              <div>
-                                <p className="label-text">Disponibles</p>
-                                <p className="font-semibold text-foreground">{institution.available_machines}</p>
-                              </div>
-                              <div>
-                                <p className="label-text">Mantenimiento</p>
-                                <p className="font-semibold text-foreground">{institution.maintenance_machines}</p>
-                              </div>
-                            </div>
-
-                            <UtilizationBar
-                              value={institutionUtilization}
-                              size="sm"
-                              animated
-                              label="Uso del parque de equipos"
-                            />
-                          </div>
-                        )
-                      })
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Right Column */}
-                <div className="space-y-6">
-                  {/* Posibles Retiros */}
-                  <Card className={`bg-card/90 backdrop-blur-sm ${idleMachines.length > 3 ? "border-warning/30" : ""}`}>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Clock3 className="h-5 w-5 text-warning" />
-                        Posibles Retiros
-                      </CardTitle>
-                      <CardDescription>Equipos sin actividad reciente para reasignación.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      {idleMachines.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">No hay maquinas candidatas para retiro.</p>
-                      ) : (
-                        idleMachines.slice(0, 10).map((machine, index) => (
-                          <div
-                            key={machine.machine_id}
-                            className={`rounded-lg border p-3 animate-fade-in-up ${
-                              machine.never_used
-                                ? "border-l-4 border-l-warning bg-warning-muted/30"
-                                : (machine.idle_hours ?? 0) > 120
-                                  ? "border-l-4 border-l-destructive bg-destructive/5"
-                                  : "border-l-4 border-l-neutral bg-card"
-                            }`}
-                            style={{ animationDelay: `${index * 0.05}s` }}
-                          >
-                            <p className="font-medium text-sm text-foreground">{machine.machine_model}</p>
-                            <p className="text-xs text-muted-foreground">Lote {machine.machine_lote}</p>
-                            <p className="text-xs text-muted-foreground mt-1">{machine.institution_name}</p>
-                            <div className="mt-2">
-                              {machine.never_used ? (
-                                <StatusBadge status="never_used" />
-                              ) : (
-                                <Badge variant="info" className="text-xs">
-                                  {machine.idle_hours} horas inactiva
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  {/* Resumen Operativo */}
-                  <Card className="bg-card/90 backdrop-blur-sm">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Activity className="h-5 w-5 text-primary" />
-                        Resumen Operativo
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-0 text-sm">
-                      <div className="flex items-center justify-between py-3 border-b">
-                        <span className="text-muted-foreground">Equipos en sede</span>
-                        <span className="font-semibold text-foreground">{summary.totalMachines}</span>
-                      </div>
-                      <div className="flex items-center justify-between py-3 border-b">
-                        <span className="text-muted-foreground">Disponibles</span>
-                        <span className="font-semibold text-foreground">{summary.availableMachines}</span>
-                      </div>
-                      <div className="flex items-center justify-between py-3 border-b">
-                        <span className="text-muted-foreground">Procedimientos activos</span>
-                        <span className="font-semibold text-foreground">{summary.activeProcedures}</span>
-                      </div>
-                      <div className="flex items-center justify-between py-3">
-                        <span className="text-muted-foreground">Modo tablero</span>
-                        <span className="font-semibold text-foreground flex items-center gap-2">
-                          <MonitorSmartphone className="h-4 w-4" />
-                          Tiempo real
-                          <span className="relative flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
-                          </span>
-                        </span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
+                {/* Right: Retirables */}
+                <RetirablesPanel idleMachines={idleMachines} />
               </div>
             </>
           )}
