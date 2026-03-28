@@ -667,12 +667,14 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
       setClosing(true)
 
       // Actualizar el procedimiento
+      const now = new Date().toISOString()
       const { error: procedureError } = await supabase
         .from("procedures")
-        .update({ 
+        .update({
           status: "completed",
           end_time: new Date().toLocaleTimeString("es-ES", { hour12: false }),
-          updated_at: new Date().toISOString()
+          completed_at: now,
+          updated_at: now
         })
         .eq("id", procedure.id)
 

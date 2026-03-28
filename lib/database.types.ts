@@ -25,6 +25,7 @@ export type Database = {
           created_at: string
           id: string
           is_active: boolean
+          is_warehouse: boolean
           name: string
           updated_at: string
         }
@@ -38,6 +39,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          is_warehouse?: boolean
           name: string
           updated_at?: string
         }
@@ -51,6 +53,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          is_warehouse?: boolean
           name?: string
           updated_at?: string
         }
@@ -454,6 +457,7 @@ export type Database = {
       procedures: {
         Row: {
           assistant_name: string | null
+          completed_at: string | null
           created_at: string | null
           created_by: string | null
           diagnosis: string
@@ -471,6 +475,7 @@ export type Database = {
         }
         Insert: {
           assistant_name?: string | null
+          completed_at?: string | null
           created_at?: string | null
           created_by?: string | null
           diagnosis: string
@@ -488,6 +493,7 @@ export type Database = {
         }
         Update: {
           assistant_name?: string | null
+          completed_at?: string | null
           created_at?: string | null
           created_by?: string | null
           diagnosis?: string
