@@ -14,10 +14,20 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Search, Settings, Plus, Trash2, Loader2, Filter, ArrowRightLeft, History } from "lucide-react"
+import { Search, Settings, Plus, Trash2, Loader2, Filter, ArrowRightLeft, History, X } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { Tables } from "@/lib/database.types"
 import { formatTimestampForColombia, getMachineDisplayName } from "@/lib/utils"
@@ -63,6 +73,7 @@ export default function Maquinas() {
   const [transferMachine, setTransferMachine] = useState<Machine | null>(null)
   const [transferHistory, setTransferHistory] = useState<TransferHistoryEntry[]>([])
   const [showTransferHistory, setShowTransferHistory] = useState(false)
+  const [machineToRetire, setMachineToRetire] = useState<string | null>(null)
   const { toast } = useToast()
   const permissions = usePermissions()
   const { selectedInstitutionId, selectedInstitutionName, availableInstitutions } = useInstitution()
@@ -258,8 +269,8 @@ export default function Maquinas() {
   }
 
   // Retirar máquina (soft delete — solo desde Bodega)
-  const handleRetireMachine = async (machineId: string) => {
-    if (!confirm("¿Estás seguro de que quieres retirar esta máquina?\n\nSe marcará como inactiva pero el historial de procedimientos y transferencias se preservará.")) return
+  const handleRetireMachine = async () => {
+    if (!machineToRetire) return
 
     try {
       const { error } = await supabase
@@ -268,7 +279,7 @@ export default function Maquinas() {
           status: "inactive",
           updated_at: new Date().toISOString(),
         })
-        .eq("id", machineId)
+        .eq("id", machineToRetire)
 
       if (error) throw error
 
@@ -285,6 +296,8 @@ export default function Maquinas() {
         description: "No se pudo retirar la máquina",
         variant: "destructive",
       })
+    } finally {
+      setMachineToRetire(null)
     }
   }
 
@@ -398,8 +411,17 @@ export default function Maquinas() {
                     placeholder="Buscar máquinas..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 pr-9"
                   />
+                  {searchTerm && (
+                    <button
+                      onClick={() => setSearchTerm("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      aria-label="Limpiar búsqueda"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
                 <div className="relative">
                   <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4 z-10" />
@@ -520,12 +542,9 @@ export default function Maquinas() {
                           <Badge variant="outline">{machine.reference_code}</Badge>
                           {getUsageBadge(machine.id, machine.status)}
                         </div>
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm text-muted-foreground">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground">
                           <div>
                             <span className="font-medium">Lote:</span> {machine.lote}
-                          </div>
-                          <div>
-                            <span className="font-medium">Remisión:</span> {machine.remision || "Sin remisión"}
                           </div>
                           <div>
                             <span className="font-medium">Último Mantenimiento:</span> {machine.last_maintenance || "No registrado"}
@@ -566,7 +585,7 @@ export default function Maquinas() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleRetireMachine(machine.id)}
+                              onClick={() => setMachineToRetire(machine.id)}
                               className="text-destructive hover:text-destructive/80"
                             >
                               <Trash2 className="h-3 w-3" />
@@ -637,15 +656,6 @@ export default function Maquinas() {
                       <SelectItem value="maintenance">En Mantenimiento</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-                <div>
-                  <Label htmlFor="edit_remision">Remisión</Label>
-                  <Input
-                    id="edit_remision"
-                    value={editMachine.remision || ""}
-                    onChange={(e) => setEditMachine({ ...editMachine, remision: e.target.value.toUpperCase() })}
-                    placeholder="Ej: REM-2026-001"
-                  />
                 </div>
                 <div>
                   <Label htmlFor="edit_observations">Observaciones</Label>
@@ -773,6 +783,23 @@ export default function Maquinas() {
           )}
         </div>
       </div>
+      {/* AlertDialog para confirmar retiro de máquina */}
+      <AlertDialog open={!!machineToRetire} onOpenChange={(open) => !open && setMachineToRetire(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro de que quieres retirar esta máquina?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se marcará como inactiva pero el historial de procedimientos y transferencias se preservará.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRetireMachine}>
+              Aceptar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </ProtectedRoute>
   )
 }
