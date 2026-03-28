@@ -747,7 +747,7 @@ export default function Maquinas() {
                             <div className="flex-1">
                               <p className="font-medium text-sm">
                                 {transfer.machine
-                                  ? getMachineDisplayName(transfer.machine.model, transfer.machine.lote)
+                                  ? `${getMachineDisplayName(transfer.machine.model, transfer.machine.lote)} — Lote: ${transfer.machine.lote}`
                                   : "Máquina eliminada"}
                               </p>
                               <p className="text-sm text-muted-foreground">
@@ -767,7 +767,7 @@ export default function Maquinas() {
                               )}
                             </div>
                             <div className="text-right text-sm text-muted-foreground">
-                              <p>{transfer.transfer_date}</p>
+                              <p>{transfer.transfer_date?.split("T")[0]}</p>
                               {transfer.transferred_by_user && (
                                 <p className="text-xs">{transfer.transferred_by_user.name}</p>
                               )}

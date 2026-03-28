@@ -649,7 +649,7 @@ export default function AdminPage() {
                             id="institution-contact-phone"
                             value={newInstitution.contact_phone}
                             onChange={(e) => handleInstitutionChange("contact_phone", e.target.value)}
-                            placeholder="+57 300 000 0000"
+                            placeholder="+57 300 1234567"
                           />
                         </div>
                       </div>
