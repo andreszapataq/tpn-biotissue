@@ -28,6 +28,7 @@ type Institution = {
   contact_email: string | null
   contact_phone: string | null
   is_active: boolean
+  is_warehouse: boolean
 }
 
 type AppUser = {
@@ -68,6 +69,7 @@ type InstitutionDraft = {
   contact_name: string
   contact_email: string
   contact_phone: string
+  is_warehouse: boolean
 }
 
 const DEFAULT_NEW_INSTITUTION = {
@@ -77,6 +79,7 @@ const DEFAULT_NEW_INSTITUTION = {
   contact_name: "",
   contact_email: "",
   contact_phone: "",
+  is_warehouse: false,
 }
 
 export default function AdminPage() {
@@ -277,6 +280,7 @@ export default function AdminPage() {
               contact_name: institution.contact_name || "",
               contact_email: institution.contact_email || "",
               contact_phone: institution.contact_phone || "",
+              is_warehouse: institution.is_warehouse,
             },
           ]),
         ),
@@ -349,6 +353,7 @@ export default function AdminPage() {
         contact_name: newInstitution.contact_name.trim() || null,
         contact_email: newInstitution.contact_email.trim() || null,
         contact_phone: newInstitution.contact_phone.trim() || null,
+        is_warehouse: newInstitution.is_warehouse,
       }
 
       const { error } = await supabase.from("institutions").insert(payload)
@@ -423,6 +428,7 @@ export default function AdminPage() {
           contact_name: draft.contact_name.trim() || null,
           contact_email: draft.contact_email.trim() || null,
           contact_phone: draft.contact_phone.trim() || null,
+          is_warehouse: draft.is_warehouse,
         })
         .eq("id", institution.id)
 
@@ -653,6 +659,21 @@ export default function AdminPage() {
                           />
                         </div>
                       </div>
+                      <div className="flex items-center gap-3 rounded-md border p-3">
+                        <Switch
+                          id="institution-is-warehouse"
+                          checked={newInstitution.is_warehouse}
+                          onCheckedChange={(checked) =>
+                            setNewInstitution((prev) => ({ ...prev, is_warehouse: checked }))
+                          }
+                        />
+                        <Label htmlFor="institution-is-warehouse" className="text-sm cursor-pointer">
+                          Es bodega operativa
+                          <span className="block text-xs text-muted-foreground font-normal">
+                            No maneja pacientes ni procedimientos
+                          </span>
+                        </Label>
+                      </div>
                       <Button onClick={createInstitution} disabled={savingInstitution} className="w-full">
                         {savingInstitution ? "Creando..." : "Crear Institución"}
                       </Button>
@@ -673,6 +694,9 @@ export default function AdminPage() {
                                 <p className="font-semibold text-foreground">{institution.name}</p>
                                 {institution.code === "institucion-principal" && (
                                   <Badge variant="outline">Principal</Badge>
+                                )}
+                                {institution.is_warehouse && (
+                                  <Badge variant="outline">Bodega</Badge>
                                 )}
                                 <Badge variant={institution.is_active ? "default" : "secondary"}>
                                   {institution.is_active ? "Activa" : "Inactiva"}

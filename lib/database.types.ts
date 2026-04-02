@@ -717,6 +717,7 @@ export type Database = {
           institution_code: string
           institution_id: string
           institution_name: string
+          is_warehouse: boolean
           last_activity_at: string
           maintenance_machines: number
           total_machines: number

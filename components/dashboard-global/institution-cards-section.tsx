@@ -10,6 +10,7 @@ type InstitutionStatus = {
   institution_id: string
   institution_name: string
   institution_code: string
+  is_warehouse: boolean
   active_patients: number
   active_procedures: number
   total_machines: number

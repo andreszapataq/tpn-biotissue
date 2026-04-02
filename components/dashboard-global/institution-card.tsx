@@ -10,6 +10,7 @@ type InstitutionStatus = {
   institution_id: string
   institution_name: string
   institution_code: string
+  is_warehouse: boolean
   active_patients: number
   active_procedures: number
   total_machines: number
@@ -50,7 +51,9 @@ export function InstitutionCard({ institution, retirables, index }: InstitutionC
       className={cn(
         "overflow-hidden animate-fade-in-up bg-card/90 backdrop-blur-sm shadow-sm",
         "hover:shadow-md transition-all",
-        isActive && "border-l-4 border-l-success"
+        institution.is_warehouse
+          ? "border-l-4 border-l-info/50"
+          : isActive && "border-l-4 border-l-success"
       )}
       style={{ animationDelay: `${index * 0.04}s` }}
     >
@@ -63,35 +66,59 @@ export function InstitutionCard({ institution, retirables, index }: InstitutionC
             </h3>
             <p className="text-xs font-mono text-muted-foreground">{institution.institution_code}</p>
           </div>
-          <StatusBadge
-            status={isActive ? "active" : "inactive"}
-            label={isActive ? "Activa" : "Inactiva"}
-          />
+          {institution.is_warehouse ? (
+            <StatusBadge status="maintenance" label="Bodega" />
+          ) : (
+            <StatusBadge
+              status={isActive ? "active" : "inactive"}
+              label={isActive ? "Activa" : "Inactiva"}
+            />
+          )}
         </div>
 
         {/* Metrics row */}
-        <div className="grid grid-cols-3 gap-3 text-center">
-          <div className="bg-info/5 rounded-lg p-2">
-            <p className="text-xl font-bold tabular-nums text-info">{institution.connected_machines}</p>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">En uso</p>
+        {institution.is_warehouse ? (
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="bg-success/5 rounded-lg p-2">
+              <p className="text-xl font-bold tabular-nums text-success">{institution.available_machines}</p>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Disponibles</p>
+            </div>
+            <div className="bg-info/5 rounded-lg p-2">
+              <p className="text-xl font-bold tabular-nums text-info">{institution.maintenance_machines}</p>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Mantenimiento</p>
+            </div>
+            <div className="bg-muted/50 rounded-lg p-2">
+              <p className="text-xl font-bold tabular-nums text-muted-foreground">{institution.inactive_machines}</p>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Inactivas</p>
+            </div>
           </div>
-          <div className="bg-success/5 rounded-lg p-2">
-            <p className="text-xl font-bold tabular-nums text-success">{institution.available_machines}</p>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Disponibles</p>
+        ) : (
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="bg-info/5 rounded-lg p-2">
+              <p className="text-xl font-bold tabular-nums text-info">{institution.connected_machines}</p>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">En uso</p>
+            </div>
+            <div className="bg-success/5 rounded-lg p-2">
+              <p className="text-xl font-bold tabular-nums text-success">{institution.available_machines}</p>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Disponibles</p>
+            </div>
+            <div className="bg-warning/5 rounded-lg p-2">
+              <p className="text-xl font-bold tabular-nums text-warning">{institution.active_patients}</p>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Pacientes</p>
+            </div>
           </div>
-          <div className="bg-warning/5 rounded-lg p-2">
-            <p className="text-xl font-bold tabular-nums text-warning">{institution.active_patients}</p>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Pacientes</p>
-          </div>
-        </div>
+        )}
 
-        {/* Utilization */}
+        {/* Utilization / Total */}
         <div className="mt-3">
           <UtilizationBar
-            value={utilization}
+            value={institution.is_warehouse ? 0 : utilization}
             size="sm"
-            animated
-            label={`${institution.connected_machines}/${institution.total_machines} equipos`}
+            animated={!institution.is_warehouse}
+            label={institution.is_warehouse
+              ? `${institution.total_machines} equipos en bodega`
+              : `${institution.connected_machines}/${institution.total_machines} equipos`
+            }
           />
         </div>
 
