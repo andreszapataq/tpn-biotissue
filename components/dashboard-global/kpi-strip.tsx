@@ -1,6 +1,6 @@
 "use client"
 
-import { Activity, MonitorSmartphone, Package, Users } from "lucide-react"
+import { Activity, Building2, Clock, MonitorSmartphone, Package, Users } from "lucide-react"
 import { KpiCard } from "@/components/ui/kpi-card"
 
 interface KpiStripProps {
@@ -22,8 +22,10 @@ export function KpiStrip({
   utilization,
   idleMachinesCount,
 }: KpiStripProps) {
+  const cardClass = "bg-card/90 backdrop-blur-sm shadow-sm hover:shadow-md transition-all"
+
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
       <KpiCard
         title="FLOTA TOTAL"
         value={totalMachines}
@@ -32,19 +34,19 @@ export function KpiStrip({
         iconColor="text-primary"
         iconBg="bg-primary/10"
         valueSize="large"
-        className="bg-card/90 backdrop-blur-sm shadow-sm hover:shadow-md transition-all"
+        className={cardClass}
         animationDelay="0s"
       />
       <KpiCard
         title="EN USO"
         value={connectedMachines}
-        subtitle={`de ${totalMachines} equipos (${utilization}%)`}
+        subtitle={`${utilization}% utilizacion`}
         icon={Activity}
         iconColor="text-info"
         iconBg="bg-info/10"
         valueSize="large"
-        className="bg-card/90 backdrop-blur-sm shadow-sm hover:shadow-md transition-all"
-        animationDelay="0.1s"
+        className={cardClass}
+        animationDelay="0.05s"
       />
       <KpiCard
         title="DISPONIBLES"
@@ -54,8 +56,8 @@ export function KpiStrip({
         iconColor="text-success"
         iconBg="bg-success/10"
         valueSize="large"
-        className="bg-card/90 backdrop-blur-sm shadow-sm hover:shadow-md transition-all"
-        animationDelay="0.2s"
+        className={cardClass}
+        animationDelay="0.1s"
       />
       <KpiCard
         title="PACIENTES"
@@ -65,8 +67,30 @@ export function KpiStrip({
         iconColor="text-warning"
         iconBg="bg-warning/10"
         valueSize="large"
-        className="bg-card/90 backdrop-blur-sm shadow-sm hover:shadow-md transition-all"
-        animationDelay="0.3s"
+        className={cardClass}
+        animationDelay="0.15s"
+      />
+      <KpiCard
+        title="INSTITUCIONES"
+        value={institutionCount}
+        subtitle="sedes conectadas"
+        icon={Building2}
+        iconColor="text-primary"
+        iconBg="bg-primary/10"
+        valueSize="large"
+        className={cardClass}
+        animationDelay="0.2s"
+      />
+      <KpiCard
+        title="RETIRABLES"
+        value={idleMachinesCount}
+        subtitle="sin actividad >72h"
+        icon={Clock}
+        iconColor="text-destructive"
+        iconBg="bg-destructive/10"
+        valueSize="large"
+        className={cardClass}
+        animationDelay="0.25s"
       />
     </div>
   )

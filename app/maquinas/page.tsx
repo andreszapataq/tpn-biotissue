@@ -40,6 +40,7 @@ import { PageHeader } from "@/components/ui/page-header"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { KpiCard } from "@/components/ui/kpi-card"
 import { TransferDialog } from "@/components/machines/transfer-dialog"
+import { MACHINE_MODELS } from "@/lib/constants"
 
 type Machine = Tables<"machines">
 
@@ -81,13 +82,7 @@ export default function Maquinas() {
   const isBodega = currentInstitutionCode === "bodega-biotissue"
 
   // Modelos de máquinas NPWT disponibles con códigos de referencia
-  const machineModels = [
-    { code: "12236", name: "TopiVac Hand T-NPWT Classic" },
-    { code: "12229", name: "TopiVac Hand T-NPWT Irrigation (C)", subtitle: "Cassette" },
-    { code: "12229", name: "TopiVac Hand T-NPWT Irrigation (P)", subtitle: "Peristáltica" },
-    { code: "13066", name: "TopiVac Handy Careoxi NPWT" },
-    { code: "12212", name: "TopiVac Medium Clinic V4" }
-  ]
+  const machineModels = MACHINE_MODELS
 
 
 

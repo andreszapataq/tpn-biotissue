@@ -670,6 +670,42 @@ export type Database = {
           never_used: boolean
         }[]
       }
+      get_fleet_by_model: {
+        Args: never
+        Returns: {
+          model: string
+          total_count: number
+          in_use_count: number
+          available_count: number
+          maintenance_count: number
+        }[]
+      }
+      get_global_machines_list: {
+        Args: {
+          search_term?: string
+          filter_institution_id?: string
+          filter_model?: string
+          filter_status?: string
+          page_limit?: number
+          page_offset?: number
+        }
+        Returns: {
+          machine_id: string
+          lote: string
+          model: string
+          reference_code: string
+          status: string
+          remision: string
+          observations: string
+          last_maintenance: string
+          institution_id: string
+          institution_name: string
+          institution_code: string
+          is_in_use: boolean
+          created_at: string
+          total_count: number
+        }[]
+      }
       get_institutions_live_status: {
         Args: never
         Returns: {

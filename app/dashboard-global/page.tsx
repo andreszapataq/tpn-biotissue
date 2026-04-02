@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Loader2, ShieldAlert } from "lucide-react"
 import { ProtectedRoute } from "@/components/auth/protected-route"
 import { UserMenu } from "@/components/auth/user-menu"
@@ -9,8 +9,9 @@ import { supabase } from "@/lib/supabase"
 import { Card, CardContent } from "@/components/ui/card"
 import { PageHeader } from "@/components/ui/page-header"
 import { KpiStrip } from "@/components/dashboard-global/kpi-strip"
-import { InstitutionList } from "@/components/dashboard-global/institution-list"
-import { RetirablesPanel } from "@/components/dashboard-global/retirables-panel"
+import { ModelCardsSection } from "@/components/dashboard-global/model-cards-section"
+import { InstitutionCardsSection } from "@/components/dashboard-global/institution-cards-section"
+import { GlobalMachineSearch, type GlobalMachine } from "@/components/dashboard-global/global-machine-search"
 
 type InstitutionStatus = {
   institution_id: string
@@ -37,58 +38,109 @@ type IdleMachine = {
   never_used: boolean
 }
 
+type ModelStats = {
+  model: string
+  total_count: number
+  in_use_count: number
+  available_count: number
+  maintenance_count: number
+}
+
 type FilterTab = "todos" | "en_uso" | "disponibles" | "retirables"
 
 export default function DashboardGlobalPage() {
   const permissions = usePermissions()
+
+  // Dashboard data
   const [loading, setLoading] = useState(true)
   const [institutionStats, setInstitutionStats] = useState<InstitutionStatus[]>([])
   const [idleMachines, setIdleMachines] = useState<IdleMachine[]>([])
+  const [modelStats, setModelStats] = useState<ModelStats[]>([])
+
+  // Institution filters
   const [searchTerm, setSearchTerm] = useState("")
   const [activeFilter, setActiveFilter] = useState<FilterTab>("todos")
+
+  // Global machine search state
+  const [globalMachines, setGlobalMachines] = useState<GlobalMachine[]>([])
+  const [globalMachinesTotal, setGlobalMachinesTotal] = useState(0)
+  const [machinesLoading, setMachinesLoading] = useState(false)
+  const [machineSearchTerm, setMachineSearchTerm] = useState("")
+  const [machineFilterInstitution, setMachineFilterInstitution] = useState("")
+  const [machineFilterModel, setMachineFilterModel] = useState("")
+  const [machineFilterStatus, setMachineFilterStatus] = useState("")
+  const [machinePage, setMachinePage] = useState(0)
 
   const loadDashboard = async () => {
     try {
       setLoading(true)
 
-      const [statusResult, idleResult] = await Promise.all([
+      const [statusResult, idleResult, modelResult] = await Promise.all([
         supabase.rpc("get_institutions_live_status"),
         supabase.rpc("get_idle_machines", { hours_threshold: 72 }),
+        supabase.rpc("get_fleet_by_model"),
       ])
 
-      if (statusResult.error) {
-        throw statusResult.error
-      }
-
-      if (idleResult.error) {
-        throw idleResult.error
-      }
+      if (statusResult.error) throw statusResult.error
+      if (idleResult.error) throw idleResult.error
+      if (modelResult.error) throw modelResult.error
 
       setInstitutionStats(statusResult.data || [])
       setIdleMachines(idleResult.data || [])
+      setModelStats(modelResult.data || [])
     } catch (error) {
       console.error("Error loading global dashboard:", error)
       setInstitutionStats([])
       setIdleMachines([])
+      setModelStats([])
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => {
-    if (!permissions.canViewGlobalDashboard) {
-      return
+  const loadGlobalMachines = useCallback(async () => {
+    try {
+      setMachinesLoading(true)
+
+      const { data, error } = await supabase.rpc("get_global_machines_list", {
+        search_term: machineSearchTerm,
+        filter_institution_id: machineFilterInstitution || undefined,
+        filter_model: machineFilterModel || undefined,
+        filter_status: machineFilterStatus || undefined,
+        page_limit: 25,
+        page_offset: machinePage * 25,
+      })
+
+      if (error) throw error
+
+      const machines = (data || []) as GlobalMachine[]
+      setGlobalMachines(machines)
+      setGlobalMachinesTotal(machines[0]?.total_count ?? 0)
+    } catch (error) {
+      console.error("Error loading global machines:", error)
+      setGlobalMachines([])
+      setGlobalMachinesTotal(0)
+    } finally {
+      setMachinesLoading(false)
     }
+  }, [machineSearchTerm, machineFilterInstitution, machineFilterModel, machineFilterStatus, machinePage])
+
+  // Initial load + realtime
+  useEffect(() => {
+    if (!permissions.canViewGlobalDashboard) return
 
     void loadDashboard()
+    void loadGlobalMachines()
 
     const channel = supabase
       .channel("dashboard-global-live")
       .on("postgres_changes", { event: "*", schema: "public", table: "procedures" }, () => {
         void loadDashboard()
+        void loadGlobalMachines()
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "machines" }, () => {
         void loadDashboard()
+        void loadGlobalMachines()
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "patients" }, () => {
         void loadDashboard()
@@ -98,7 +150,14 @@ export default function DashboardGlobalPage() {
     return () => {
       void supabase.removeChannel(channel)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [permissions.canViewGlobalDashboard])
+
+  // Reload machines when filters change
+  useEffect(() => {
+    if (!permissions.canViewGlobalDashboard) return
+    void loadGlobalMachines()
+  }, [loadGlobalMachines, permissions.canViewGlobalDashboard])
 
   // Aggregated summary
   const summary = useMemo(() => {
@@ -140,7 +199,6 @@ export default function DashboardGlobalPage() {
   const filteredInstitutions = useMemo(() => {
     let result = institutionStats
 
-    // Text search
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase()
       result = result.filter((inst) =>
@@ -154,7 +212,6 @@ export default function DashboardGlobalPage() {
       )
     }
 
-    // Tab filter
     switch (activeFilter) {
       case "en_uso":
         result = result.filter((inst) => inst.connected_machines > 0)
@@ -170,7 +227,7 @@ export default function DashboardGlobalPage() {
     return result
   }, [institutionStats, searchTerm, activeFilter, retirablesByInstitution])
 
-  // Tab counts (computed from unfiltered data so counts stay stable)
+  // Tab counts
   const tabCounts = useMemo(
     () => ({
       todos: institutionStats.length,
@@ -188,8 +245,8 @@ export default function DashboardGlobalPage() {
           {/* Header */}
           <div className="flex items-start justify-between gap-4">
             <PageHeader
-              title="Vista Global de Instituciones"
-              subtitle="Seguimiento en tiempo real de equipos conectados, pacientes activos y maquinas retirables."
+              title="Vista Global"
+              subtitle="Seguimiento en tiempo real de equipos, instituciones y pacientes activos."
               backHref="/"
             />
             <div className="flex items-center gap-3">
@@ -220,7 +277,7 @@ export default function DashboardGlobalPage() {
               </CardContent>
             </Card>
           ) : (
-            <>
+            <div className="space-y-8">
               {/* KPI Strip */}
               <KpiStrip
                 totalMachines={summary.totalMachines}
@@ -232,23 +289,38 @@ export default function DashboardGlobalPage() {
                 idleMachinesCount={idleMachines.length}
               />
 
-              {/* Main Content Grid */}
-              <div className="grid grid-cols-1 xl:grid-cols-[2fr,1fr] gap-6">
-                {/* Left: Institutions */}
-                <InstitutionList
-                  filteredInstitutions={filteredInstitutions}
-                  retirablesByInstitution={retirablesByInstitution}
-                  searchTerm={searchTerm}
-                  onSearchChange={setSearchTerm}
-                  activeFilter={activeFilter}
-                  onFilterChange={setActiveFilter}
-                  tabCounts={tabCounts}
-                />
+              {/* Section 1: Machine Model Cards */}
+              <ModelCardsSection modelStats={modelStats} />
 
-                {/* Right: Retirables */}
-                <RetirablesPanel idleMachines={idleMachines} />
-              </div>
-            </>
+              {/* Section 2: Institutions */}
+              <InstitutionCardsSection
+                filteredInstitutions={filteredInstitutions}
+                retirablesByInstitution={retirablesByInstitution}
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
+                activeFilter={activeFilter}
+                onFilterChange={setActiveFilter}
+                tabCounts={tabCounts}
+              />
+
+              {/* Section 3: Global Machine Search */}
+              <GlobalMachineSearch
+                machines={globalMachines}
+                totalCount={globalMachinesTotal}
+                loading={machinesLoading}
+                searchTerm={machineSearchTerm}
+                onSearchChange={setMachineSearchTerm}
+                institutionFilter={machineFilterInstitution}
+                onInstitutionFilterChange={setMachineFilterInstitution}
+                modelFilter={machineFilterModel}
+                onModelFilterChange={setMachineFilterModel}
+                statusFilter={machineFilterStatus}
+                onStatusFilterChange={setMachineFilterStatus}
+                page={machinePage}
+                onPageChange={setMachinePage}
+                institutions={institutionStats}
+              />
+            </div>
           )}
         </div>
       </div>
