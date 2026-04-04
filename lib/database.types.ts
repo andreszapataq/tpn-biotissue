@@ -468,6 +468,7 @@ export type Database = {
           machine_id: string | null
           patient_id: string | null
           procedure_date: string
+          specialist_id: string | null
           start_time: string
           status: string | null
           surgeon_name: string
@@ -486,6 +487,7 @@ export type Database = {
           machine_id?: string | null
           patient_id?: string | null
           procedure_date: string
+          specialist_id?: string | null
           start_time: string
           status?: string | null
           surgeon_name: string
@@ -504,6 +506,7 @@ export type Database = {
           machine_id?: string | null
           patient_id?: string | null
           procedure_date?: string
+          specialist_id?: string | null
           start_time?: string
           status?: string | null
           surgeon_name?: string
@@ -536,6 +539,48 @@ export type Database = {
             columns: ["patient_id"]
             isOneToOne: false
             referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "procedures_specialist_id_fkey"
+            columns: ["specialist_id"]
+            isOneToOne: false
+            referencedRelation: "specialists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      specialists: {
+        Row: {
+          id: string
+          institution_id: string
+          name: string
+          specialty: string
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          institution_id: string
+          name: string
+          specialty: string
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          institution_id?: string
+          name?: string
+          specialty?: string
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "specialists_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
             referencedColumns: ["id"]
           },
         ]

@@ -43,6 +43,7 @@ export default function NuevoProcedimiento() {
   const { user } = useAuth()
   const { selectedInstitutionId } = useInstitution()
   const patientNameRef = useRef<HTMLInputElement>(null)
+  const specialistNameRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
   
   const [formData, setFormData] = useState({
@@ -52,7 +53,9 @@ export default function NuevoProcedimiento() {
     patientName: "",
     patientId: "",
     patientAge: "",
-    surgeon: "",
+    specialistName: "",
+    specialistSpecialty: "",
+    specialistId: undefined as string | undefined,
     assistant: "",
     diagnosis: "",
     location: "",
@@ -303,7 +306,7 @@ export default function NuevoProcedimiento() {
         .select("id, created_at")
         .eq("institution_id", selectedInstitutionId || "")
         .eq("patient_id", patient.id)
-        .eq("surgeon_name", formData.surgeon)
+        .eq("surgeon_name", formData.specialistName)
         .eq("status", "active")
         .gte("created_at", fiveMinutesAgo)
         .order("created_at", { ascending: false })
@@ -318,12 +321,51 @@ export default function NuevoProcedimiento() {
         return
       }
 
-      // 4. Crear procedimiento
+      // 4. Crear o buscar especialista
+      let specialistId = formData.specialistId
+      if (!specialistId && formData.specialistName) {
+        // Buscar especialista existente por nombre e institución
+        const { data: existingSpecialists } = await supabase
+          .from("specialists")
+          .select("id")
+          .eq("institution_id", selectedInstitutionId || "")
+          .eq("name", formData.specialistName)
+
+        const existingSpecialist = existingSpecialists?.[0]
+
+        if (existingSpecialist) {
+          specialistId = existingSpecialist.id
+          // Actualizar especialidad si cambió
+          await supabase
+            .from("specialists")
+            .update({
+              specialty: formData.specialistSpecialty,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", existingSpecialist.id)
+        } else {
+          const { data: newSpecialist, error: specialistError } = await supabase
+            .from("specialists")
+            .insert({
+              name: formData.specialistName,
+              specialty: formData.specialistSpecialty,
+              institution_id: selectedInstitutionId!,
+            })
+            .select("id")
+            .single()
+
+          if (specialistError) throw specialistError
+          specialistId = newSpecialist.id
+        }
+      }
+
+      // 5. Crear procedimiento
       const procedureData: any = {
         institution_id: selectedInstitutionId || undefined,
         patient_id: patient.id,
-        machine_id: formData.machines.length > 0 ? formData.machines[0] : null, // Primera máquina para backward compat
-        surgeon_name: formData.surgeon,
+        machine_id: formData.machines.length > 0 ? formData.machines[0] : null,
+        specialist_id: specialistId || null,
+        surgeon_name: formData.specialistName,
         assistant_name: formData.assistant || null,
         procedure_date: formData.date,
         start_time: formData.startTime,
@@ -652,29 +694,50 @@ export default function NuevoProcedimiento() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="surgeon">Cirujano Líder</Label>
+                <div className="md:col-span-2">
+                  <Label>Especialista</Label>
                   <SpecialistCombobox
-                    id="surgeon"
                     institutionId={selectedInstitutionId}
-                    value={formData.surgeon}
-                    onChange={(val) => setFormData((prev) => ({ ...prev, surgeon: val }))}
-                    field="surgeon_name"
-                    placeholder="Buscar cirujano..."
+                    specialistName={formData.specialistName}
+                    specialistSpecialty={formData.specialistSpecialty}
+                    onSpecialistChange={(data) => setFormData((prev) => ({
+                      ...prev,
+                      specialistName: data.specialistName,
+                      specialistSpecialty: data.specialistSpecialty,
+                      specialistId: data.specialistId,
+                    }))}
                     disabled={saving}
+                    nameInputRef={specialistNameRef}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="specialistName">Nombre Completo</Label>
+                  <Input
+                    ref={specialistNameRef}
+                    id="specialistName"
+                    value={formData.specialistName}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, specialistName: e.target.value, specialistId: undefined }))}
+                    placeholder="Nombre completo del especialista"
                     required
                   />
                 </div>
                 <div>
+                  <Label htmlFor="specialistSpecialty">Especialidad</Label>
+                  <Input
+                    id="specialistSpecialty"
+                    value={formData.specialistSpecialty}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, specialistSpecialty: e.target.value }))}
+                    placeholder="Ej: Cirugía General, Ortopedia..."
+                    required
+                  />
+                </div>
+                <div className="md:col-span-2">
                   <Label htmlFor="assistant">Asistente</Label>
-                  <SpecialistCombobox
+                  <Input
                     id="assistant"
-                    institutionId={selectedInstitutionId}
                     value={formData.assistant}
-                    onChange={(val) => setFormData((prev) => ({ ...prev, assistant: val }))}
-                    field="assistant_name"
-                    placeholder="Buscar asistente..."
-                    disabled={saving}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, assistant: e.target.value }))}
+                    placeholder="Nombre del asistente"
                   />
                 </div>
               </div>

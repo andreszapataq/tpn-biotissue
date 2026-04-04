@@ -1,9 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ChevronsUpDown, Check, UserPlus } from "lucide-react"
+import { ChevronsUpDown, Check, UserPlus, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { supabase } from "@/lib/supabase"
+import { useDebounce } from "@/hooks/use-debounce"
 import { Button } from "@/components/ui/button"
 import {
   Popover,
@@ -17,92 +18,122 @@ import {
   CommandEmpty,
   CommandGroup,
   CommandItem,
+  CommandSeparator,
 } from "@/components/ui/command"
+
+interface SpecialistData {
+  specialistName: string
+  specialistSpecialty: string
+  specialistId?: string
+}
+
+interface SpecialistRow {
+  id: string
+  name: string
+  specialty: string
+}
 
 interface SpecialistComboboxProps {
   institutionId: string | null
-  value: string
-  onChange: (value: string) => void
-  field: "surgeon_name" | "assistant_name"
-  placeholder?: string
+  specialistName: string
+  specialistSpecialty: string
+  onSpecialistChange: (data: SpecialistData) => void
   disabled?: boolean
-  required?: boolean
-  id?: string
+  nameInputRef?: React.RefObject<HTMLInputElement | null>
 }
 
 export function SpecialistCombobox({
   institutionId,
-  value,
-  onChange,
-  field,
-  placeholder = "Buscar especialista...",
+  specialistName,
+  specialistSpecialty,
+  onSpecialistChange,
   disabled = false,
-  required = false,
-  id,
+  nameInputRef,
 }: SpecialistComboboxProps) {
   const [open, setOpen] = useState(false)
-  const [names, setNames] = useState<string[]>([])
   const [searchValue, setSearchValue] = useState("")
-  const [loaded, setLoaded] = useState(false)
+  const [specialists, setSpecialists] = useState<SpecialistRow[]>([])
+  const [loading, setLoading] = useState(false)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
-  // Load distinct names when popover opens
+  const debouncedSearch = useDebounce(searchValue, 300)
+
   useEffect(() => {
-    if (!open || !institutionId || loaded) return
+    if (!open || !institutionId) return
 
-    const fetchNames = async () => {
-      const { data } = await supabase
-        .from("procedures")
-        .select(field)
+    const fetchSpecialists = async () => {
+      setLoading(true)
+      const term = debouncedSearch.trim()
+
+      let query = supabase
+        .from("specialists")
+        .select("id, name, specialty")
         .eq("institution_id", institutionId)
-        .not(field, "is", null)
-        .order(field, { ascending: true })
 
-      if (data) {
-        const unique = [...new Set(
-          data.map((row) => row[field] as string).filter(Boolean)
-        )]
-        setNames(unique)
+      if (term) {
+        query = query.or(
+          `name.ilike.%${term}%,specialty.ilike.%${term}%`
+        )
+        query = query.order("name", { ascending: true })
+      } else {
+        query = query.order("updated_at", { ascending: false })
       }
-      setLoaded(true)
+
+      query = query.limit(10)
+
+      const { data } = await query
+      setSpecialists((data as SpecialistRow[]) || [])
+      setLoading(false)
     }
 
-    fetchNames()
-  }, [open, institutionId, field, loaded])
+    fetchSpecialists()
+  }, [open, institutionId, debouncedSearch])
 
-  // Reset cache when institution changes
-  useEffect(() => {
-    setLoaded(false)
-    setNames([])
-  }, [institutionId])
+  const handleSelect = (specialist: SpecialistRow) => {
+    setSelectedId(specialist.id)
+    onSpecialistChange({
+      specialistName: specialist.name,
+      specialistSpecialty: specialist.specialty,
+      specialistId: specialist.id,
+    })
+    setOpen(false)
+  }
 
-  const searchTrimmed = searchValue.trim()
-  const exactMatch = names.some(
-    (n) => n.toLowerCase() === searchTrimmed.toLowerCase()
-  )
+  const handleNewSpecialist = () => {
+    setSelectedId(null)
+    onSpecialistChange({
+      specialistName: "",
+      specialistSpecialty: "",
+      specialistId: undefined,
+    })
+    setOpen(false)
+    setTimeout(() => nameInputRef?.current?.focus(), 100)
+  }
+
+  const displayValue = specialistName
+    ? specialistSpecialty
+      ? `${specialistName} — ${specialistSpecialty}`
+      : specialistName
+    : null
 
   return (
     <Popover open={open} onOpenChange={(isOpen) => {
       setOpen(isOpen)
-      if (!isOpen && searchTrimmed && !value) {
-        // If user typed something and closed without selecting, use what they typed
-        onChange(searchTrimmed)
-      }
       if (isOpen) setSearchValue("")
     }}>
       <PopoverTrigger asChild>
         <Button
-          id={id}
           variant="outline"
           role="combobox"
           aria-expanded={open}
           disabled={disabled}
           className={cn(
             "w-full justify-between font-normal h-10",
-            !value && "text-muted-foreground"
+            !displayValue && "text-muted-foreground"
           )}
         >
           <span className="truncate">
-            {value || placeholder}
+            {displayValue || "Buscar especialista por nombre o especialidad..."}
           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -112,62 +143,64 @@ export function SpecialistCombobox({
         align="start"
         onWheel={(e) => e.stopPropagation()}
       >
-        <Command>
+        <Command shouldFilter={false}>
           <CommandInput
-            placeholder={placeholder}
+            placeholder="Buscar por nombre o especialidad..."
             value={searchValue}
             onValueChange={setSearchValue}
           />
           <CommandList className="max-h-60 overflow-y-auto overscroll-contain">
-            <CommandEmpty>
-              {searchTrimmed ? (
-                <button
-                  className="flex w-full items-center gap-2 px-2 py-1.5 text-sm cursor-pointer hover:bg-accent rounded-sm"
-                  onClick={() => {
-                    onChange(searchTrimmed)
-                    setOpen(false)
-                  }}
-                >
-                  <UserPlus className="h-4 w-4 text-muted-foreground" />
-                  Usar: &ldquo;{searchTrimmed}&rdquo;
-                </button>
-              ) : (
-                "No se encontraron especialistas."
-              )}
-            </CommandEmpty>
-            <CommandGroup>
-              {/* Show "use typed text" option when there's no exact match */}
-              {searchTrimmed && !exactMatch && names.length > 0 && (
-                <CommandItem
-                  value={`__new__${searchTrimmed}`}
-                  onSelect={() => {
-                    onChange(searchTrimmed)
-                    setOpen(false)
-                  }}
-                >
-                  <UserPlus className="h-4 w-4 text-muted-foreground" />
-                  <span>Usar: &ldquo;{searchTrimmed}&rdquo;</span>
-                </CommandItem>
-              )}
-              {names.map((name) => (
-                <CommandItem
-                  key={name}
-                  value={name}
-                  onSelect={() => {
-                    onChange(name)
-                    setOpen(false)
-                  }}
-                >
-                  <Check
-                    className={cn(
-                      "h-4 w-4",
-                      value === name ? "opacity-100" : "opacity-0"
-                    )}
-                  />
-                  <span>{name}</span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
+            {loading ? (
+              <div className="flex items-center justify-center py-6">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                <span className="ml-2 text-sm text-muted-foreground">Buscando...</span>
+              </div>
+            ) : (
+              <>
+                {specialists.length === 0 && (
+                  <CommandEmpty>
+                    {debouncedSearch.trim()
+                      ? "No se encontraron especialistas."
+                      : "No hay especialistas registrados."}
+                  </CommandEmpty>
+                )}
+                {specialists.length > 0 && (
+                  <CommandGroup heading={debouncedSearch.trim() ? "Resultados" : "Especialistas recientes"}>
+                    {specialists.map((specialist) => (
+                      <CommandItem
+                        key={specialist.id}
+                        value={specialist.id}
+                        onSelect={() => handleSelect(specialist)}
+                        className="py-2.5"
+                      >
+                        <Check
+                          className={cn(
+                            "h-4 w-4 shrink-0",
+                            selectedId === specialist.id ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-medium truncate">{specialist.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {specialist.specialty}
+                          </span>
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                )}
+                <CommandSeparator />
+                <CommandGroup>
+                  <CommandItem
+                    onSelect={handleNewSpecialist}
+                    className="py-2.5"
+                  >
+                    <UserPlus className="h-4 w-4 text-muted-foreground" />
+                    <span>Nuevo especialista</span>
+                  </CommandItem>
+                </CommandGroup>
+              </>
+            )}
           </CommandList>
         </Command>
       </PopoverContent>

@@ -101,6 +101,7 @@ export interface Procedure {
   institution_id: string
   patient_id: string
   machine_id: string
+  specialist_id?: string
   surgeon_name: string
   assistant_name?: string
   procedure_date: string
@@ -110,6 +111,15 @@ export interface Procedure {
   location?: string
   status: "active" | "completed" | "cancelled"
   created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface Specialist {
+  id: string
+  institution_id: string
+  name: string
+  specialty: string
   created_at: string
   updated_at: string
 }
