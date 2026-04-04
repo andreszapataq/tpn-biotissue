@@ -22,7 +22,7 @@ const statusConfig: Record<DomainStatus, { variant: "success" | "warning" | "inf
   available: { variant: "success", label: "Disponible" },
   active: { variant: "success", label: "Activo" },
   stock_ok: { variant: "success", label: "Stock OK" },
-  completed: { variant: "success", label: "Completado" },
+  completed: { variant: "info", label: "Completado" },
   in_use: { variant: "warning", label: "En uso" },
   stock_medium: { variant: "warning", label: "Stock Medio" },
   maintenance: { variant: "info", label: "Mantenimiento" },
