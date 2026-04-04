@@ -156,8 +156,8 @@ export default function Pacientes() {
       patient.identification.includes(searchTerm),
   )
 
-  const activePatients = filteredPatients.filter((p) => p.status === "active")
-  const completedPatients = filteredPatients.filter((p) => p.status === "completed")
+  const activePatients = filteredPatients.filter((p) => p.procedureSummary.activeProcedures > 0)
+  const completedPatients = filteredPatients.filter((p) => p.procedureSummary.activeProcedures === 0 && p.procedureSummary.totalProcedures > 0)
 
   return (
     <ProtectedRoute requiredRole={["administrador", "soporte", "asistente"]}>
@@ -345,7 +345,7 @@ export default function Pacientes() {
                           </p>
                           <div className="flex items-center gap-2">
                             <span className="font-medium">Estado:</span>
-                            <StatusBadge status={selectedPatient.status === "completed" ? "completed" : "active"} />
+                            <StatusBadge status={selectedPatient.procedureSummary.activeProcedures > 0 ? "active" : "completed"} />
                           </div>
                           <p>
                             <span className="font-medium">Registrado:</span> {formatTimestampForColombia(selectedPatient.created_at)}
