@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -24,6 +24,8 @@ import { useAuth } from "@/components/auth/auth-provider"
 import { InstitutionSwitcher } from "@/components/institutions/institution-switcher"
 import { useInstitution } from "@/components/institutions/institution-provider"
 import { getCurrentDateInColombia, getMachineDisplayName } from "@/lib/utils"
+import { PatientCombobox } from "@/components/patients/patient-combobox"
+import { SpecialistCombobox } from "@/components/procedures/specialist-combobox"
 
 type Machine = Tables<"machines">
 type InventoryProduct = Tables<"inventory_products">
@@ -40,6 +42,7 @@ export default function NuevoProcedimiento() {
   const { toast } = useToast()
   const { user } = useAuth()
   const { selectedInstitutionId } = useInstitution()
+  const patientNameRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
   
   const [formData, setFormData] = useState({
@@ -593,9 +596,22 @@ export default function NuevoProcedimiento() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="md:col-span-3">
+                  <Label>Paciente</Label>
+                  <PatientCombobox
+                    institutionId={selectedInstitutionId}
+                    patientName={formData.patientName}
+                    patientId={formData.patientId}
+                    patientAge={formData.patientAge}
+                    onPatientChange={(data) => setFormData((prev) => ({ ...prev, ...data }))}
+                    disabled={saving}
+                    nameInputRef={patientNameRef}
+                  />
+                </div>
                 <div>
                   <Label htmlFor="patientName">Nombre Completo</Label>
                   <Input
+                    ref={patientNameRef}
                     id="patientName"
                     value={formData.patientName}
                     onChange={(e) => setFormData((prev) => ({ ...prev, patientName: e.target.value }))}
@@ -638,21 +654,27 @@ export default function NuevoProcedimiento() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="surgeon">Cirujano Líder</Label>
-                  <Input
+                  <SpecialistCombobox
                     id="surgeon"
+                    institutionId={selectedInstitutionId}
                     value={formData.surgeon}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, surgeon: e.target.value }))}
-                    placeholder="Nombre del cirujano líder"
+                    onChange={(val) => setFormData((prev) => ({ ...prev, surgeon: val }))}
+                    field="surgeon_name"
+                    placeholder="Buscar cirujano..."
+                    disabled={saving}
                     required
                   />
                 </div>
                 <div>
                   <Label htmlFor="assistant">Asistente</Label>
-                  <Input
+                  <SpecialistCombobox
                     id="assistant"
+                    institutionId={selectedInstitutionId}
                     value={formData.assistant}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, assistant: e.target.value }))}
-                    placeholder="Nombre del asistente"
+                    onChange={(val) => setFormData((prev) => ({ ...prev, assistant: val }))}
+                    field="assistant_name"
+                    placeholder="Buscar asistente..."
+                    disabled={saving}
                   />
                 </div>
               </div>
