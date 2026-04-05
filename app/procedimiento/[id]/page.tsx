@@ -1,7 +1,6 @@
 "use client"
 
-import type React from "react"
-import { useState, useEffect, use } from "react"
+import { useState, useEffect, use, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -40,6 +39,7 @@ import { useToast } from "@/hooks/use-toast"
 import { ProtectedRoute } from "@/components/auth/protected-route"
 import { useAuth } from "@/components/auth/auth-provider"
 import { usePermissions } from "@/hooks/use-permissions"
+import { SpecialistCombobox } from "@/components/procedures/specialist-combobox"
 
 
 type Procedure = Tables<"procedures">
@@ -84,23 +84,21 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
 
   // Estados para edición de procedimiento
   const [isEditGeneralDialogOpen, setIsEditGeneralDialogOpen] = useState(false)
-  const [isEditPatientDialogOpen, setIsEditPatientDialogOpen] = useState(false)
   const [isUpdatingGeneral, setIsUpdatingGeneral] = useState(false)
-  const [isUpdatingPatient, setIsUpdatingPatient] = useState(false)
   
   // Estados para formularios de edición
   const [editGeneralData, setEditGeneralData] = useState({
     location: "",
-    surgeon_name: "",
     assistant_name: "",
     diagnosis: ""
   })
   
-  const [editPatientData, setEditPatientData] = useState({
-    name: "",
-    identification: "",
-    age: 0
-  })
+  // Estados para edición de especialista en el diálogo general
+  const [editSpecialistName, setEditSpecialistName] = useState("")
+  const [editSpecialistSpecialty, setEditSpecialistSpecialty] = useState("")
+  const [editSpecialistId, setEditSpecialistId] = useState<string | undefined>(undefined)
+  const [isNewSpecialist, setIsNewSpecialist] = useState(false)
+  const specialistNameRef = useRef<HTMLInputElement>(null)
   
   const { toast } = useToast()
   const { user } = useAuth()
@@ -331,23 +329,16 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
     if (!procedure) return
     setEditGeneralData({
       location: procedure.location || "",
-      surgeon_name: procedure.surgeon_name || "",
       assistant_name: procedure.assistant_name || "",
       diagnosis: procedure.diagnosis || ""
     })
+    setEditSpecialistName(procedure.surgeon_name || "")
+    setEditSpecialistSpecialty("")
+    setEditSpecialistId(procedure.specialist_id || undefined)
+    setIsNewSpecialist(false)
     setIsEditGeneralDialogOpen(true)
   }
 
-  // Abrir diálogo de edición de datos del paciente
-  const openEditPatientDialog = () => {
-    if (!procedure?.patient) return
-    setEditPatientData({
-      name: procedure.patient.name || "",
-      identification: procedure.patient.identification || "",
-      age: procedure.patient.age || 0
-    })
-    setIsEditPatientDialogOpen(true)
-  }
 
   // Actualizar información general del procedimiento
   const handleUpdateGeneralInfo = async () => {
@@ -356,11 +347,51 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
     try {
       setIsUpdatingGeneral(true)
 
+      // Resolver specialist_id
+      let specialistId = editSpecialistId || null
+      if (!specialistId && editSpecialistName) {
+        // Buscar especialista existente por nombre e institución
+        const { data: existingSpecialists } = await supabase
+          .from("specialists")
+          .select("id")
+          .eq("institution_id", procedure.institution_id)
+          .eq("name", editSpecialistName)
+
+        const existingSpecialist = existingSpecialists?.[0]
+
+        if (existingSpecialist) {
+          specialistId = existingSpecialist.id
+          if (editSpecialistSpecialty) {
+            await supabase
+              .from("specialists")
+              .update({
+                specialty: editSpecialistSpecialty,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", existingSpecialist.id)
+          }
+        } else {
+          const { data: newSpecialist, error: specialistError } = await supabase
+            .from("specialists")
+            .insert({
+              name: editSpecialistName,
+              specialty: editSpecialistSpecialty || "",
+              institution_id: procedure.institution_id,
+            })
+            .select("id")
+            .single()
+
+          if (specialistError) throw specialistError
+          specialistId = newSpecialist.id
+        }
+      }
+
       const { error } = await supabase
         .from("procedures")
         .update({
           location: editGeneralData.location || null,
-          surgeon_name: editGeneralData.surgeon_name,
+          surgeon_name: editSpecialistName,
+          specialist_id: specialistId,
           assistant_name: editGeneralData.assistant_name || null,
           diagnosis: editGeneralData.diagnosis,
           updated_at: new Date().toISOString()
@@ -389,44 +420,6 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
     }
   }
 
-  // Actualizar datos del paciente
-  const handleUpdatePatientInfo = async () => {
-    if (!procedure?.patient) return
-
-    try {
-      setIsUpdatingPatient(true)
-
-      const { error } = await supabase
-        .from("patients")
-        .update({
-          name: editPatientData.name,
-          identification: editPatientData.identification,
-          age: editPatientData.age,
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", procedure.patient.id)
-
-      if (error) throw error
-
-      toast({
-        title: "Éxito",
-        description: "Datos del paciente actualizados correctamente",
-      })
-
-      setIsEditPatientDialogOpen(false)
-      await loadProcedureData()
-
-    } catch (error: any) {
-      console.error("Error updating patient:", error)
-      toast({
-        title: "Error",
-        description: "No se pudieron actualizar los datos del paciente",
-        variant: "destructive",
-      })
-    } finally {
-      setIsUpdatingPatient(false)
-    }
-  }
 
   const handleProductQuantityChange = (productId: string, change: number) => {
     setSelectedProducts((prev) => {
@@ -868,15 +861,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
               {/* Datos del Paciente */}
               <Card>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle>Datos del Paciente</CardTitle>
-                    {procedure?.status === "active" && permissions.canEditMachines && (
-                      <Button variant="outline" size="sm" onClick={openEditPatientDialog}>
-                        <Edit className="h-4 w-4 mr-2" />
-                        Editar
-                      </Button>
-                    )}
-                  </div>
+                  <CardTitle>Datos del Paciente</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1266,27 +1251,57 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="edit-location">Ubicación</Label>
-                  <Input
-                    id="edit-location"
-                    value={editGeneralData.location}
-                    onChange={(e) => setEditGeneralData({...editGeneralData, location: e.target.value})}
-                    placeholder="Ej: Quirófano 1"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="edit-surgeon">Cirujano Líder</Label>
-                  <Input
-                    id="edit-surgeon"
-                    value={editGeneralData.surgeon_name}
-                    onChange={(e) => setEditGeneralData({...editGeneralData, surgeon_name: e.target.value})}
-                    placeholder="Nombre del cirujano"
-                    required
-                  />
-                </div>
+              <div>
+                <Label htmlFor="edit-location">Ubicación</Label>
+                <Input
+                  id="edit-location"
+                  value={editGeneralData.location}
+                  onChange={(e) => setEditGeneralData({...editGeneralData, location: e.target.value})}
+                  placeholder="Ej: Quirófano 1"
+                />
               </div>
+              <div>
+                <Label>Especialista</Label>
+                <SpecialistCombobox
+                  institutionId={procedure?.institution_id || null}
+                  specialistName={editSpecialistName}
+                  specialistSpecialty={editSpecialistSpecialty}
+                  onSpecialistChange={(data) => {
+                    setEditSpecialistName(data.specialistName)
+                    setEditSpecialistSpecialty(data.specialistSpecialty)
+                    setEditSpecialistId(data.specialistId)
+                    setIsNewSpecialist(!data.specialistId)
+                  }}
+                  nameInputRef={specialistNameRef}
+                />
+              </div>
+              {isNewSpecialist && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="edit-specialist-name">Nombre Completo</Label>
+                    <Input
+                      ref={specialistNameRef}
+                      id="edit-specialist-name"
+                      value={editSpecialistName}
+                      onChange={(e) => {
+                        setEditSpecialistName(e.target.value)
+                        setEditSpecialistId(undefined)
+                      }}
+                      placeholder="Nombre completo del especialista"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-specialist-specialty">Especialidad</Label>
+                    <Input
+                      id="edit-specialist-specialty"
+                      value={editSpecialistSpecialty}
+                      onChange={(e) => setEditSpecialistSpecialty(e.target.value)}
+                      placeholder="Ej: Cirugía plástica"
+                    />
+                  </div>
+                </div>
+              )}
               <div>
                 <Label htmlFor="edit-assistant">Asistente</Label>
                 <Input
@@ -1309,8 +1324,8 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
               </div>
             </div>
             <DialogFooter>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => setIsEditGeneralDialogOpen(false)}
                 disabled={isUpdatingGeneral}
               >
@@ -1318,7 +1333,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
               </Button>
               <Button
                 onClick={handleUpdateGeneralInfo}
-                disabled={isUpdatingGeneral || !editGeneralData.surgeon_name || !editGeneralData.diagnosis}
+                disabled={isUpdatingGeneral || !editSpecialistName || !editGeneralData.diagnosis}
               >
                 {isUpdatingGeneral ? (
                   <>
@@ -1336,77 +1351,6 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
           </DialogContent>
         </Dialog>
 
-        {/* Diálogo de Edición - Datos del Paciente */}
-        <Dialog open={isEditPatientDialogOpen} onOpenChange={setIsEditPatientDialogOpen}>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>Editar Datos del Paciente</DialogTitle>
-              <DialogDescription>
-                Modifica los datos del paciente. Solo administradores pueden realizar esta acción.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div>
-                <Label htmlFor="edit-patient-name">Nombre Completo</Label>
-                <Input
-                  id="edit-patient-name"
-                  value={editPatientData.name}
-                  onChange={(e) => setEditPatientData({...editPatientData, name: e.target.value})}
-                  placeholder="Nombre completo del paciente"
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-patient-id">Identificación</Label>
-                <Input
-                  id="edit-patient-id"
-                  value={editPatientData.identification}
-                  onChange={(e) => setEditPatientData({...editPatientData, identification: e.target.value})}
-                  placeholder="Número de identificación"
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-patient-age">Edad</Label>
-                <Input
-                  id="edit-patient-age"
-                  type="number"
-                  value={editPatientData.age || ""}
-                  onChange={(e) => setEditPatientData({...editPatientData, age: parseInt(e.target.value) || 0})}
-                  placeholder="Edad en años"
-                  min="0"
-                  max="120"
-                  required
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button 
-                variant="outline" 
-                onClick={() => setIsEditPatientDialogOpen(false)}
-                disabled={isUpdatingPatient}
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={handleUpdatePatientInfo}
-                disabled={isUpdatingPatient || !editPatientData.name || !editPatientData.identification || !editPatientData.age}
-              >
-                {isUpdatingPatient ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Guardando...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Guardar Cambios
-                  </>
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </div>
     </ProtectedRoute>
   )

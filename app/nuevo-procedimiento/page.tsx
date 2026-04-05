@@ -26,6 +26,7 @@ import { useInstitution } from "@/components/institutions/institution-provider"
 import { getCurrentDateInColombia, getMachineDisplayName } from "@/lib/utils"
 import { PatientCombobox } from "@/components/patients/patient-combobox"
 import { SpecialistCombobox } from "@/components/procedures/specialist-combobox"
+import { useDebounce } from "@/hooks/use-debounce"
 
 type Machine = Tables<"machines">
 type InventoryProduct = Tables<"inventory_products">
@@ -61,6 +62,13 @@ export default function NuevoProcedimiento() {
     location: "",
     machines: [] as string[],
   })
+
+  // Detección de duplicados
+  const [duplicatePatient, setDuplicatePatient] = useState<{ name: string; identification: string } | null>(null)
+  const [duplicateSpecialist, setDuplicateSpecialist] = useState<{ name: string; specialty: string } | null>(null)
+  const [patientSelectedFromCombobox, setPatientSelectedFromCombobox] = useState(false)
+  const debouncedPatientId = useDebounce(formData.patientId, 500)
+  const debouncedSpecialistName = useDebounce(formData.specialistName, 500)
 
 
 
@@ -111,6 +119,58 @@ export default function NuevoProcedimiento() {
   useEffect(() => {
     void loadData()
   }, [selectedInstitutionId])
+
+  // Verificar duplicado de paciente por identificación
+  useEffect(() => {
+    if (!debouncedPatientId || !selectedInstitutionId || debouncedPatientId.length < 3 || patientSelectedFromCombobox) {
+      setDuplicatePatient(null)
+      return
+    }
+
+    const checkDuplicate = async () => {
+      const { data } = await supabase
+        .from("patients")
+        .select("name, identification")
+        .eq("institution_id", selectedInstitutionId)
+        .eq("identification", debouncedPatientId)
+        .limit(1)
+
+      const match = data?.[0]
+      if (match && match.name !== formData.patientName) {
+        setDuplicatePatient(match)
+      } else {
+        setDuplicatePatient(null)
+      }
+    }
+
+    checkDuplicate()
+  }, [debouncedPatientId, selectedInstitutionId])
+
+  // Verificar duplicado de especialista por nombre
+  useEffect(() => {
+    if (!debouncedSpecialistName || !selectedInstitutionId || formData.specialistId || debouncedSpecialistName.length < 3) {
+      setDuplicateSpecialist(null)
+      return
+    }
+
+    const checkDuplicate = async () => {
+      const { data } = await supabase
+        .from("specialists")
+        .select("name, specialty")
+        .eq("institution_id", selectedInstitutionId)
+        .ilike("name", `%${debouncedSpecialistName}%`)
+        .limit(1)
+
+      const match = data?.[0]
+      if (match) {
+        setDuplicateSpecialist(match)
+      } else {
+        setDuplicateSpecialist(null)
+      }
+    }
+
+    checkDuplicate()
+  }, [debouncedSpecialistName, selectedInstitutionId, formData.specialistId])
 
   const handleProductQuantityChange = (productId: string, change: number) => {
     setSelectedProducts((prev) => {
@@ -645,7 +705,11 @@ export default function NuevoProcedimiento() {
                     patientName={formData.patientName}
                     patientId={formData.patientId}
                     patientAge={formData.patientAge}
-                    onPatientChange={(data) => setFormData((prev) => ({ ...prev, ...data }))}
+                    onPatientChange={(data) => {
+                      setFormData((prev) => ({ ...prev, ...data }))
+                      setPatientSelectedFromCombobox(!!data.patientName)
+                      setDuplicatePatient(null)
+                    }}
                     disabled={saving}
                     nameInputRef={patientNameRef}
                   />
@@ -666,7 +730,10 @@ export default function NuevoProcedimiento() {
                   <Input
                     id="patientId"
                     value={formData.patientId}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, patientId: e.target.value }))}
+                    onChange={(e) => {
+                      setFormData((prev) => ({ ...prev, patientId: e.target.value }))
+                      setPatientSelectedFromCombobox(false)
+                    }}
                     placeholder="Número de identificación"
                     required
                   />
@@ -683,6 +750,14 @@ export default function NuevoProcedimiento() {
                   />
                 </div>
               </div>
+              {duplicatePatient && (
+                <Alert variant="default" className="border-amber-500 bg-amber-50 dark:bg-amber-950/20">
+                  <Info className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-amber-800 dark:text-amber-200">
+                    Ya existe un paciente con identificación <strong>{duplicatePatient.identification}</strong>: <strong>{duplicatePatient.name}</strong>. Usa el buscador de arriba para seleccionarlo y evitar duplicados.
+                  </AlertDescription>
+                </Alert>
+              )}
             </CardContent>
           </Card>
 
@@ -710,27 +785,41 @@ export default function NuevoProcedimiento() {
                     nameInputRef={specialistNameRef}
                   />
                 </div>
-                <div>
-                  <Label htmlFor="specialistName">Nombre Completo</Label>
-                  <Input
-                    ref={specialistNameRef}
-                    id="specialistName"
-                    value={formData.specialistName}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, specialistName: e.target.value, specialistId: undefined }))}
-                    placeholder="Nombre completo del especialista"
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="specialistSpecialty">Especialidad</Label>
-                  <Input
-                    id="specialistSpecialty"
-                    value={formData.specialistSpecialty}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, specialistSpecialty: e.target.value }))}
-                    placeholder="Ej: Cirugía General, Ortopedia..."
-                    required
-                  />
-                </div>
+                {!formData.specialistId && (
+                  <>
+                    <div>
+                      <Label htmlFor="specialistName">Nombre Completo</Label>
+                      <Input
+                        ref={specialistNameRef}
+                        id="specialistName"
+                        value={formData.specialistName}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, specialistName: e.target.value, specialistId: undefined }))}
+                        placeholder="Nombre completo del especialista"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="specialistSpecialty">Especialidad</Label>
+                      <Input
+                        id="specialistSpecialty"
+                        value={formData.specialistSpecialty}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, specialistSpecialty: e.target.value }))}
+                        placeholder="Ej: Cirugía General, Ortopedia..."
+                        required
+                      />
+                    </div>
+                    {duplicateSpecialist && (
+                      <div className="md:col-span-2">
+                        <Alert variant="default" className="border-amber-500 bg-amber-50 dark:bg-amber-950/20">
+                          <Info className="h-4 w-4 text-amber-600" />
+                          <AlertDescription className="text-amber-800 dark:text-amber-200">
+                            Ya existe un especialista similar: <strong>{duplicateSpecialist.name}</strong> ({duplicateSpecialist.specialty}). Usa el buscador de arriba para seleccionarlo y evitar duplicados.
+                          </AlertDescription>
+                        </Alert>
+                      </div>
+                    )}
+                  </>
+                )}
                 <div className="md:col-span-2">
                   <Label htmlFor="assistant">Asistente</Label>
                   <Input

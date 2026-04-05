@@ -4,11 +4,20 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { PageHeader } from "@/components/ui/page-header"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
-import { Search, Eye, Activity, Loader2, Plus, FileText, ExternalLink, X } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Search, Eye, Activity, Loader2, Plus, FileText, ExternalLink, X, Edit, Save } from "lucide-react"
 import Link from "next/link"
 import { supabase, type Patient } from "@/lib/supabase"
 import { formatTimestampForColombia } from "@/lib/utils"
@@ -16,6 +25,7 @@ import { useToast } from "@/hooks/use-toast"
 import { ProtectedRoute } from "@/components/auth/protected-route"
 import { InstitutionSwitcher } from "@/components/institutions/institution-switcher"
 import { useInstitution } from "@/components/institutions/institution-provider"
+import { usePermissions } from "@/hooks/use-permissions"
 
 interface ProcedureInfo {
   id: string
@@ -84,8 +94,12 @@ export default function Pacientes() {
   const [selectedPatient, setSelectedPatient] = useState<PatientWithProcedures | null>(null)
   const [patients, setPatients] = useState<PatientWithProcedures[]>([])
   const [loading, setLoading] = useState(true)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isUpdating, setIsUpdating] = useState(false)
+  const [editData, setEditData] = useState({ name: "", identification: "", age: 0 })
   const { toast } = useToast()
   const { selectedInstitutionId } = useInstitution()
+  const permissions = usePermissions()
 
   const loadPatients = async () => {
     try {
@@ -149,6 +163,53 @@ export default function Pacientes() {
   useEffect(() => {
     void loadPatients()
   }, [selectedInstitutionId])
+
+  const openEditDialog = (patient: PatientWithProcedures) => {
+    setEditData({
+      name: patient.name || "",
+      identification: patient.identification || "",
+      age: patient.age || 0,
+    })
+    setIsEditDialogOpen(true)
+  }
+
+  const handleUpdatePatient = async () => {
+    if (!selectedPatient) return
+
+    try {
+      setIsUpdating(true)
+
+      const { error } = await supabase
+        .from("patients")
+        .update({
+          name: editData.name,
+          identification: editData.identification,
+          age: editData.age,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", selectedPatient.id)
+
+      if (error) throw error
+
+      toast({
+        title: "Éxito",
+        description: "Datos del paciente actualizados correctamente",
+      })
+
+      setIsEditDialogOpen(false)
+      setSelectedPatient({ ...selectedPatient, name: editData.name, identification: editData.identification, age: editData.age })
+      await loadPatients()
+    } catch (error: any) {
+      console.error("Error updating patient:", error)
+      toast({
+        title: "Error",
+        description: "No se pudieron actualizar los datos del paciente",
+        variant: "destructive",
+      })
+    } finally {
+      setIsUpdating(false)
+    }
+  }
 
   const filteredPatients = patients.filter(
     (patient) =>
@@ -335,7 +396,15 @@ export default function Pacientes() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div>
-                        <h4 className="font-semibold mb-2">Información Personal</h4>
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-semibold">Información Personal</h4>
+                          {permissions.canEditMachines && (
+                            <Button variant="outline" size="sm" onClick={() => openEditDialog(selectedPatient)}>
+                              <Edit className="h-3 w-3 mr-1" />
+                              Editar
+                            </Button>
+                          )}
+                        </div>
                         <div className="space-y-1 text-sm">
                           <p>
                             <span className="font-medium">ID:</span> {selectedPatient.identification}
@@ -416,6 +485,78 @@ export default function Pacientes() {
             </div>
           )}
         </div>
+
+        {/* Diálogo de Edición de Paciente */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Editar Datos del Paciente</DialogTitle>
+              <DialogDescription>
+                Modifica los datos del paciente. Los cambios se reflejarán en todos los procedimientos vinculados.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div>
+                <Label htmlFor="edit-patient-name">Nombre Completo</Label>
+                <Input
+                  id="edit-patient-name"
+                  value={editData.name}
+                  onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                  placeholder="Nombre completo del paciente"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-patient-id">Identificación</Label>
+                <Input
+                  id="edit-patient-id"
+                  value={editData.identification}
+                  onChange={(e) => setEditData({ ...editData, identification: e.target.value })}
+                  placeholder="Número de identificación"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-patient-age">Edad</Label>
+                <Input
+                  id="edit-patient-age"
+                  type="number"
+                  value={editData.age || ""}
+                  onChange={(e) => setEditData({ ...editData, age: parseInt(e.target.value) || 0 })}
+                  placeholder="Edad en años"
+                  min="0"
+                  max="120"
+                  required
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setIsEditDialogOpen(false)}
+                disabled={isUpdating}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleUpdatePatient}
+                disabled={isUpdating || !editData.name || !editData.identification || !editData.age}
+              >
+                {isUpdating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Guardar Cambios
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </ProtectedRoute>
   )
