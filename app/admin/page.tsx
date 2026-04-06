@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Building2, Eye, EyeOff, Loader2, UserCog, UserPlus, Users } from "lucide-react"
+import { Building2, Eye, EyeOff, Loader2, Pencil, UserCog, UserPlus, Users } from "lucide-react"
 import { ProtectedRoute } from "@/components/auth/protected-route"
 import { PageHeader } from "@/components/ui/page-header"
 import { UserMenu } from "@/components/auth/user-menu"
@@ -17,7 +17,9 @@ import { InstitutionMultiSelect } from "@/components/admin/institution-multi-sel
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabase"
-import { APP_ROLES, getRoleLabel, type AppRole } from "@/lib/roles"
+import { Separator } from "@/components/ui/separator"
+import { APP_ROLES, getRoleBadgeClassName, getRoleLabel, type AppRole } from "@/lib/roles"
+import { cn } from "@/lib/utils"
 
 type Institution = {
   id: string
@@ -92,6 +94,7 @@ export default function AdminPage() {
   const [users, setUsers] = useState<AppUser[]>([])
   const [userDrafts, setUserDrafts] = useState<Record<string, UserDraft>>({})
   const [newInstitution, setNewInstitution] = useState(DEFAULT_NEW_INSTITUTION)
+  const [editingInstitutionId, setEditingInstitutionId] = useState<string | null>(null)
   const [showCreateUserDialog, setShowCreateUserDialog] = useState(false)
   const [creatingUser, setCreatingUser] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
@@ -333,6 +336,51 @@ export default function AdminPage() {
     }))
   }
 
+  const cancelEditInstitution = (institutionId: string) => {
+    const institution = institutions.find((i) => i.id === institutionId)
+    if (institution) {
+      setInstitutionDrafts((prev) => ({
+        ...prev,
+        [institutionId]: {
+          name: institution.name,
+          city: institution.city || "",
+          contact_name: institution.contact_name || "",
+          contact_email: institution.contact_email || "",
+          contact_phone: institution.contact_phone || "",
+          is_warehouse: institution.is_warehouse,
+        },
+      }))
+    }
+    setEditingInstitutionId(null)
+  }
+
+  const isInstitutionDirty = (institutionId: string) => {
+    const institution = institutions.find((i) => i.id === institutionId)
+    const draft = institutionDrafts[institutionId]
+    if (!institution || !draft) return false
+    return (
+      draft.name !== institution.name ||
+      draft.city !== (institution.city || "") ||
+      draft.contact_name !== (institution.contact_name || "") ||
+      draft.contact_email !== (institution.contact_email || "") ||
+      draft.contact_phone !== (institution.contact_phone || "")
+    )
+  }
+
+  const isUserDirty = (userId: string) => {
+    const user = users.find((u) => u.id === userId)
+    const draft = userDrafts[userId]
+    if (!user || !draft) return false
+    const originalIds = user.memberships?.map((m) => m.institution_id).sort() || []
+    const draftIds = [...draft.institution_ids].sort()
+    return (
+      draft.role !== user.role ||
+      draft.institution_id !== (user.institution_id || "") ||
+      draft.is_active !== (user.is_active !== false) ||
+      JSON.stringify(originalIds) !== JSON.stringify(draftIds)
+    )
+  }
+
   const createInstitution = async () => {
     if (!newInstitution.name.trim() || !newInstitution.code.trim()) {
       toast({
@@ -441,6 +489,7 @@ export default function AdminPage() {
         description: `Se guardaron los cambios de ${draft.name.trim()}.`,
       })
 
+      setEditingInstitutionId(null)
       await loadData()
     } catch (error: any) {
       console.error("Error updating institution:", error)
@@ -588,10 +637,16 @@ export default function AdminPage() {
                 <TabsTrigger value="institutions" className="gap-2">
                   <Building2 className="h-4 w-4" />
                   Instituciones
+                  <Badge variant="secondary" className="ml-0.5 text-xs px-1.5 py-0">
+                    {institutions.length}
+                  </Badge>
                 </TabsTrigger>
                 <TabsTrigger value="users" className="gap-2">
                   <Users className="h-4 w-4" />
                   Usuarios
+                  <Badge variant="secondary" className="ml-0.5 text-xs px-1.5 py-0">
+                    {users.length}
+                  </Badge>
                 </TabsTrigger>
               </TabsList>
 
@@ -685,94 +740,154 @@ export default function AdminPage() {
                       <CardTitle>Instituciones Registradas</CardTitle>
                       <CardDescription>Edita nombre, ciudad y contacto; además puedes activar o pausar instituciones.</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                      {institutions.map((institution) => (
-                        <div key={institution.id} className="rounded-lg border bg-card p-4 space-y-4">
-                          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <p className="font-semibold text-foreground">{institution.name}</p>
-                                {institution.code === "institucion-principal" && (
-                                  <Badge variant="outline">Principal</Badge>
+                    <CardContent className="space-y-3">
+                      {institutions.map((institution) => {
+                        const isEditing = editingInstitutionId === institution.id
+                        const dirty = isInstitutionDirty(institution.id)
+
+                        return (
+                          <div
+                            key={institution.id}
+                            className={cn(
+                              "rounded-lg border bg-card p-4 space-y-3 transition-all hover:shadow-sm",
+                              !institution.is_active && "opacity-60"
+                            )}
+                          >
+                            {/* Read-only header */}
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="space-y-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="font-semibold text-foreground">{institution.name}</p>
+                                  {institution.code === "institucion-principal" && (
+                                    <Badge variant="outline">Principal</Badge>
+                                  )}
+                                  {institution.is_warehouse && (
+                                    <Badge variant="outline">Bodega</Badge>
+                                  )}
+                                </div>
+                                <p className="text-sm text-muted-foreground">
+                                  {institution.code}
+                                  {institution.city && ` · ${institution.city}`}
+                                </p>
+                                {institution.contact_name || institution.contact_email ? (
+                                  <p className="text-xs text-muted-foreground">
+                                    {institution.contact_name}
+                                    {institution.contact_name && institution.contact_email && " · "}
+                                    {institution.contact_email}
+                                  </p>
+                                ) : (
+                                  <p className="text-xs text-muted-foreground italic">Sin contacto asignado</p>
                                 )}
-                                {institution.is_warehouse && (
-                                  <Badge variant="outline">Bodega</Badge>
-                                )}
-                                <Badge variant={institution.is_active ? "default" : "secondary"}>
-                                  {institution.is_active ? "Activa" : "Inactiva"}
-                                </Badge>
                               </div>
-                              <p className="text-sm text-muted-foreground">{institution.code}</p>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <Label htmlFor={`active-${institution.id}`} className="text-sm">
-                                Activa
-                              </Label>
-                              <Switch
-                                id={`active-${institution.id}`}
-                                checked={institution.is_active}
-                                onCheckedChange={(checked) => void toggleInstitutionStatus(institution, checked)}
-                              />
-                            </div>
-                          </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor={`institution-name-${institution.id}`}>Nombre</Label>
-                              <Input
-                                id={`institution-name-${institution.id}`}
-                                value={institutionDrafts[institution.id]?.name || ""}
-                                onChange={(e) => updateInstitutionDraft(institution.id, { name: e.target.value })}
-                              />
+                              <div className="flex items-center gap-3 shrink-0">
+                                <div className="flex items-center gap-2">
+                                  <Switch
+                                    id={`active-${institution.id}`}
+                                    checked={institution.is_active}
+                                    onCheckedChange={(checked) => void toggleInstitutionStatus(institution, checked)}
+                                  />
+                                  <Label
+                                    htmlFor={`active-${institution.id}`}
+                                    className={cn(
+                                      "text-sm font-medium cursor-pointer",
+                                      institution.is_active ? "text-green-700" : "text-muted-foreground"
+                                    )}
+                                  >
+                                    {institution.is_active ? "Activa" : "Inactiva"}
+                                  </Label>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="gap-1.5"
+                                  onClick={() =>
+                                    setEditingInstitutionId(isEditing ? null : institution.id)
+                                  }
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                  {isEditing ? "Cerrar" : "Editar"}
+                                </Button>
+                              </div>
                             </div>
-                            <div className="space-y-2">
-                              <Label htmlFor={`institution-city-${institution.id}`}>Ciudad</Label>
-                              <Input
-                                id={`institution-city-${institution.id}`}
-                                value={institutionDrafts[institution.id]?.city || ""}
-                                onChange={(e) => updateInstitutionDraft(institution.id, { city: e.target.value })}
-                                placeholder="Bogotá"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor={`institution-contact-name-${institution.id}`}>Contacto</Label>
-                              <Input
-                                id={`institution-contact-name-${institution.id}`}
-                                value={institutionDrafts[institution.id]?.contact_name || ""}
-                                onChange={(e) => updateInstitutionDraft(institution.id, { contact_name: e.target.value })}
-                                placeholder="María Pérez"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor={`institution-contact-phone-${institution.id}`}>Teléfono</Label>
-                              <Input
-                                id={`institution-contact-phone-${institution.id}`}
-                                value={institutionDrafts[institution.id]?.contact_phone || ""}
-                                onChange={(e) => updateInstitutionDraft(institution.id, { contact_phone: e.target.value })}
-                                placeholder="+57 300 000 0000"
-                              />
-                            </div>
-                            <div className="space-y-2 md:col-span-2">
-                              <Label htmlFor={`institution-contact-email-${institution.id}`}>Correo</Label>
-                              <Input
-                                id={`institution-contact-email-${institution.id}`}
-                                value={institutionDrafts[institution.id]?.contact_email || ""}
-                                onChange={(e) => updateInstitutionDraft(institution.id, { contact_email: e.target.value })}
-                                placeholder="contacto@clinica.com"
-                              />
-                            </div>
-                          </div>
 
-                          <div className="flex justify-end">
-                            <Button
-                              onClick={() => void saveInstitution(institution)}
-                              disabled={savingInstitutionIds.includes(institution.id)}
-                            >
-                              {savingInstitutionIds.includes(institution.id) ? "Guardando..." : "Guardar cambios"}
-                            </Button>
+                            {/* Edit panel (conditional) */}
+                            {isEditing && (
+                              <>
+                                <Separator />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div className="space-y-2">
+                                    <Label htmlFor={`institution-name-${institution.id}`}>Nombre</Label>
+                                    <Input
+                                      id={`institution-name-${institution.id}`}
+                                      value={institutionDrafts[institution.id]?.name || ""}
+                                      onChange={(e) => updateInstitutionDraft(institution.id, { name: e.target.value })}
+                                    />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label htmlFor={`institution-city-${institution.id}`}>Ciudad</Label>
+                                    <Input
+                                      id={`institution-city-${institution.id}`}
+                                      value={institutionDrafts[institution.id]?.city || ""}
+                                      onChange={(e) => updateInstitutionDraft(institution.id, { city: e.target.value })}
+                                      placeholder="Bogotá"
+                                    />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label htmlFor={`institution-contact-name-${institution.id}`}>Contacto</Label>
+                                    <Input
+                                      id={`institution-contact-name-${institution.id}`}
+                                      value={institutionDrafts[institution.id]?.contact_name || ""}
+                                      onChange={(e) => updateInstitutionDraft(institution.id, { contact_name: e.target.value })}
+                                      placeholder="María Pérez"
+                                    />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label htmlFor={`institution-contact-phone-${institution.id}`}>Teléfono</Label>
+                                    <Input
+                                      id={`institution-contact-phone-${institution.id}`}
+                                      value={institutionDrafts[institution.id]?.contact_phone || ""}
+                                      onChange={(e) => updateInstitutionDraft(institution.id, { contact_phone: e.target.value })}
+                                      placeholder="+57 300 000 0000"
+                                    />
+                                  </div>
+                                  <div className="space-y-2 md:col-span-2">
+                                    <Label htmlFor={`institution-contact-email-${institution.id}`}>Correo</Label>
+                                    <Input
+                                      id={`institution-contact-email-${institution.id}`}
+                                      value={institutionDrafts[institution.id]?.contact_email || ""}
+                                      onChange={(e) => updateInstitutionDraft(institution.id, { contact_email: e.target.value })}
+                                      placeholder="contacto@clinica.com"
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center justify-end gap-2">
+                                  {dirty && (
+                                    <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 bg-amber-50 mr-auto">
+                                      Sin guardar
+                                    </Badge>
+                                  )}
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => cancelEditInstitution(institution.id)}
+                                  >
+                                    Cancelar
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => void saveInstitution(institution)}
+                                    disabled={savingInstitutionIds.includes(institution.id)}
+                                  >
+                                    {savingInstitutionIds.includes(institution.id) ? "Guardando..." : "Guardar cambios"}
+                                  </Button>
+                                </div>
+                              </>
+                            )}
                           </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </CardContent>
                   </Card>
                 </div>
@@ -801,44 +916,97 @@ export default function AdminPage() {
                     ) : (
                       users.map((user) => {
                         const draft = userDrafts[user.id]
+                        const dirty = isUserDirty(user.id)
 
                         return (
-                          <div key={user.id} className="rounded-lg border bg-card p-4 space-y-4">
-                            <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-                              <div>
-                                <p className="font-semibold text-foreground">{user.name}</p>
+                          <div
+                            key={user.id}
+                            className={cn(
+                              "rounded-lg border bg-card p-5 space-y-4 transition-all hover:shadow-sm",
+                              draft?.is_active === false && "opacity-60"
+                            )}
+                          >
+                            {/* Identity section */}
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="space-y-0.5">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="font-semibold text-foreground">{user.name}</p>
+                                  <Badge variant="outline" className={getRoleBadgeClassName(user.role)}>
+                                    {getRoleLabel(user.role)}
+                                  </Badge>
+                                </div>
                                 <p className="text-sm text-muted-foreground">{user.email}</p>
                                 <p className="text-xs text-muted-foreground">
-                                  Actual: {getRoleLabel(user.role)}
-                                  {user.institution?.name ? ` • ${user.institution.name}` : " • Sin institución"}
+                                  {user.institution?.name || "Sin institución primaria"}
                                 </p>
                               </div>
-                              <Badge variant={draft?.is_active ? "default" : "secondary"}>
-                                {draft?.is_active ? "Activo" : "Inactivo"}
-                              </Badge>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <Switch
+                                  id={`user-active-${user.id}`}
+                                  checked={draft?.is_active ?? false}
+                                  onCheckedChange={(checked) => updateDraft(user.id, { is_active: checked })}
+                                />
+                                <Label
+                                  htmlFor={`user-active-${user.id}`}
+                                  className={cn(
+                                    "text-sm font-medium cursor-pointer",
+                                    draft?.is_active ? "text-green-700" : "text-muted-foreground"
+                                  )}
+                                >
+                                  {draft?.is_active ? "Activo" : "Inactivo"}
+                                </Label>
+                              </div>
                             </div>
 
-                            <div className="grid grid-cols-1 lg:grid-cols-[1fr,1fr,auto,auto] gap-4 items-end">
-                              <div className="space-y-2">
-                                <Label>Rol</Label>
-                                <Select
-                                  value={draft?.role}
-                                  onValueChange={(value) => updateDraft(user.id, { role: value as AppRole })}
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {APP_ROLES.map((role) => (
-                                      <SelectItem key={role} value={role}>
-                                        {getRoleLabel(role)}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
+                            <Separator />
+
+                            {/* Editable fields */}
+                            <div className="space-y-4">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label>Rol</Label>
+                                  <Select
+                                    value={draft?.role}
+                                    onValueChange={(value) => updateDraft(user.id, { role: value as AppRole })}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {APP_ROLES.map((role) => (
+                                        <SelectItem key={role} value={role}>
+                                          {getRoleLabel(role)}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <Label>Institución primaria</Label>
+                                  <Select
+                                    value={draft?.institution_id || ""}
+                                    onValueChange={(value) => updateDraft(user.id, { institution_id: value })}
+                                    disabled={!draft?.institution_ids.length}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Seleccionar institución primaria" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {activeInstitutions
+                                        .filter((institution) => draft?.institution_ids.includes(institution.id))
+                                        .map((institution) => (
+                                          <SelectItem key={institution.id} value={institution.id}>
+                                            {institution.name}
+                                          </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
                               </div>
 
-                              <div className="space-y-2 lg:col-span-2">
+                              <div className="space-y-2">
                                 <Label>Instituciones asignadas</Label>
                                 <InstitutionMultiSelect
                                   institutions={activeInstitutions}
@@ -849,40 +1017,14 @@ export default function AdminPage() {
                                 />
                               </div>
 
-                              <div className="flex items-center gap-3 h-10">
-                                <Label htmlFor={`user-active-${user.id}`}>Activo</Label>
-                                <Switch
-                                  id={`user-active-${user.id}`}
-                                  checked={draft?.is_active ?? false}
-                                  onCheckedChange={(checked) => updateDraft(user.id, { is_active: checked })}
-                                />
+                              <div className="flex items-center justify-end gap-2">
+                                {dirty && (
+                                  <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 bg-amber-50 mr-auto">
+                                    Sin guardar
+                                  </Badge>
+                                )}
+                                <Button onClick={() => void saveUser(user)}>Guardar cambios</Button>
                               </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 lg:grid-cols-[1fr,auto] gap-4 items-end">
-                              <div className="space-y-2">
-                                <Label>Institución primaria</Label>
-                                <Select
-                                  value={draft?.institution_id || ""}
-                                  onValueChange={(value) => updateDraft(user.id, { institution_id: value })}
-                                  disabled={!draft?.institution_ids.length}
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Seleccionar institución primaria" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {activeInstitutions
-                                      .filter((institution) => draft?.institution_ids.includes(institution.id))
-                                      .map((institution) => (
-                                        <SelectItem key={institution.id} value={institution.id}>
-                                          {institution.name}
-                                        </SelectItem>
-                                      ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-
-                              <Button onClick={() => void saveUser(user)}>Guardar</Button>
                             </div>
                           </div>
                         )
