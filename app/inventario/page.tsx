@@ -849,7 +849,7 @@ export default function Inventario() {
                   <Package className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{formatNumber(totalProducts)}</div>
+                  <div className="text-2xl font-bold animate-count-up">{formatNumber(totalProducts)}</div>
                   <p className="text-xs text-muted-foreground">Tipos de productos</p>
                 </CardContent>
               </Card>
@@ -860,7 +860,7 @@ export default function Inventario() {
                   <AlertTriangle className="h-4 w-4 text-warning" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-warning">{formatNumber(lowStockCount)}</div>
+                  <div className="text-2xl font-bold text-warning animate-count-up">{formatNumber(lowStockCount)}</div>
                   <p className="text-xs text-muted-foreground">Requieren reposición</p>
                 </CardContent>
               </Card>
@@ -876,7 +876,7 @@ export default function Inventario() {
                   }
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">
+                  <div className="text-2xl font-bold animate-count-up">
                     {permissions.isAdmin
                       ? formatCurrency(totalValue)
                       : formatNumber(outOfStockCount)

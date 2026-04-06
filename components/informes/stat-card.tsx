@@ -31,7 +31,7 @@ export function StatCard({
         </div>
       </CardHeader>
       <CardContent>
-        <div className={`text-2xl font-bold tracking-tight ${valueColor || ""}`}>
+        <div className={`text-2xl font-bold tracking-tight animate-count-up ${valueColor || ""}`}>
           {value}
         </div>
         <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>

@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Checkbox } from "@/components/ui/checkbox"
+import { InstitutionMultiSelect } from "@/components/admin/institution-multi-select"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabase"
@@ -840,22 +840,13 @@ export default function AdminPage() {
 
                               <div className="space-y-2 lg:col-span-2">
                                 <Label>Instituciones asignadas</Label>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 rounded-md border p-3">
-                                  {activeInstitutions.map((institution) => (
-                                    <label
-                                      key={institution.id}
-                                      className="flex items-center gap-3 rounded-md border bg-muted px-3 py-2"
-                                    >
-                                      <Checkbox
-                                        checked={draft?.institution_ids.includes(institution.id)}
-                                        onCheckedChange={(checked) =>
-                                          toggleUserInstitution(user.id, institution.id, checked === true)
-                                        }
-                                      />
-                                      <span className="text-sm">{institution.name}</span>
-                                    </label>
-                                  ))}
-                                </div>
+                                <InstitutionMultiSelect
+                                  institutions={activeInstitutions}
+                                  selectedIds={draft?.institution_ids ?? []}
+                                  onToggle={(institutionId, checked) =>
+                                    toggleUserInstitution(user.id, institutionId, checked)
+                                  }
+                                />
                               </div>
 
                               <div className="flex items-center gap-3 h-10">
@@ -1012,17 +1003,11 @@ export default function AdminPage() {
 
               <div className="space-y-2">
                 <Label>Instituciones *</Label>
-                <div className="grid grid-cols-1 gap-2 rounded-md border p-3">
-                  {activeInstitutions.map((institution) => (
-                    <label key={institution.id} className="flex items-center gap-3 rounded-md border bg-muted px-3 py-2">
-                      <Checkbox
-                        checked={newUser.institution_ids.includes(institution.id)}
-                        onCheckedChange={(checked) => toggleNewUserInstitution(institution.id, checked === true)}
-                      />
-                      <span className="text-sm">{institution.name}</span>
-                    </label>
-                  ))}
-                </div>
+                <InstitutionMultiSelect
+                  institutions={activeInstitutions}
+                  selectedIds={newUser.institution_ids}
+                  onToggle={toggleNewUserInstitution}
+                />
               </div>
 
               {newUser.institution_ids.length > 0 && (
