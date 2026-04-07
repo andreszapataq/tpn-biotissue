@@ -87,6 +87,7 @@ export function ConsumptionTable({
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -158,6 +159,7 @@ export function ConsumptionTable({
                 </TableRow>
               </TableFooter>
             </Table>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -175,6 +177,7 @@ export function ConsumptionTable({
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -203,6 +206,7 @@ export function ConsumptionTable({
                 ))}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       )}

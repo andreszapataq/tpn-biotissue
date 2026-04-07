@@ -17,6 +17,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet"
 import { Search, Eye, Activity, Loader2, Plus, FileText, ExternalLink, X, Edit, Save } from "lucide-react"
 import Link from "next/link"
 import { supabase, type Patient } from "@/lib/supabase"
@@ -26,6 +33,7 @@ import { ProtectedRoute } from "@/components/auth/protected-route"
 import { InstitutionSwitcher } from "@/components/institutions/institution-switcher"
 import { useInstitution } from "@/components/institutions/institution-provider"
 import { usePermissions } from "@/hooks/use-permissions"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 interface ProcedureInfo {
   id: string
@@ -97,9 +105,11 @@ export default function Pacientes() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
   const [editData, setEditData] = useState({ name: "", identification: "", age: 0 })
+  const [sheetOpen, setSheetOpen] = useState(false)
   const { toast } = useToast()
   const { selectedInstitutionId } = useInstitution()
   const permissions = usePermissions()
+  const isMobile = useIsMobile()
 
   const loadPatients = async () => {
     try {
@@ -220,6 +230,93 @@ export default function Pacientes() {
   const activePatients = filteredPatients.filter((p) => p.procedureSummary.activeProcedures > 0)
   const completedPatients = filteredPatients.filter((p) => p.procedureSummary.activeProcedures === 0 && p.procedureSummary.totalProcedures > 0)
 
+  const handleSelectPatient = (patient: PatientWithProcedures) => {
+    setSelectedPatient(patient)
+    if (isMobile) {
+      setSheetOpen(true)
+    }
+  }
+
+  const patientDetailContent = selectedPatient ? (
+    <div className="space-y-4">
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="font-semibold">Informacion Personal</h4>
+          {permissions.canEditMachines && (
+            <Button variant="outline" size="sm" onClick={() => openEditDialog(selectedPatient)}>
+              <Edit className="h-3 w-3 mr-1" />
+              Editar
+            </Button>
+          )}
+        </div>
+        <div className="space-y-1 text-sm">
+          <p>
+            <span className="font-medium">ID:</span> {selectedPatient.identification}
+          </p>
+          <p>
+            <span className="font-medium">Edad:</span> {selectedPatient.age} anos
+          </p>
+          <div className="flex items-center gap-2">
+            <span className="font-medium">Estado:</span>
+            <StatusBadge status={selectedPatient.procedureSummary.activeProcedures > 0 ? "active" : "completed"} />
+          </div>
+          <p>
+            <span className="font-medium">Registrado:</span> {formatTimestampForColombia(selectedPatient.created_at)}
+          </p>
+          {selectedPatient.procedureSummary.lastClosedAt && (
+            <p>
+              <span className="font-medium">Ultimo Cierre:</span> {formatTimestampForColombia(selectedPatient.procedureSummary.lastClosedAt)}
+            </p>
+          )}
+          <p>
+            <span className="font-medium">Procedimientos:</span>{" "}
+            {selectedPatient.procedureSummary.activeProcedures > 0 && (
+              <span className="text-primary">{selectedPatient.procedureSummary.activeProcedures} activo{selectedPatient.procedureSummary.activeProcedures !== 1 ? "s" : ""}</span>
+            )}
+            {selectedPatient.procedureSummary.activeProcedures > 0 && selectedPatient.procedureSummary.completedProcedures > 0 && ", "}
+            {selectedPatient.procedureSummary.completedProcedures > 0 && (
+              <span className="text-success">{selectedPatient.procedureSummary.completedProcedures} completado{selectedPatient.procedureSummary.completedProcedures !== 1 ? "s" : ""}</span>
+            )}
+            {selectedPatient.procedureSummary.totalProcedures === 0 && (
+              <span className="text-muted-foreground">Sin procedimientos</span>
+            )}
+          </p>
+        </div>
+      </div>
+
+      {selectedPatient.procedureSummary.procedures.length > 0 && (
+        <>
+          <Separator />
+          <div>
+            <h4 className="font-semibold mb-3 flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Historial de Procedimientos
+            </h4>
+            <div className="max-h-[400px] overflow-y-auto space-y-3 pr-1">
+              {selectedPatient.procedureSummary.procedures.map((proc) => (
+                <div key={proc.id} className="border rounded-lg p-3 text-sm space-y-1">
+                  <div className="flex items-center justify-between">
+                    <StatusBadge status={proc.status === "active" ? "active" : "completed"} />
+                    <Link href={`/procedimiento/${proc.id}`}>
+                      <Button variant="ghost" size="sm" className="h-7 px-2">
+                        <ExternalLink className="h-3 w-3" />
+                      </Button>
+                    </Link>
+                  </div>
+                  <p className="text-muted-foreground">
+                    {formatTimestampForColombia(proc.procedure_date)}
+                  </p>
+                  <p className="text-foreground line-clamp-2">{proc.diagnosis}</p>
+                  <p className="text-muted-foreground text-xs">Dr. {proc.surgeon_name}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  ) : null
+
   return (
     <ProtectedRoute requiredRole={["administrador", "soporte", "asistente"]}>
       <div className="page-shell">
@@ -299,7 +396,7 @@ export default function Pacientes() {
                               </div>
                               <div className="flex items-center gap-2">
                                 <StatusBadge status="active" />
-                                <Button variant="outline" size="sm" onClick={() => setSelectedPatient(patient)}>
+                                <Button variant="outline" size="sm" onClick={() => handleSelectPatient(patient)}>
                                   <Eye className="h-3 w-3 mr-1" />
                                   Ver Detalles
                                 </Button>
@@ -348,7 +445,7 @@ export default function Pacientes() {
                               </div>
                               <div className="flex items-center gap-2">
                                 <StatusBadge status="completed" />
-                                <Button variant="outline" size="sm" onClick={() => setSelectedPatient(patient)}>
+                                <Button variant="outline" size="sm" onClick={() => handleSelectPatient(patient)}>
                                   <Eye className="h-3 w-3 mr-1" />
                                   Ver Historial
                                 </Button>
@@ -383,8 +480,8 @@ export default function Pacientes() {
                 </Tabs>
               </div>
 
-              {/* Panel de Detalles */}
-              <div className="lg:col-span-1">
+              {/* Panel de Detalles — Desktop */}
+              <div className="hidden lg:block lg:col-span-1">
                 {selectedPatient ? (
                   <Card className="sticky top-4">
                     <CardHeader>
@@ -394,83 +491,8 @@ export default function Pacientes() {
                       </CardTitle>
                       <CardDescription>{selectedPatient.name}</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-semibold">Información Personal</h4>
-                          {permissions.canEditMachines && (
-                            <Button variant="outline" size="sm" onClick={() => openEditDialog(selectedPatient)}>
-                              <Edit className="h-3 w-3 mr-1" />
-                              Editar
-                            </Button>
-                          )}
-                        </div>
-                        <div className="space-y-1 text-sm">
-                          <p>
-                            <span className="font-medium">ID:</span> {selectedPatient.identification}
-                          </p>
-                          <p>
-                            <span className="font-medium">Edad:</span> {selectedPatient.age} años
-                          </p>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">Estado:</span>
-                            <StatusBadge status={selectedPatient.procedureSummary.activeProcedures > 0 ? "active" : "completed"} />
-                          </div>
-                          <p>
-                            <span className="font-medium">Registrado:</span> {formatTimestampForColombia(selectedPatient.created_at)}
-                          </p>
-                          {selectedPatient.procedureSummary.lastClosedAt && (
-                            <p>
-                              <span className="font-medium">Último Cierre:</span> {formatTimestampForColombia(selectedPatient.procedureSummary.lastClosedAt)}
-                            </p>
-                          )}
-                          <p>
-                            <span className="font-medium">Procedimientos:</span>{" "}
-                            {selectedPatient.procedureSummary.activeProcedures > 0 && (
-                              <span className="text-primary">{selectedPatient.procedureSummary.activeProcedures} activo{selectedPatient.procedureSummary.activeProcedures !== 1 ? "s" : ""}</span>
-                            )}
-                            {selectedPatient.procedureSummary.activeProcedures > 0 && selectedPatient.procedureSummary.completedProcedures > 0 && ", "}
-                            {selectedPatient.procedureSummary.completedProcedures > 0 && (
-                              <span className="text-success">{selectedPatient.procedureSummary.completedProcedures} completado{selectedPatient.procedureSummary.completedProcedures !== 1 ? "s" : ""}</span>
-                            )}
-                            {selectedPatient.procedureSummary.totalProcedures === 0 && (
-                              <span className="text-muted-foreground">Sin procedimientos</span>
-                            )}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Historial de Procedimientos */}
-                      {selectedPatient.procedureSummary.procedures.length > 0 && (
-                        <>
-                          <Separator />
-                          <div>
-                            <h4 className="font-semibold mb-3 flex items-center gap-2">
-                              <FileText className="h-4 w-4" />
-                              Historial de Procedimientos
-                            </h4>
-                            <div className="max-h-[400px] overflow-y-auto space-y-3 pr-1">
-                              {selectedPatient.procedureSummary.procedures.map((proc) => (
-                                <div key={proc.id} className="border rounded-lg p-3 text-sm space-y-1">
-                                  <div className="flex items-center justify-between">
-                                    <StatusBadge status={proc.status === "active" ? "active" : "completed"} />
-                                    <Link href={`/procedimiento/${proc.id}`}>
-                                      <Button variant="ghost" size="sm" className="h-7 px-2">
-                                        <ExternalLink className="h-3 w-3" />
-                                      </Button>
-                                    </Link>
-                                  </div>
-                                  <p className="text-muted-foreground">
-                                    {formatTimestampForColombia(proc.procedure_date)}
-                                  </p>
-                                  <p className="text-foreground line-clamp-2">{proc.diagnosis}</p>
-                                  <p className="text-muted-foreground text-xs">Dr. {proc.surgeon_name}</p>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </>
-                      )}
+                    <CardContent>
+                      {patientDetailContent}
                     </CardContent>
                   </Card>
                 ) : (
@@ -485,6 +507,24 @@ export default function Pacientes() {
             </div>
           )}
         </div>
+
+        {/* Sheet de Detalles — Mobile */}
+        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+          <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5" />
+                Detalles del Paciente
+              </SheetTitle>
+              {selectedPatient && (
+                <SheetDescription>{selectedPatient.name}</SheetDescription>
+              )}
+            </SheetHeader>
+            <div className="mt-4">
+              {patientDetailContent}
+            </div>
+          </SheetContent>
+        </Sheet>
 
         {/* Diálogo de Edición de Paciente */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>

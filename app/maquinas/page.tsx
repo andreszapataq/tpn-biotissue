@@ -556,7 +556,7 @@ export default function Maquinas() {
                         </div>
                       </div>
                       {permissions.canEditMachines && (
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           {availableInstitutions.length > 1 && (
                             <Button
                               variant="outline"
@@ -574,16 +574,16 @@ export default function Maquinas() {
                           >
                             Editar
                           </Button>
-                          
+
                           {/* Retirar máquina — solo visible desde Bodega */}
                           {isBodega && permissions.canDeleteMachines && (
                             <Button
                               variant="outline"
-                              size="sm"
+                              size="icon"
                               onClick={() => setMachineToRetire(machine.id)}
-                              className="text-destructive hover:text-destructive/80"
+                              className="h-10 w-10 text-destructive hover:text-destructive/80"
                             >
-                              <Trash2 className="h-3 w-3" />
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           )}
                         </div>

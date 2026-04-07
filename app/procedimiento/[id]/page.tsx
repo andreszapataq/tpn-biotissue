@@ -99,6 +99,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
   const [editSpecialistId, setEditSpecialistId] = useState<string | undefined>(undefined)
   const [isNewSpecialist, setIsNewSpecialist] = useState(false)
   const specialistNameRef = useRef<HTMLInputElement>(null)
+  const suppliesRef = useRef<HTMLDivElement>(null)
   
   const { toast } = useToast()
   const { user } = useAuth()
@@ -1114,7 +1115,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
 
               {/* Agregar Insumos (solo si está activo) */}
               {procedure.status === "active" && permissions.canAddProcedureSupplies && (
-                <Card>
+                <Card ref={suppliesRef}>
                   <CardHeader>
                     <CardTitle>Agregar Insumos</CardTitle>
                     <CardDescription>Seleccionar insumos adicionales para el tratamiento</CardDescription>
@@ -1176,11 +1177,11 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                                 <Button
                                   type="button"
                                   variant="outline"
-                                  size="sm"
+                                  size="icon"
                                   onClick={() => handleProductQuantityChange(product.id, -1)}
-                                  className="h-8 w-8 p-0 touch-manipulation border-primary/30 hover:bg-primary/10"
+                                  className="h-10 w-10 p-0 touch-manipulation border-primary/30 hover:bg-primary/10"
                                 >
-                                  <Minus className="h-3.5 w-3.5" />
+                                  <Minus className="h-4 w-4" />
                                 </Button>
                                 <div className="flex flex-col items-center w-10">
                                   <span className="text-sm font-bold text-primary leading-none">{qty}</span>
@@ -1189,12 +1190,12 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                                 <Button
                                   type="button"
                                   variant="outline"
-                                  size="sm"
+                                  size="icon"
                                   onClick={() => handleProductQuantityChange(product.id, 1)}
                                   disabled={qty >= (product.stock || 0)}
-                                  className="h-8 w-8 p-0 touch-manipulation border-primary/30 hover:bg-primary/10"
+                                  className="h-10 w-10 p-0 touch-manipulation border-primary/30 hover:bg-primary/10"
                                 >
-                                  <Plus className="h-3.5 w-3.5" />
+                                  <Plus className="h-4 w-4" />
                                 </Button>
                               </>
                             ) : (
@@ -1203,9 +1204,9 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleProductQuantityChange(product.id, 1)}
-                                className="h-8 px-3 text-xs text-primary hover:text-primary hover:bg-info-muted touch-manipulation"
+                                className="h-10 px-3 text-xs text-primary hover:text-primary hover:bg-info-muted touch-manipulation"
                               >
-                                <Plus className="h-3.5 w-3.5 mr-1" />
+                                <Plus className="h-4 w-4 mr-1" />
                                 Agregar
                               </Button>
                             )}
@@ -1351,7 +1352,20 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
           </DialogContent>
         </Dialog>
 
+        {/* FAB mobile — ir a insumos */}
+        {procedure.status === "active" && permissions.canAddProcedureSupplies && (
+          <div className="fixed bottom-6 right-6 z-20 sm:hidden">
+            <Button
+              size="icon"
+              className="h-14 w-14 rounded-full shadow-lg"
+              onClick={() => suppliesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+              aria-label="Ir a insumos"
+            >
+              <Package className="h-6 w-6" />
+            </Button>
+          </div>
+        )}
       </div>
     </ProtectedRoute>
   )
-} 
+}

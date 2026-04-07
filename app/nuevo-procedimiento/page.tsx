@@ -973,11 +973,11 @@ export default function NuevoProcedimiento() {
                           <Button
                             type="button"
                             variant="outline"
-                            size="sm"
+                            size="icon"
                             onClick={() => handleProductQuantityChange(product.id, -1)}
-                            className="border-primary/30 hover:bg-primary/10"
+                            className="h-10 w-10 border-primary/30 hover:bg-primary/10 touch-manipulation"
                           >
-                            <Minus className="h-3 w-3" />
+                            <Minus className="h-4 w-4" />
                           </Button>
                           <div className="flex flex-col items-center w-10">
                             <span className="text-sm font-bold text-primary leading-none">{qty}</span>
@@ -986,12 +986,12 @@ export default function NuevoProcedimiento() {
                           <Button
                             type="button"
                             variant="outline"
-                            size="sm"
+                            size="icon"
                             onClick={() => handleProductQuantityChange(product.id, 1)}
                             disabled={qty >= (product.stock || 0)}
-                            className="border-primary/30 hover:bg-primary/10"
+                            className="h-10 w-10 border-primary/30 hover:bg-primary/10 touch-manipulation"
                           >
-                            <Plus className="h-3 w-3" />
+                            <Plus className="h-4 w-4" />
                           </Button>
                         </>
                       ) : (
@@ -1015,13 +1015,13 @@ export default function NuevoProcedimiento() {
           </Card>
 
               {/* Botones de Acción */}
-              <div className="flex gap-4 justify-end">
-                <Link href="/">
-                  <Button variant="outline">Cancelar</Button>
+              <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <Link href="/" className="w-full sm:w-auto block">
+                  <Button variant="outline" className="w-full sm:w-auto">Cancelar</Button>
                 </Link>
                 <Button
                   type="submit"
-                  className="min-w-32"
+                  className="w-full sm:w-auto sm:min-w-32"
                   disabled={saving}
                 >
                   {saving ? (

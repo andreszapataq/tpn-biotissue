@@ -633,15 +633,15 @@ export default function AdminPage() {
             </Card>
           ) : (
             <Tabs defaultValue="institutions" className="space-y-4">
-              <TabsList>
-                <TabsTrigger value="institutions" className="gap-2">
+              <TabsList className="w-full">
+                <TabsTrigger value="institutions" className="flex-1 gap-2">
                   <Building2 className="h-4 w-4" />
                   Instituciones
                   <Badge variant="secondary" className="ml-0.5 text-xs px-1.5 py-0">
                     {institutions.length}
                   </Badge>
                 </TabsTrigger>
-                <TabsTrigger value="users" className="gap-2">
+                <TabsTrigger value="users" className="flex-1 gap-2">
                   <Users className="h-4 w-4" />
                   Usuarios
                   <Badge variant="secondary" className="ml-0.5 text-xs px-1.5 py-0">

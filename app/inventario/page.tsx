@@ -1377,9 +1377,9 @@ export default function Inventario() {
           ) : (
             <Tabs defaultValue="disponibles" className="space-y-4">
               <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="disponibles">Disponibles ({formatNumber(availableItems.length)})</TabsTrigger>
-                <TabsTrigger value="bajo-stock">Stock Bajo ({formatNumber(lowStockItems.length)})</TabsTrigger>
-                <TabsTrigger value="sin-stock">Sin Stock ({formatNumber(outOfStockItems.length)})</TabsTrigger>
+                <TabsTrigger value="disponibles" className="text-xs sm:text-sm">Disponibles ({formatNumber(availableItems.length)})</TabsTrigger>
+                <TabsTrigger value="bajo-stock" className="text-xs sm:text-sm">Stock Bajo ({formatNumber(lowStockItems.length)})</TabsTrigger>
+                <TabsTrigger value="sin-stock" className="text-xs sm:text-sm">Sin Stock ({formatNumber(outOfStockItems.length)})</TabsTrigger>
               </TabsList>
 
               {/* Tab: Disponibles — stock > mínimo, no archivado */}

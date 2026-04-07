@@ -218,7 +218,7 @@ export function GlobalMachineSearch({
       </p>
 
       {/* Table */}
-      <div className="rounded-lg border bg-card/90 backdrop-blur-sm overflow-hidden">
+      <div className="rounded-lg border bg-card/90 backdrop-blur-sm overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>

@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer utilities {
+  .touch-manipulation {
+    touch-action: manipulation;
+  }
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -98,27 +104,10 @@
   }
 }
 
-/* Optimizaciones para tablet */
-@media (min-width: 768px) {
-  .touch-target {
-    min-height: 44px;
-    min-width: 44px;
-  }
-
-  .tablet-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 1rem;
-  }
-}
-
-/* Estilos para formularios táctiles */
-.form-input {
-  @apply h-12 text-base;
-}
-
-.form-button {
-  @apply h-12 px-6 text-base;
+/* Touch targets minimos para dispositivos tactiles */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
 }
 
 /* Animaciones suaves */
@@ -180,13 +169,13 @@
   @apply min-h-screen bg-background;
 }
 .page-container {
-  @apply max-w-7xl mx-auto space-y-6 p-4;
+  @apply max-w-7xl mx-auto space-y-6 p-4 sm:p-6;
 }
 .page-container-narrow {
-  @apply max-w-4xl mx-auto space-y-6 p-4;
+  @apply max-w-4xl mx-auto space-y-6 p-4 sm:p-6;
 }
 .page-container-medium {
-  @apply max-w-6xl mx-auto space-y-6 p-4;
+  @apply max-w-6xl mx-auto space-y-6 p-4 sm:p-6;
 }
 
 /* Dashboard animations */

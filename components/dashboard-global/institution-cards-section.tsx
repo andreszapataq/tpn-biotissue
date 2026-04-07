@@ -78,22 +78,24 @@ export function InstitutionCardsSection({
         </div>
 
         <Tabs value={activeFilter} onValueChange={(v) => onFilterChange(v as FilterTab)}>
-          <TabsList>
-            <TabsTrigger value="todos" className="gap-1.5">
+          <TabsList className="w-full">
+            <TabsTrigger value="todos" className="flex-1 gap-1 text-xs sm:text-sm px-1 sm:px-3">
               Todos
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{tabCounts.todos}</Badge>
+              <Badge variant="secondary" className="hidden sm:inline-flex text-[10px] px-1.5 py-0">{tabCounts.todos}</Badge>
             </TabsTrigger>
-            <TabsTrigger value="en_uso" className="gap-1.5">
+            <TabsTrigger value="en_uso" className="flex-1 gap-1 text-xs sm:text-sm px-1 sm:px-3">
               En uso
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{tabCounts.en_uso}</Badge>
+              <Badge variant="secondary" className="hidden sm:inline-flex text-[10px] px-1.5 py-0">{tabCounts.en_uso}</Badge>
             </TabsTrigger>
-            <TabsTrigger value="disponibles" className="gap-1.5">
-              Disponibles
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{tabCounts.disponibles}</Badge>
+            <TabsTrigger value="disponibles" className="flex-1 gap-1 text-xs sm:text-sm px-1 sm:px-3">
+              <span className="sm:hidden">Disp.</span>
+              <span className="hidden sm:inline">Disponibles</span>
+              <Badge variant="secondary" className="hidden sm:inline-flex text-[10px] px-1.5 py-0">{tabCounts.disponibles}</Badge>
             </TabsTrigger>
-            <TabsTrigger value="retirables" className="gap-1.5">
-              Retirables
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{tabCounts.retirables}</Badge>
+            <TabsTrigger value="retirables" className="flex-1 gap-1 text-xs sm:text-sm px-1 sm:px-3">
+              <span className="sm:hidden">Retir.</span>
+              <span className="hidden sm:inline">Retirables</span>
+              <Badge variant="secondary" className="hidden sm:inline-flex text-[10px] px-1.5 py-0">{tabCounts.retirables}</Badge>
             </TabsTrigger>
           </TabsList>
         </Tabs>

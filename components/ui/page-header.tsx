@@ -20,7 +20,7 @@ export function PageHeader({
   actions,
 }: PageHeaderProps) {
   return (
-    <div className="flex items-start justify-between gap-4">
+    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
       <div className="space-y-3">
         {backHref && (
           <Link href={backHref}>
@@ -35,7 +35,7 @@ export function PageHeader({
           {subtitle && <p className="body-muted mt-1">{subtitle}</p>}
         </div>
       </div>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+      {actions && <div className="flex items-center gap-2 w-full sm:w-auto">{actions}</div>}
     </div>
   )
 }

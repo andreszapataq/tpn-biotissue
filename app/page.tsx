@@ -147,14 +147,14 @@ const DashboardContent = memo(function DashboardContent() {
     const endItem = Math.min(currentPage * itemsPerPage, totalItems)
 
     return (
-      <div className="flex items-center justify-between px-4 py-3 border-t bg-muted">
+      <div className="flex flex-col sm:flex-row items-center justify-between px-4 py-3 border-t bg-muted gap-3">
         <div className="flex items-center text-sm text-foreground">
           <span>
-            Mostrando {startItem} - {endItem} de {totalItems} registros
+            Mostrando {startItem} - {endItem} de {totalItems}
           </span>
         </div>
-        
-        <div className="flex items-center space-x-2">
+
+        <div className="flex items-center space-x-1 sm:space-x-2 overflow-x-auto">
           <Button
             variant="outline"
             size="sm"
@@ -162,9 +162,9 @@ const DashboardContent = memo(function DashboardContent() {
             disabled={currentPage === 1}
           >
             <ChevronLeft className="h-4 w-4" />
-            Anterior
+            <span className="hidden sm:inline">Anterior</span>
           </Button>
-          
+
           <div className="flex items-center space-x-1">
             {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
               let pageNumber
@@ -177,28 +177,28 @@ const DashboardContent = memo(function DashboardContent() {
               } else {
                 pageNumber = currentPage - 2 + i
               }
-              
+
               return (
                 <Button
                   key={pageNumber}
                   variant={currentPage === pageNumber ? "default" : "outline"}
                   size="sm"
                   onClick={() => onPageChange(pageNumber)}
-                  className="w-8 h-8 p-0"
+                  className="w-10 h-10 p-0"
                 >
                   {pageNumber}
                 </Button>
               )
             })}
           </div>
-          
+
           <Button
             variant="outline"
             size="sm"
             onClick={() => onPageChange(currentPage + 1)}
             disabled={currentPage === totalPages}
           >
-            Siguiente
+            <span className="hidden sm:inline">Siguiente</span>
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
@@ -586,10 +586,16 @@ const DashboardContent = memo(function DashboardContent() {
         {/* Main Content */}
         <Tabs defaultValue="pacientes" className="space-y-4">
           <div className="flex flex-col space-y-4">
-            <TabsList className="inline-flex h-10 w-full items-center justify-start gap-1 rounded-md bg-muted p-1">
-              <TabsTrigger value="pacientes" className="flex-1 px-4">Últimos Pacientes</TabsTrigger>
-              <TabsTrigger value="procedimientos" className="flex-1 px-4">Procedimientos Cerrados</TabsTrigger>
-              <TabsTrigger value="alertas" className="flex-1 px-4">Alertas</TabsTrigger>
+            <TabsList className="inline-flex h-11 w-full items-center justify-start gap-1 rounded-md bg-muted p-1">
+              <TabsTrigger value="pacientes" className="flex-1 px-2 sm:px-4 text-xs sm:text-sm">
+                <span className="sm:hidden">Pacientes</span>
+                <span className="hidden sm:inline">Últimos Pacientes</span>
+              </TabsTrigger>
+              <TabsTrigger value="procedimientos" className="flex-1 px-2 sm:px-4 text-xs sm:text-sm">
+                <span className="sm:hidden">Cerrados</span>
+                <span className="hidden sm:inline">Procedimientos Cerrados</span>
+              </TabsTrigger>
+              <TabsTrigger value="alertas" className="flex-1 px-2 sm:px-4 text-xs sm:text-sm">Alertas</TabsTrigger>
             </TabsList>
             
             {/* 🔍 Buscador Global */}
@@ -773,7 +779,7 @@ const DashboardContent = memo(function DashboardContent() {
                             </div>
                           </div>
                           
-                          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 text-sm">
                             <div>
                               <p className="font-medium text-muted-foreground">Fecha</p>
                               <div className="flex items-center text-foreground">
