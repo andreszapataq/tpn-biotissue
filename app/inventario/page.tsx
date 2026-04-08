@@ -77,6 +77,7 @@ export default function Inventario() {
     name: "",
     code: "",
     category: "Apósitos",
+    lote: "",
     stock: 0,
     minimum_stock: 5,
     unit_price: 0,
@@ -179,13 +180,15 @@ export default function Inventario() {
         throw new Error("El código del producto es requerido")
       }
 
-      // Verificar que no exista un producto con el mismo código
-      const { data: existingProducts, error: checkError } = await supabase
+      // Verificar que no exista un producto con el mismo código y lote
+      const loteValue = newProduct.lote.trim() || null
+      let checkQuery = supabase
         .from("inventory_products")
         .select("id")
         .eq("code", newProduct.code.toUpperCase())
         .eq("institution_id", selectedInstitutionId || "")
-        .is("lote", null)
+      checkQuery = loteValue ? checkQuery.eq("lote", loteValue) : checkQuery.is("lote", null)
+      const { data: existingProducts, error: checkError } = await checkQuery
 
       if (checkError) {
         console.error("Error checking for existing product:", checkError)
@@ -193,7 +196,7 @@ export default function Inventario() {
       }
 
       if (existingProducts && existingProducts.length > 0) {
-        throw new Error(`Ya existe un producto con el código ${newProduct.code.toUpperCase()}`)
+        throw new Error(`Ya existe un producto con el código ${newProduct.code.toUpperCase()}${loteValue ? ` y lote ${loteValue}` : ''}`)
       }
 
       // Obtener perfil del usuario para registrar el movimiento
@@ -212,6 +215,7 @@ export default function Inventario() {
         name: newProduct.name.trim(),
         code: newProduct.code.trim().toUpperCase(),
         category: newProduct.category,
+        lote: loteValue,
         institution_id: selectedInstitutionId || undefined,
         stock: newProduct.stock,
         minimum_stock: newProduct.minimum_stock,
@@ -240,7 +244,7 @@ export default function Inventario() {
           reference_type: "initial_stock",
           reference_id: null,
           institution_id: selectedInstitutionId || undefined,
-          notes: `Inventario inicial del sistema`,
+          notes: loteValue ? `Inventario inicial del sistema - Lote: ${loteValue}` : `Inventario inicial del sistema`,
           created_at: new Date().toISOString()
         }
 
@@ -270,6 +274,7 @@ export default function Inventario() {
         name: "",
         code: "",
         category: "Apósitos",
+        lote: "",
         stock: 0,
         minimum_stock: 5,
         unit_price: 0,
@@ -943,6 +948,15 @@ export default function Inventario() {
                               <SelectItem value="Otros">Otros</SelectItem>
                             </SelectContent>
                           </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="lote">Lote</Label>
+                          <Input
+                            id="lote"
+                            value={newProduct.lote}
+                            onChange={(e) => setNewProduct({ ...newProduct, lote: e.target.value })}
+                            placeholder="Ej: 2026-001"
+                          />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div>
