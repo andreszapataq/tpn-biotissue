@@ -447,6 +447,11 @@ export default function Inventario() {
   const outOfStockItems = filteredInventory.filter(
     (item) => (item.stock || 0) === 0 || item.is_archived
   )
+  // Combined list for "Disponibles" tab: normal stock first (alphabetical), then low stock (alphabetical)
+  const allInStockItems = [
+    ...availableItems.sort((a, b) => a.name.localeCompare(b.name)),
+    ...lowStockItems.sort((a, b) => a.name.localeCompare(b.name)),
+  ]
 
   const getStockStatus = (stock: number, minimum: number) => {
     if (stock === 0) return { variant: "destructive" as const, label: "Agotado" }
@@ -1391,18 +1396,18 @@ export default function Inventario() {
           ) : (
             <Tabs defaultValue="disponibles" className="space-y-4">
               <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="disponibles" className="text-xs sm:text-sm">Disponibles ({formatNumber(availableItems.length)})</TabsTrigger>
+                <TabsTrigger value="disponibles" className="text-xs sm:text-sm">Disponibles ({formatNumber(allInStockItems.length)})</TabsTrigger>
                 <TabsTrigger value="bajo-stock" className="text-xs sm:text-sm">Stock Bajo ({formatNumber(lowStockItems.length)})</TabsTrigger>
                 <TabsTrigger value="sin-stock" className="text-xs sm:text-sm">Sin Stock ({formatNumber(outOfStockItems.length)})</TabsTrigger>
               </TabsList>
 
-              {/* Tab: Disponibles — stock > mínimo, no archivado */}
+              {/* Tab: Disponibles — todos los productos con stock (normal + bajo), no archivados */}
               <TabsContent value="disponibles" className="space-y-4">
-                {availableItems.length === 0 ? (
+                {allInStockItems.length === 0 ? (
                   <Card>
                     <CardContent className="pt-6 text-center">
                       <Package className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-                      <p className="text-muted-foreground">No hay productos disponibles con stock normal</p>
+                      <p className="text-muted-foreground">No hay productos disponibles con stock</p>
                       <Button className="mt-4" onClick={() => setIsCreateDialogOpen(true)}>
                         <Plus className="h-4 w-4 mr-2" />
                         Crear Primer Producto
@@ -1411,7 +1416,7 @@ export default function Inventario() {
                   </Card>
                 ) : (
                   <div className="grid gap-4">
-                    {availableItems.map((item) => {
+                    {allInStockItems.map((item) => {
                       const status = getStockStatus(item.stock || 0, item.minimum_stock || 0)
                       return (
                         <Card key={item.id}>
