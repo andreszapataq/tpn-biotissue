@@ -348,15 +348,17 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
     try {
       setIsUpdatingGeneral(true)
 
-      // Resolver specialist_id
+      // Resolver specialist_id: solo buscar/crear si el usuario cambió el especialista
       let specialistId = editSpecialistId || null
-      if (!specialistId && editSpecialistName) {
+      const specialistChanged = editSpecialistName !== (procedure.surgeon_name || "")
+
+      if (!specialistId && editSpecialistName && specialistChanged) {
         // Buscar especialista existente por nombre e institución
         const { data: existingSpecialists } = await supabase
           .from("specialists")
           .select("id")
           .eq("institution_id", procedure.institution_id)
-          .eq("name", editSpecialistName)
+          .eq("name", editSpecialistName.trim())
 
         const existingSpecialist = existingSpecialists?.[0]
 
@@ -375,7 +377,7 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
           const { data: newSpecialist, error: specialistError } = await supabase
             .from("specialists")
             .insert({
-              name: editSpecialistName,
+              name: editSpecialistName.trim(),
               specialty: editSpecialistSpecialty || "",
               institution_id: procedure.institution_id,
             })
@@ -385,13 +387,16 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
           if (specialistError) throw specialistError
           specialistId = newSpecialist.id
         }
+      } else if (!specialistId && !specialistChanged) {
+        // El usuario no cambió el especialista, mantener el specialist_id original
+        specialistId = procedure.specialist_id || null
       }
 
       const { error } = await supabase
         .from("procedures")
         .update({
           location: editGeneralData.location || null,
-          surgeon_name: editSpecialistName,
+          surgeon_name: editSpecialistName.trim(),
           specialist_id: specialistId,
           assistant_name: editGeneralData.assistant_name || null,
           diagnosis: editGeneralData.diagnosis,
@@ -410,10 +415,10 @@ export default function ProcedureDetail({ params }: { params: Promise<{ id: stri
       await loadProcedureData()
 
     } catch (error: any) {
-      console.error("Error updating procedure:", error)
+      console.error("Error updating procedure:", error?.message || error?.code || error)
       toast({
         title: "Error",
-        description: "No se pudo actualizar la información del procedimiento",
+        description: error?.message || "No se pudo actualizar la información del procedimiento",
         variant: "destructive",
       })
     } finally {
