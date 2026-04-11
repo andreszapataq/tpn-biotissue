@@ -36,7 +36,7 @@ export const MACHINE_MODELS: MachineModel[] = [
   },
   {
     code: "13066",
-    name: "TopiVac Handy Careoxi NPWT",
+    name: "TopiVac Handy CareOxi NPWT",
     shortName: "CareOxi",
     image: "/images/machines/careoxi.png",
   },

@@ -21,7 +21,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { Search, Package, AlertTriangle, Plus, Minus, TrendingUp, Loader2, Check, ChevronsUpDown, CalendarIcon, Trash2, PackageX, X } from "lucide-react"
 import { PageHeader } from "@/components/ui/page-header"
@@ -1306,8 +1305,7 @@ export default function Inventario() {
                           <p className="text-sm font-medium text-foreground">
                             Entradas pendientes ({pendingEntries.length})
                           </p>
-                          <ScrollArea className="max-h-48">
-                            <div className="space-y-2">
+                          <div className="space-y-2">
                               {pendingEntries.map((entry) => (
                                 <div key={entry.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted">
                                   <div className="flex-1 min-w-0">
@@ -1338,7 +1336,6 @@ export default function Inventario() {
                                 </div>
                               ))}
                             </div>
-                          </ScrollArea>
                         </div>
                       </>
                     )}
