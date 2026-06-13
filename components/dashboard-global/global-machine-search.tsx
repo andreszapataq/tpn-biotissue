@@ -1,7 +1,20 @@
 "use client"
 
-import { useCallback, useEffect, useRef } from "react"
-import { Search, X, RotateCcw, MonitorSmartphone } from "lucide-react"
+import { Fragment, useCallback, useEffect, useRef, useState } from "react"
+import {
+  Search,
+  X,
+  RotateCcw,
+  MonitorSmartphone,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
+  ChevronRight,
+  ChevronDown,
+  BatteryCharging,
+  Loader2,
+  ArrowRight,
+} from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -16,8 +29,9 @@ import {
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { getMachineDisplayName, formatDateForColombia } from "@/lib/utils"
+import { cn, getMachineDisplayName, formatDateForColombia } from "@/lib/utils"
 import { MACHINE_MODELS } from "@/lib/constants"
+import { supabase } from "@/lib/supabase"
 
 export interface GlobalMachine {
   machine_id: string
@@ -28,6 +42,7 @@ export interface GlobalMachine {
   remision: string | null
   observations: string | null
   last_maintenance: string | null
+  battery_replaced_at: string | null
   institution_id: string
   institution_name: string
   institution_code: string
@@ -36,10 +51,21 @@ export interface GlobalMachine {
   total_count: number
 }
 
+type TransferEntry = {
+  id: string
+  transfer_date: string | null
+  remision: string | null
+  notes: string | null
+  from_institution: { name: string } | null
+  to_institution: { name: string } | null
+}
+
 interface InstitutionOption {
   institution_id: string
   institution_name: string
 }
+
+type SortDir = "asc" | "desc"
 
 interface GlobalMachineSearchProps {
   machines: GlobalMachine[]
@@ -53,6 +79,9 @@ interface GlobalMachineSearchProps {
   onModelFilterChange: (v: string) => void
   statusFilter: string
   onStatusFilterChange: (v: string) => void
+  sortField: string
+  sortDir: SortDir
+  onSortChange: (field: string, dir: SortDir) => void
   page: number
   onPageChange: (p: number) => void
   institutions: InstitutionOption[]
@@ -77,12 +106,19 @@ export function GlobalMachineSearch({
   onModelFilterChange,
   statusFilter,
   onStatusFilterChange,
+  sortField,
+  sortDir,
+  onSortChange,
   page,
   onPageChange,
   institutions,
 }: GlobalMachineSearchProps) {
   const totalPages = Math.ceil(totalCount / PAGE_SIZE)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [transfersByMachine, setTransfersByMachine] = useState<Record<string, TransferEntry[]>>({})
+  const [loadingTransfers, setLoadingTransfers] = useState<Record<string, boolean>>({})
 
   const handleSearchInput = useCallback(
     (value: string) => {
@@ -101,6 +137,49 @@ export function GlobalMachineSearch({
     }
   }, [])
 
+  const loadTransfers = useCallback(
+    async (machineId: string) => {
+      if (transfersByMachine[machineId] || loadingTransfers[machineId]) return
+      setLoadingTransfers((prev) => ({ ...prev, [machineId]: true }))
+      try {
+        const { data, error } = await supabase
+          .from("machine_transfers")
+          .select(
+            `id, transfer_date, remision, notes,
+             from_institution:institutions!machine_transfers_from_institution_id_fkey(name),
+             to_institution:institutions!machine_transfers_to_institution_id_fkey(name)`
+          )
+          .eq("machine_id", machineId)
+          .order("transfer_date", { ascending: false })
+        if (error) throw error
+        setTransfersByMachine((prev) => ({ ...prev, [machineId]: (data as unknown as TransferEntry[]) || [] }))
+      } catch (err) {
+        console.error("Error loading machine transfers:", err)
+        setTransfersByMachine((prev) => ({ ...prev, [machineId]: [] }))
+      } finally {
+        setLoadingTransfers((prev) => ({ ...prev, [machineId]: false }))
+      }
+    },
+    [transfersByMachine, loadingTransfers]
+  )
+
+  const toggleExpand = (machineId: string) => {
+    if (expandedId === machineId) {
+      setExpandedId(null)
+    } else {
+      setExpandedId(machineId)
+      void loadTransfers(machineId)
+    }
+  }
+
+  const toggleSort = (field: string) => {
+    if (sortField === field) {
+      onSortChange(field, sortDir === "asc" ? "desc" : "asc")
+    } else {
+      onSortChange(field, "asc")
+    }
+  }
+
   const hasFilters = searchTerm || institutionFilter || modelFilter || statusFilter
 
   const resetFilters = () => {
@@ -109,6 +188,34 @@ export function GlobalMachineSearch({
     onModelFilterChange("")
     onStatusFilterChange("")
     onPageChange(0)
+  }
+
+  const SortHeader = ({
+    field,
+    label,
+    className,
+  }: {
+    field: string
+    label: string
+    className?: string
+  }) => {
+    const active = sortField === field
+    const Icon = active ? (sortDir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown
+    return (
+      <TableHead className={className}>
+        <button
+          type="button"
+          onClick={() => toggleSort(field)}
+          className={cn(
+            "inline-flex items-center gap-1 hover:text-foreground transition-colors",
+            active ? "text-foreground font-medium" : "text-muted-foreground"
+          )}
+        >
+          {label}
+          <Icon className={cn("h-3.5 w-3.5", active ? "opacity-100" : "opacity-40")} />
+        </button>
+      </TableHead>
+    )
   }
 
   return (
@@ -222,29 +329,33 @@ export function GlobalMachineSearch({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Lote</TableHead>
-              <TableHead>Modelo</TableHead>
-              <TableHead className="hidden md:table-cell">Ref.</TableHead>
-              <TableHead>Institucion</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead className="hidden lg:table-cell">Ult. Mant.</TableHead>
+              <TableHead className="w-8" />
+              <SortHeader field="lote" label="Lote" />
+              <SortHeader field="model" label="Modelo" />
+              <SortHeader field="reference_code" label="Ref." className="hidden md:table-cell" />
+              <SortHeader field="institution_name" label="Institucion" />
+              <SortHeader field="status" label="Estado" />
+              <SortHeader field="last_maintenance" label="Ult. Mant." className="hidden lg:table-cell" />
+              <SortHeader field="battery_replaced_at" label="Bateria" className="hidden lg:table-cell" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={i}>
+                  <TableCell><Skeleton className="h-4 w-4" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                   <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-16" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-28" /></TableCell>
                   <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                   <TableCell className="hidden lg:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell className="hidden lg:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
                 </TableRow>
               ))
             ) : machines.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-12">
+                <TableCell colSpan={8} className="text-center py-12">
                   <MonitorSmartphone className="h-10 w-10 mx-auto text-muted-foreground/40 mb-2" />
                   <p className="text-sm text-muted-foreground">No se encontraron equipos con los filtros actuales.</p>
                 </TableCell>
@@ -252,32 +363,116 @@ export function GlobalMachineSearch({
             ) : (
               machines.map((machine) => {
                 const effectiveStatus = getEffectiveStatus(machine.status, machine.is_in_use)
+                const isExpanded = expandedId === machine.machine_id
                 return (
-                  <TableRow key={machine.machine_id} className="hover:bg-muted/50">
-                    <TableCell className="font-mono font-medium">{machine.lote}</TableCell>
-                    <TableCell>
-                      <span className="text-sm">{getMachineDisplayName(machine.model)}</span>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <Badge variant="outline" className="font-mono text-xs">{machine.reference_code}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="text-sm truncate max-w-[200px]" title={machine.institution_name}>
-                          {machine.institution_name}
-                        </p>
-                        <p className="text-xs font-mono text-muted-foreground">{machine.institution_code}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={effectiveStatus} />
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
-                      {machine.last_maintenance
-                        ? formatDateForColombia(machine.last_maintenance)
-                        : "—"}
-                    </TableCell>
-                  </TableRow>
+                  <Fragment key={machine.machine_id}>
+                    <TableRow
+                      onClick={() => toggleExpand(machine.machine_id)}
+                      className={cn("cursor-pointer hover:bg-muted/50", isExpanded && "bg-muted/40")}
+                    >
+                      <TableCell className="text-muted-foreground">
+                        {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      </TableCell>
+                      <TableCell className="font-mono font-medium">{machine.lote}</TableCell>
+                      <TableCell>
+                        <span className="text-sm">{getMachineDisplayName(machine.model)}</span>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        <Badge variant="outline" className="font-mono text-xs">{machine.reference_code}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <p className="text-sm truncate max-w-[200px]" title={machine.institution_name}>
+                            {machine.institution_name}
+                          </p>
+                          <p className="text-xs font-mono text-muted-foreground">{machine.institution_code}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge status={effectiveStatus} />
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
+                        {machine.last_maintenance
+                          ? formatDateForColombia(machine.last_maintenance)
+                          : "—"}
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell text-sm">
+                        {machine.battery_replaced_at ? (
+                          <span className="inline-flex items-center gap-1 text-success">
+                            <BatteryCharging className="h-3.5 w-3.5" />
+                            {formatDateForColombia(machine.battery_replaced_at)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                    {isExpanded && (
+                      <TableRow key={`${machine.machine_id}-detail`} className="bg-muted/20 hover:bg-muted/20">
+                        <TableCell colSpan={8} className="py-4">
+                          <div className="grid gap-4 sm:grid-cols-2 px-2">
+                            {/* Machine details */}
+                            <div className="space-y-2 text-sm">
+                              <div className="flex items-center gap-2">
+                                <BatteryCharging className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-muted-foreground">Bateria instalada:</span>
+                                <span className="font-medium">
+                                  {machine.battery_replaced_at
+                                    ? formatDateForColombia(machine.battery_replaced_at)
+                                    : "No registrada"}
+                                </span>
+                              </div>
+                              <div className="lg:hidden flex items-center gap-2">
+                                <span className="text-muted-foreground">Ult. mantenimiento:</span>
+                                <span className="font-medium">
+                                  {machine.last_maintenance
+                                    ? formatDateForColombia(machine.last_maintenance)
+                                    : "No registrado"}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Observaciones: </span>
+                                <span className="font-medium">{machine.observations || "Ninguna"}</span>
+                              </div>
+                            </div>
+
+                            {/* Transfer history */}
+                            <div className="space-y-2">
+                              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                                Historial de traslados
+                              </p>
+                              {loadingTransfers[machine.machine_id] ? (
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  Cargando...
+                                </div>
+                              ) : (transfersByMachine[machine.machine_id]?.length ?? 0) === 0 ? (
+                                <p className="text-sm text-muted-foreground">Sin traslados registrados.</p>
+                              ) : (
+                                <ul className="space-y-1.5">
+                                  {transfersByMachine[machine.machine_id]?.map((t) => (
+                                    <li key={t.id} className="text-sm flex items-center gap-2 flex-wrap">
+                                      <span className="text-xs font-mono text-muted-foreground">
+                                        {t.transfer_date ? formatDateForColombia(t.transfer_date.split("T")[0]) : "—"}
+                                      </span>
+                                      <span>{t.from_institution?.name || "—"}</span>
+                                      <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                                      <span className="font-medium">{t.to_institution?.name || "—"}</span>
+                                      {t.remision && (
+                                        <Badge variant="outline" className="font-mono text-[10px]">
+                                          {t.remision}
+                                        </Badge>
+                                      )}
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </Fragment>
                 )
               })
             )}

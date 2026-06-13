@@ -53,17 +53,21 @@ export function ModelCard({
           )}
         </div>
 
-        {/* Model name */}
+        {/* Model name (subtitle inline so all cards align) */}
         <h3 className="font-semibold text-sm text-foreground leading-tight truncate" title={model.name}>
           {model.shortName}
+          {model.subtitle && (
+            <span className="font-normal text-muted-foreground"> · {model.subtitle}</span>
+          )}
         </h3>
-        {model.subtitle && (
-          <p className="text-xs text-muted-foreground">{model.subtitle}</p>
-        )}
         <p className="text-xs font-mono text-muted-foreground mt-0.5">Ref: {model.code}</p>
 
         {/* Counts */}
         <div className="mt-3 space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-foreground">Total</span>
+            <Badge variant="neutral" className="text-xs font-semibold tabular-nums">{totalCount}</Badge>
+          </div>
           <div className="flex items-center justify-between">
             <span className="text-xs text-muted-foreground">En uso</span>
             <Badge variant="info" className="text-xs tabular-nums">{inUseCount}</Badge>
@@ -82,7 +86,7 @@ export function ModelCard({
 
         {/* Utilization bar */}
         <div className="mt-3">
-          <UtilizationBar value={utilization} size="sm" animated label={`Total: ${totalCount}`} />
+          <UtilizationBar value={utilization} size="sm" animated />
         </div>
       </CardContent>
     </Card>

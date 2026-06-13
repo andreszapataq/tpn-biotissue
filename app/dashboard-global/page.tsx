@@ -71,6 +71,8 @@ export default function DashboardGlobalPage() {
   const [machineFilterModel, setMachineFilterModel] = useState("")
   const [machineFilterStatus, setMachineFilterStatus] = useState("")
   const [machinePage, setMachinePage] = useState(0)
+  const [machineSortField, setMachineSortField] = useState("last_maintenance")
+  const [machineSortDir, setMachineSortDir] = useState<"asc" | "desc">("asc")
 
   const loadDashboard = async () => {
     try {
@@ -108,6 +110,8 @@ export default function DashboardGlobalPage() {
         filter_institution_id: machineFilterInstitution || undefined,
         filter_model: machineFilterModel || undefined,
         filter_status: machineFilterStatus || undefined,
+        sort_field: machineSortField,
+        sort_direction: machineSortDir,
         page_limit: 25,
         page_offset: machinePage * 25,
       })
@@ -124,7 +128,7 @@ export default function DashboardGlobalPage() {
     } finally {
       setMachinesLoading(false)
     }
-  }, [machineSearchTerm, machineFilterInstitution, machineFilterModel, machineFilterStatus, machinePage])
+  }, [machineSearchTerm, machineFilterInstitution, machineFilterModel, machineFilterStatus, machineSortField, machineSortDir, machinePage])
 
   // Initial load + realtime
   useEffect(() => {
@@ -293,18 +297,7 @@ export default function DashboardGlobalPage() {
               {/* Section 1: Machine Model Cards */}
               <ModelCardsSection modelStats={modelStats} />
 
-              {/* Section 2: Institutions */}
-              <InstitutionCardsSection
-                filteredInstitutions={filteredInstitutions}
-                retirablesByInstitution={retirablesByInstitution}
-                searchTerm={searchTerm}
-                onSearchChange={setSearchTerm}
-                activeFilter={activeFilter}
-                onFilterChange={setActiveFilter}
-                tabCounts={tabCounts}
-              />
-
-              {/* Section 3: Global Machine Search */}
+              {/* Section 2: Global Machine Search */}
               <GlobalMachineSearch
                 machines={globalMachines}
                 totalCount={globalMachinesTotal}
@@ -317,9 +310,27 @@ export default function DashboardGlobalPage() {
                 onModelFilterChange={setMachineFilterModel}
                 statusFilter={machineFilterStatus}
                 onStatusFilterChange={setMachineFilterStatus}
+                sortField={machineSortField}
+                sortDir={machineSortDir}
+                onSortChange={(field, dir) => {
+                  setMachineSortField(field)
+                  setMachineSortDir(dir)
+                  setMachinePage(0)
+                }}
                 page={machinePage}
                 onPageChange={setMachinePage}
                 institutions={institutionStats}
+              />
+
+              {/* Section 3: Institutions */}
+              <InstitutionCardsSection
+                filteredInstitutions={filteredInstitutions}
+                retirablesByInstitution={retirablesByInstitution}
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
+                activeFilter={activeFilter}
+                onFilterChange={setActiveFilter}
+                tabCounts={tabCounts}
               />
             </div>
           )}

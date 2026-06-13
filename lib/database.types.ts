@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "12.2.3 (519615d)"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -176,36 +176,6 @@ export type Database = {
           },
         ]
       }
-      login_attempts: {
-        Row: {
-          attempted_at: string
-          email: string
-          failure_reason: string | null
-          id: string
-          ip_address: unknown
-          success: boolean
-          user_agent: string | null
-        }
-        Insert: {
-          attempted_at?: string
-          email: string
-          failure_reason?: string | null
-          id?: string
-          ip_address?: unknown
-          success: boolean
-          user_agent?: string | null
-        }
-        Update: {
-          attempted_at?: string
-          email?: string
-          failure_reason?: string | null
-          id?: string
-          ip_address?: unknown
-          success?: boolean
-          user_agent?: string | null
-        }
-        Relationships: []
-      }
       machine_transfers: {
         Row: {
           created_at: string
@@ -213,6 +183,7 @@ export type Database = {
           id: string
           machine_id: string
           notes: string | null
+          remision: string | null
           to_institution_id: string
           transfer_date: string
           transferred_by: string | null
@@ -223,6 +194,7 @@ export type Database = {
           id?: string
           machine_id: string
           notes?: string | null
+          remision?: string | null
           to_institution_id: string
           transfer_date?: string
           transferred_by?: string | null
@@ -233,6 +205,7 @@ export type Database = {
           id?: string
           machine_id?: string
           notes?: string | null
+          remision?: string | null
           to_institution_id?: string
           transfer_date?: string
           transferred_by?: string | null
@@ -270,6 +243,7 @@ export type Database = {
       }
       machines: {
         Row: {
+          battery_replaced_at: string | null
           created_at: string | null
           id: string
           institution_id: string
@@ -283,6 +257,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          battery_replaced_at?: string | null
           created_at?: string | null
           id?: string
           institution_id?: string
@@ -296,6 +271,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          battery_replaced_at?: string | null
           created_at?: string | null
           id?: string
           institution_id?: string
@@ -361,32 +337,32 @@ export type Database = {
       }
       procedure_machines: {
         Row: {
-          id: string
-          procedure_id: string
-          machine_id: string
-          institution_id: string
           created_at: string | null
+          id: string
+          institution_id: string
+          machine_id: string
+          procedure_id: string
         }
         Insert: {
-          id?: string
-          procedure_id: string
-          machine_id: string
-          institution_id: string
           created_at?: string | null
+          id?: string
+          institution_id: string
+          machine_id: string
+          procedure_id: string
         }
         Update: {
-          id?: string
-          procedure_id?: string
-          machine_id?: string
-          institution_id?: string
           created_at?: string | null
+          id?: string
+          institution_id?: string
+          machine_id?: string
+          procedure_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "procedure_machines_procedure_id_fkey"
-            columns: ["procedure_id"]
+            foreignKeyName: "procedure_machines_institution_id_fkey"
+            columns: ["institution_id"]
             isOneToOne: false
-            referencedRelation: "procedures"
+            referencedRelation: "institutions"
             referencedColumns: ["id"]
           },
           {
@@ -397,10 +373,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "procedure_machines_institution_id_fkey"
-            columns: ["institution_id"]
+            foreignKeyName: "procedure_machines_procedure_id_fkey"
+            columns: ["procedure_id"]
             isOneToOne: false
-            referencedRelation: "institutions"
+            referencedRelation: "procedures"
             referencedColumns: ["id"]
           },
         ]
@@ -552,27 +528,27 @@ export type Database = {
       }
       specialists: {
         Row: {
+          created_at: string | null
           id: string
           institution_id: string
           name: string
           specialty: string
-          created_at: string | null
           updated_at: string | null
         }
         Insert: {
+          created_at?: string | null
           id?: string
           institution_id: string
           name: string
           specialty: string
-          created_at?: string | null
           updated_at?: string | null
         }
         Update: {
+          created_at?: string | null
           id?: string
           institution_id?: string
           name?: string
           specialty?: string
-          created_at?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -702,6 +678,72 @@ export type Database = {
       current_app_user_role: { Args: never; Returns: string }
       current_institution_id: { Args: never; Returns: string }
       default_institution_id: { Args: never; Returns: string }
+      get_fleet_by_model: {
+        Args: never
+        Returns: {
+          available_count: number
+          in_use_count: number
+          maintenance_count: number
+          model: string
+          total_count: number
+        }[]
+      }
+      get_global_machines_list:
+        | {
+            Args: {
+              filter_institution_id?: string
+              filter_model?: string
+              filter_status?: string
+              page_limit?: number
+              page_offset?: number
+              search_term?: string
+            }
+            Returns: {
+              created_at: string
+              institution_code: string
+              institution_id: string
+              institution_name: string
+              is_in_use: boolean
+              last_maintenance: string
+              lote: string
+              machine_id: string
+              model: string
+              observations: string
+              reference_code: string
+              remision: string
+              status: string
+              total_count: number
+            }[]
+          }
+        | {
+            Args: {
+              filter_institution_id?: string
+              filter_model?: string
+              filter_status?: string
+              page_limit?: number
+              page_offset?: number
+              search_term?: string
+              sort_direction?: string
+              sort_field?: string
+            }
+            Returns: {
+              battery_replaced_at: string
+              created_at: string
+              institution_code: string
+              institution_id: string
+              institution_name: string
+              is_in_use: boolean
+              last_maintenance: string
+              lote: string
+              machine_id: string
+              model: string
+              observations: string
+              reference_code: string
+              remision: string
+              status: string
+              total_count: number
+            }[]
+          }
       get_idle_machines: {
         Args: { hours_threshold?: number }
         Returns: {
@@ -713,42 +755,6 @@ export type Database = {
           machine_lote: string
           machine_model: string
           never_used: boolean
-        }[]
-      }
-      get_fleet_by_model: {
-        Args: never
-        Returns: {
-          model: string
-          total_count: number
-          in_use_count: number
-          available_count: number
-          maintenance_count: number
-        }[]
-      }
-      get_global_machines_list: {
-        Args: {
-          search_term?: string
-          filter_institution_id?: string
-          filter_model?: string
-          filter_status?: string
-          page_limit?: number
-          page_offset?: number
-        }
-        Returns: {
-          machine_id: string
-          lote: string
-          model: string
-          reference_code: string
-          status: string
-          remision: string
-          observations: string
-          last_maintenance: string
-          institution_id: string
-          institution_name: string
-          institution_code: string
-          is_in_use: boolean
-          created_at: string
-          total_count: number
         }[]
       }
       get_institutions_live_status: {

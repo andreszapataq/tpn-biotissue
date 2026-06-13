@@ -93,6 +93,7 @@ export default function Maquinas() {
     model: "TopiVac Hand T-NPWT Classic",
     status: "active" as const,
     observations: "",
+    battery_replaced_at: "",
   })
 
   // Formulario para editar máquina
@@ -189,7 +190,11 @@ export default function Maquinas() {
 
       const { data, error } = await supabase
         .from("machines")
-        .insert([{ ...newMachine, institution_id: selectedInstitutionId || undefined }])
+        .insert([{
+          ...newMachine,
+          battery_replaced_at: newMachine.battery_replaced_at || null,
+          institution_id: selectedInstitutionId || undefined,
+        }])
         .select()
         .single()
 
@@ -209,6 +214,7 @@ export default function Maquinas() {
         model: "TopiVac Hand T-NPWT Classic",
         status: "active",
         observations: "",
+        battery_replaced_at: "",
       })
     } catch (error: any) {
       console.error("Error creating machine:", error)
@@ -234,7 +240,12 @@ export default function Maquinas() {
 
       const { data, error } = await supabase
         .from("machines")
-        .update({ ...editMachine, updated_at: new Date().toISOString() })
+        .update({
+          ...editMachine,
+          battery_replaced_at: editMachine.battery_replaced_at || null,
+          last_maintenance: editMachine.last_maintenance || null,
+          updated_at: new Date().toISOString(),
+        })
         .eq("id", selectedMachine.id)
         .select()
         .single()
@@ -343,6 +354,7 @@ export default function Maquinas() {
       remision: machine.remision,
       observations: machine.observations,
       last_maintenance: machine.last_maintenance,
+      battery_replaced_at: machine.battery_replaced_at,
     })
     setIsEditDialogOpen(true)
   }
@@ -485,6 +497,15 @@ export default function Maquinas() {
                         </Select>
                       </div>
                       <div>
+                        <Label htmlFor="battery_replaced_at">Batería Instalada</Label>
+                        <Input
+                          id="battery_replaced_at"
+                          type="date"
+                          value={newMachine.battery_replaced_at}
+                          onChange={(e) => setNewMachine({ ...newMachine, battery_replaced_at: e.target.value })}
+                        />
+                      </div>
+                      <div>
                         <Label htmlFor="observations">Observaciones</Label>
                         <Textarea
                           id="observations"
@@ -543,6 +564,9 @@ export default function Maquinas() {
                           </div>
                           <div>
                             <span className="font-medium">Último Mantenimiento:</span> {machine.last_maintenance || "No registrado"}
+                          </div>
+                          <div>
+                            <span className="font-medium">Batería Instalada:</span> {machine.battery_replaced_at || "No registrada"}
                           </div>
                           <div>
                             <span className="font-medium">Observaciones:</span> {machine.observations || "Ninguna"}
@@ -669,6 +693,15 @@ export default function Maquinas() {
                     type="date"
                     value={editMachine.last_maintenance || ""}
                     onChange={(e) => setEditMachine({ ...editMachine, last_maintenance: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit_battery_replaced_at">Batería Instalada</Label>
+                  <Input
+                    id="edit_battery_replaced_at"
+                    type="date"
+                    value={editMachine.battery_replaced_at || ""}
+                    onChange={(e) => setEditMachine({ ...editMachine, battery_replaced_at: e.target.value })}
                   />
                 </div>
               </div>
