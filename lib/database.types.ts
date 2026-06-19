@@ -688,6 +688,14 @@ export type Database = {
           total_count: number
         }[]
       }
+      get_new_battery_count: {
+        Args: never
+        Returns: number
+      }
+      get_overdue_maintenance_count: {
+        Args: never
+        Returns: number
+      }
       get_global_machines_list:
         | {
             Args: {

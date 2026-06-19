@@ -14,6 +14,8 @@ import {
   BatteryCharging,
   Loader2,
   ArrowRight,
+  AlertTriangle,
+  Clock,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -29,7 +31,7 @@ import {
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { cn, getMachineDisplayName, formatDateForColombia } from "@/lib/utils"
+import { cn, getMachineDisplayName, formatDateForColombia, getMaintenanceStatus } from "@/lib/utils"
 import { MACHINE_MODELS } from "@/lib/constants"
 import { supabase } from "@/lib/supabase"
 
@@ -94,6 +96,42 @@ function getEffectiveStatus(status: string, isInUse: boolean): "available" | "in
   return isInUse ? "in_use" : "available"
 }
 
+function MaintenanceDate({ lastMaintenance }: { lastMaintenance: string | null }) {
+  if (!lastMaintenance) {
+    return <span className="text-muted-foreground">—</span>
+  }
+
+  const { level, daysUntilDue } = getMaintenanceStatus(lastMaintenance)
+  const formatted = formatDateForColombia(lastMaintenance)
+
+  if (level === "overdue") {
+    const daysOverdue = daysUntilDue != null ? Math.abs(daysUntilDue) : null
+    return (
+      <span
+        className="inline-flex items-center gap-1 font-medium text-destructive"
+        title={daysOverdue != null ? `Mantenimiento vencido hace ${daysOverdue} día${daysOverdue !== 1 ? "s" : ""}` : "Mantenimiento vencido"}
+      >
+        <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+        {formatted}
+      </span>
+    )
+  }
+
+  if (level === "due_soon") {
+    return (
+      <span
+        className="inline-flex items-center gap-1 font-medium text-warning"
+        title={daysUntilDue != null ? `Mantenimiento próximo: faltan ${daysUntilDue} día${daysUntilDue !== 1 ? "s" : ""}` : "Mantenimiento próximo"}
+      >
+        <Clock className="h-3.5 w-3.5 shrink-0" />
+        {formatted}
+      </span>
+    )
+  }
+
+  return <span className="text-muted-foreground">{formatted}</span>
+}
+
 export function GlobalMachineSearch({
   machines,
   totalCount,
@@ -119,6 +157,37 @@ export function GlobalMachineSearch({
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [transfersByMachine, setTransfersByMachine] = useState<Record<string, TransferEntry[]>>({})
   const [loadingTransfers, setLoadingTransfers] = useState<Record<string, boolean>>({})
+  const [overdueCount, setOverdueCount] = useState<number | null>(null)
+  const [newBatteryCount, setNewBatteryCount] = useState<number | null>(null)
+  // Easter egg: al hacer click en el badge alterna entre vencidos y baterías nuevas
+  const [showBattery, setShowBattery] = useState(false)
+
+  // Conteo global (toda la flota visible) de equipos con mantenimiento vencido y
+  // con batería nueva. Se recalcula cuando la lista se recarga (machines cambia).
+  useEffect(() => {
+    let cancelled = false
+    const loadCounts = async () => {
+      const [overdueRes, batteryRes] = await Promise.all([
+        supabase.rpc("get_overdue_maintenance_count"),
+        supabase.rpc("get_new_battery_count"),
+      ])
+      if (cancelled) return
+      if (overdueRes.error) {
+        console.error("Error loading overdue maintenance count:", overdueRes.error)
+      } else {
+        setOverdueCount(typeof overdueRes.data === "number" ? overdueRes.data : 0)
+      }
+      if (batteryRes.error) {
+        console.error("Error loading new battery count:", batteryRes.error)
+      } else {
+        setNewBatteryCount(typeof batteryRes.data === "number" ? batteryRes.data : 0)
+      }
+    }
+    void loadCounts()
+    return () => {
+      cancelled = true
+    }
+  }, [machines])
 
   const handleSearchInput = useCallback(
     (value: string) => {
@@ -319,10 +388,37 @@ export function GlobalMachineSearch({
         )}
       </div>
 
-      {/* Results count */}
-      <p className="text-xs text-muted-foreground mb-2">
-        {totalCount} equipo{totalCount !== 1 ? "s" : ""} encontrado{totalCount !== 1 ? "s" : ""}
-      </p>
+      {/* Results count + overdue maintenance alarm */}
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+        <p className="text-xs text-muted-foreground">
+          {totalCount} equipo{totalCount !== 1 ? "s" : ""} encontrado{totalCount !== 1 ? "s" : ""}
+        </p>
+        {overdueCount != null && overdueCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowBattery((v) => !v)}
+            title="Equipos con mantenimiento vencido"
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
+              showBattery
+                ? "bg-success/10 text-success hover:bg-success/15"
+                : "bg-destructive/10 text-destructive hover:bg-destructive/15"
+            )}
+          >
+            {showBattery ? (
+              <>
+                <BatteryCharging className="h-3.5 w-3.5" />
+                {newBatteryCount ?? 0} con batería nueva
+              </>
+            ) : (
+              <>
+                <AlertTriangle className="h-3.5 w-3.5" />
+                {overdueCount} con mantenimiento vencido
+              </>
+            )}
+          </button>
+        )}
+      </div>
 
       {/* Table */}
       <div className="rounded-lg border bg-card/90 backdrop-blur-sm overflow-x-auto">
@@ -391,10 +487,8 @@ export function GlobalMachineSearch({
                       <TableCell>
                         <StatusBadge status={effectiveStatus} />
                       </TableCell>
-                      <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
-                        {machine.last_maintenance
-                          ? formatDateForColombia(machine.last_maintenance)
-                          : "—"}
+                      <TableCell className="hidden lg:table-cell text-sm">
+                        <MaintenanceDate lastMaintenance={machine.last_maintenance} />
                       </TableCell>
                       <TableCell className="hidden lg:table-cell text-sm">
                         {machine.battery_replaced_at ? (
@@ -424,11 +518,11 @@ export function GlobalMachineSearch({
                               </div>
                               <div className="lg:hidden flex items-center gap-2">
                                 <span className="text-muted-foreground">Ult. mantenimiento:</span>
-                                <span className="font-medium">
-                                  {machine.last_maintenance
-                                    ? formatDateForColombia(machine.last_maintenance)
-                                    : "No registrado"}
-                                </span>
+                                {machine.last_maintenance ? (
+                                  <MaintenanceDate lastMaintenance={machine.last_maintenance} />
+                                ) : (
+                                  <span className="font-medium">No registrado</span>
+                                )}
                               </div>
                               <div>
                                 <span className="text-muted-foreground">Observaciones: </span>

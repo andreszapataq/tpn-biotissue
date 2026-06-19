@@ -55,6 +55,64 @@ export function formatTimestampWithTimeForColombia(timestamp: string): string {
   })
 }
 
+// Intervalo de mantenimiento de los equipos (cada 6 meses)
+export const MAINTENANCE_INTERVAL_MONTHS = 6
+// Umbral de "próximo a vencer": faltan 15 días o menos para cumplir el intervalo
+export const MAINTENANCE_DUE_SOON_DAYS = 15
+
+export type MaintenanceLevel = "overdue" | "due_soon" | "ok" | "unknown"
+
+export interface MaintenanceStatus {
+  level: MaintenanceLevel
+  // Días que faltan para la fecha de vencimiento (negativo si ya venció)
+  daysUntilDue: number | null
+  // Fecha en la que se cumple el intervalo de mantenimiento (YYYY-MM-DD)
+  nextDueDate: string | null
+}
+
+/**
+ * Calcula el estado de mantenimiento de un equipo a partir de la fecha del
+ * último mantenimiento. Los mantenimientos se realizan cada 6 meses:
+ * - overdue: ya pasaron más de 6 meses (alarma roja)
+ * - due_soon: faltan 15 días o menos para cumplir los 6 meses (alarma naranja)
+ * - ok: dentro del periodo normal
+ * - unknown: sin fecha de mantenimiento registrada
+ */
+export function getMaintenanceStatus(lastMaintenance: string | null): MaintenanceStatus {
+  if (!lastMaintenance) {
+    return { level: "unknown", daysUntilDue: null, nextDueDate: null }
+  }
+
+  // La fecha puede venir como YYYY-MM-DD o como timestamp; tomamos solo la fecha
+  const dateOnly = lastMaintenance.split("T")[0]
+  const last = new Date(dateOnly + "T00:00:00")
+  if (Number.isNaN(last.getTime())) {
+    return { level: "unknown", daysUntilDue: null, nextDueDate: null }
+  }
+
+  const due = new Date(last)
+  due.setMonth(due.getMonth() + MAINTENANCE_INTERVAL_MONTHS)
+
+  const today = new Date(getCurrentDateInColombia() + "T00:00:00")
+  const msPerDay = 1000 * 60 * 60 * 24
+  const daysUntilDue = Math.round((due.getTime() - today.getTime()) / msPerDay)
+
+  const nextDueDate = `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, "0")}-${String(
+    due.getDate()
+  ).padStart(2, "0")}`
+
+  let level: MaintenanceLevel
+  if (daysUntilDue < 0) {
+    level = "overdue"
+  } else if (daysUntilDue <= MAINTENANCE_DUE_SOON_DAYS) {
+    level = "due_soon"
+  } else {
+    level = "ok"
+  }
+
+  return { level, daysUntilDue, nextDueDate }
+}
+
 /**
  * Retorna el nombre de visualización de una máquina.
  * El subtipo (C)/(P) ya está incluido en el campo model desde la creación.
