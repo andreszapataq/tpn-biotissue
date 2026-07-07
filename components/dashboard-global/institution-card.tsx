@@ -58,22 +58,20 @@ export function InstitutionCard({ institution, retirables, index }: InstitutionC
       style={{ animationDelay: `${index * 0.04}s` }}
     >
       <CardContent className="p-4">
-        {/* Header: name + status */}
-        <div className="flex items-start justify-between gap-2 mb-3">
+        {/* Header: name + total machines */}
+        <div className="flex items-start justify-between gap-3 mb-3">
           <div className="min-w-0 flex-1">
             <h3 className="font-semibold text-foreground truncate" title={institution.institution_name}>
               {institution.institution_name}
             </h3>
             <p className="text-xs font-mono text-muted-foreground">{institution.institution_code}</p>
           </div>
-          {institution.is_warehouse ? (
-            <StatusBadge status="maintenance" label="Bodega" />
-          ) : (
-            <StatusBadge
-              status={isActive ? "active" : "inactive"}
-              label={isActive ? "Activa" : "Inactiva"}
-            />
-          )}
+          <div className="shrink-0 flex flex-col items-center rounded-lg border bg-muted/40 px-3 py-1.5 leading-none">
+            <span className="text-2xl font-bold tabular-nums text-foreground">{institution.total_machines}</span>
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mt-1">
+              {institution.total_machines === 1 ? "equipo" : "equipos"}
+            </span>
+          </div>
         </div>
 
         {/* Metrics row */}
@@ -122,17 +120,18 @@ export function InstitutionCard({ institution, retirables, index }: InstitutionC
           />
         </div>
 
-        {/* Footer: retirables + last activity */}
+        {/* Footer: bodega tag / retirables + last activity */}
         <div className="mt-3 flex items-center justify-between gap-2">
-          {retirables.length > 0 ? (
-            <Badge variant="warning" className="text-xs">
-              {retirables.length} retirable{retirables.length !== 1 ? "s" : ""}
-            </Badge>
-          ) : (
-            <span />
-          )}
+          <div className="flex items-center gap-2 min-w-0">
+            {institution.is_warehouse && <StatusBadge status="maintenance" label="Bodega" />}
+            {retirables.length > 0 && (
+              <Badge variant="warning" className="text-xs">
+                {retirables.length} retirable{retirables.length !== 1 ? "s" : ""}
+              </Badge>
+            )}
+          </div>
           {institution.last_activity_at && (
-            <p className="text-[10px] text-muted-foreground truncate">
+            <p className="text-[10px] text-muted-foreground truncate shrink-0">
               {formatTimestampForColombia(institution.last_activity_at)}
             </p>
           )}

@@ -297,7 +297,18 @@ export default function DashboardGlobalPage() {
               {/* Section 1: Machine Model Cards */}
               <ModelCardsSection modelStats={modelStats} />
 
-              {/* Section 2: Global Machine Search */}
+              {/* Section 2: Institutions */}
+              <InstitutionCardsSection
+                filteredInstitutions={filteredInstitutions}
+                retirablesByInstitution={retirablesByInstitution}
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
+                activeFilter={activeFilter}
+                onFilterChange={setActiveFilter}
+                tabCounts={tabCounts}
+              />
+
+              {/* Section 3: Global Machine Search */}
               <GlobalMachineSearch
                 machines={globalMachines}
                 totalCount={globalMachinesTotal}
@@ -320,17 +331,6 @@ export default function DashboardGlobalPage() {
                 page={machinePage}
                 onPageChange={setMachinePage}
                 institutions={institutionStats}
-              />
-
-              {/* Section 3: Institutions */}
-              <InstitutionCardsSection
-                filteredInstitutions={filteredInstitutions}
-                retirablesByInstitution={retirablesByInstitution}
-                searchTerm={searchTerm}
-                onSearchChange={setSearchTerm}
-                activeFilter={activeFilter}
-                onFilterChange={setActiveFilter}
-                tabCounts={tabCounts}
               />
             </div>
           )}
