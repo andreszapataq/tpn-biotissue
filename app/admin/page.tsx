@@ -552,12 +552,34 @@ export default function AdminPage() {
     }
 
     try {
+      // El cambio de estado pasa por la API para bloquear/desbloquear también en Supabase Auth
+      if (draft.is_active !== (user.is_active !== false)) {
+        const { data: sessionData } = await supabase.auth.getSession()
+        const token = sessionData.session?.access_token
+        if (!token) {
+          throw new Error("Sesión expirada. Recarga la página e intenta de nuevo.")
+        }
+
+        const response = await fetch("/api/admin/set-user-status", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ user_id: user.id, is_active: draft.is_active }),
+        })
+
+        if (!response.ok) {
+          const result = await response.json().catch(() => ({}))
+          throw new Error(result.error || "No se pudo cambiar el estado del usuario")
+        }
+      }
+
       const { error } = await supabase
         .from("users")
         .update({
           role: draft.role,
           institution_id: draft.institution_id,
-          is_active: draft.is_active,
         })
         .eq("id", user.id)
 

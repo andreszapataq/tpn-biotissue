@@ -175,6 +175,11 @@ export class AuthService {
           return this.mapAuthUser(user, refreshedProfile)
         }
 
+        if (profile.is_active === false) {
+          await supabase.auth.signOut()
+          return null
+        }
+
         await this.updateLastLogin(user.id)
         return this.mapAuthUser(user, profile)
       })()

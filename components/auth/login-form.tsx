@@ -53,7 +53,11 @@ function LoginFormContent() {
 
       if (error) {
         console.error("Login failed:", error)
-        setError(error.message)
+        setError(
+          (error as any).code === "user_banned" || /banned/i.test(error.message)
+            ? "Tu cuenta está desactivada. Contacta al administrador."
+            : error.message,
+        )
         return
       }
 
