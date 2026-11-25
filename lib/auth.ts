@@ -1,5 +1,5 @@
 import { supabase } from "./supabase"
-import { canSelfRegisterRole, hasGlobalVisibility, normalizeAppRole, type AppRole } from "./roles"
+import { LOWEST_PRIVILEGE_ROLE, canSelfRegisterRole, hasGlobalVisibility, normalizeAppRole, type AppRole } from "./roles"
 
 export interface UserInstitutionMembership {
   institution_id: string
@@ -146,7 +146,7 @@ export class AuthService {
         if (error || !profile) {
           const fallbackRole = canSelfRegisterRole(user.user_metadata?.role)
             ? normalizeAppRole(user.user_metadata?.role)
-            : "asistente"
+            : LOWEST_PRIVILEGE_ROLE
 
           const { error: insertError } = await supabase
             .from("users")

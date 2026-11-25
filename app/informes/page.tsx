@@ -83,7 +83,7 @@ export default function Informes() {
                 <AlertTriangle className="h-10 w-10 mx-auto text-amber-500 mb-4" />
                 <h2 className="text-lg font-semibold text-foreground mb-1">Acceso Restringido</h2>
                 <p className="text-sm text-muted-foreground">
-                  Los informes están disponibles para administradores y gerentes.
+                  Los informes están disponibles para administradores y asistentes.
                 </p>
               </CardContent>
             </Card>
@@ -94,7 +94,7 @@ export default function Informes() {
   }
 
   return (
-    <ProtectedRoute requiredRole={["administrador", "gerente"]}>
+    <ProtectedRoute requiredRole={["administrador", "asistente"]}>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50">
         <div className="max-w-7xl mx-auto px-4 py-6">
           {/* Header */}

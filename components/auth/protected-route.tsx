@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { useAuth } from "./auth-provider"
+import { usePermissions } from "@/hooks/use-permissions"
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -10,6 +11,8 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
   const { user } = useAuth()
+  // Mismo rol efectivo (por institución activa) que usan los botones y acciones de cada página
+  const { role } = usePermissions()
 
   // Sin loading - renderizar inmediatamente
   if (!user) {
@@ -17,7 +20,7 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
   }
 
   // Verificar rol si es necesario
-  if (requiredRole && !requiredRole.includes(user.role)) {
+  if (requiredRole && (!role || !requiredRole.includes(role))) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">

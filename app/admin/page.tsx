@@ -641,7 +641,7 @@ export default function AdminPage() {
         <div className="page-container-medium">
           <PageHeader
             title="Administración"
-            subtitle="Gestiona instituciones y convierte usuarios existentes en soporte, asistentes o gerencia."
+            subtitle="Gestiona instituciones y asigna roles a los usuarios: soporte, asistente o gerente."
             backHref="/"
             actions={<UserMenu />}
           />

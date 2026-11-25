@@ -7,7 +7,11 @@ export const APP_ROLES = [
 
 export type AppRole = (typeof APP_ROLES)[number]
 
-export const PUBLIC_REGISTRATION_ROLES: AppRole[] = ["soporte", "asistente"]
+// Asistente tiene permisos casi de administrador, por eso solo soporte puede auto-registrarse.
+export const PUBLIC_REGISTRATION_ROLES: AppRole[] = ["soporte"]
+
+// Rol de menor privilegio: se usa cuando el rol guardado no se reconoce.
+export const LOWEST_PRIVILEGE_ROLE: AppRole = "soporte"
 
 export function normalizeAppRole(role?: string | null): AppRole {
   switch (role) {
@@ -23,7 +27,7 @@ export function normalizeAppRole(role?: string | null): AppRole {
     case "financiero":
       return "gerente"
     default:
-      return "asistente"
+      return LOWEST_PRIVILEGE_ROLE
   }
 }
 
@@ -33,7 +37,7 @@ export function canSelfRegisterRole(role?: string | null): boolean {
 
 export function hasGlobalVisibility(role?: string | null): boolean {
   const normalizedRole = normalizeAppRole(role)
-  return normalizedRole === "administrador" || normalizedRole === "gerente"
+  return normalizedRole === "administrador" || normalizedRole === "gerente" || normalizedRole === "asistente"
 }
 
 export function getRoleLabel(role?: string | null): string {
@@ -46,8 +50,6 @@ export function getRoleLabel(role?: string | null): string {
       return "Asistente"
     case "gerente":
       return "Gerente"
-    default:
-      return "Asistente"
   }
 }
 

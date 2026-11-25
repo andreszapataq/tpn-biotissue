@@ -877,22 +877,22 @@ export default function Inventario() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">
-                    {permissions.isAdmin ? "Valor Total" : "Sin Stock"}
+                    {permissions.canViewInventoryValue ? "Valor Total" : "Sin Stock"}
                   </CardTitle>
-                  {permissions.isAdmin
+                  {permissions.canViewInventoryValue
                     ? <TrendingUp className="h-4 w-4 text-success" />
                     : <PackageX className="h-4 w-4 text-destructive" />
                   }
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold animate-count-up">
-                    {permissions.isAdmin
+                    {permissions.canViewInventoryValue
                       ? formatCurrency(totalValue)
                       : formatNumber(outOfStockCount)
                     }
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {permissions.isAdmin ? "Valor del inventario" : "Agotados o archivados"}
+                    {permissions.canViewInventoryValue ? "Valor del inventario" : "Agotados o archivados"}
                   </p>
                 </CardContent>
               </Card>
@@ -988,8 +988,8 @@ export default function Inventario() {
                             />
                           </div>
                         </div>
-                        {/* Solo mostrar precio unitario para administradores */}
-                        {permissions.isAdmin && (
+                        {/* Solo mostrar precio unitario a quienes ven valores (administrador y asistente) */}
+                        {permissions.canViewInventoryValue && (
                           <div>
                             <Label htmlFor="unit_price">Precio Unitario (COP)</Label>
                             <Input
@@ -1032,7 +1032,7 @@ export default function Inventario() {
                   </Dialog>
                   ) : (
                     <div className="text-center py-2">
-                      <p className="text-sm text-muted-foreground">Solo administradores</p>
+                      <p className="text-sm text-muted-foreground">Solo administradores y asistentes</p>
                       <p className="text-xs text-muted-foreground">pueden crear productos</p>
                     </div>
                   )}
@@ -1263,7 +1263,7 @@ export default function Inventario() {
                                 onChange={(e) => setCurrentEntry(prev => ({ ...prev, minimumStock: parseInt(e.target.value) || 0 }))}
                               />
                             </div>
-                            {permissions.isAdmin && (
+                            {permissions.canViewInventoryValue && (
                               <div className="space-y-2">
                                 <Label htmlFor="entry-price">Precio Unitario (COP)</Label>
                                 <Input
@@ -1424,9 +1424,9 @@ export default function Inventario() {
                                   <h3 className="text-lg font-semibold">{item.name}</h3>
                                   <Badge variant="outline">{item.code}</Badge>
                                   <Badge variant="secondary">{item.category}</Badge>
-                                  {permissions.isAdmin && <Badge variant={status.variant}>{status.label}</Badge>}
+                                  {permissions.canViewInventoryValue && <Badge variant={status.variant}>{status.label}</Badge>}
                                 </div>
-                                <div className={`grid gap-4 text-sm text-muted-foreground ${permissions.isAdmin ? 'grid-cols-2 md:grid-cols-5' : 'grid-cols-2 md:grid-cols-4'}`}>
+                                <div className={`grid gap-4 text-sm text-muted-foreground ${permissions.canViewInventoryValue ? 'grid-cols-2 md:grid-cols-5' : 'grid-cols-2 md:grid-cols-4'}`}>
                                   <div>
                                     <span className="font-medium">Lote:</span> <span className={`font-semibold ${item.lote ? 'text-primary' : 'text-muted-foreground'}`}>{item.lote || "N/A"}</span>
                                   </div>
@@ -1436,7 +1436,7 @@ export default function Inventario() {
                                   <div>
                                     <span className="font-medium">Stock Mínimo:</span> {formatNumber(item.minimum_stock || 0)}
                                   </div>
-                                  {permissions.isAdmin ? (
+                                  {permissions.canViewInventoryValue ? (
                                     <>
                                       <div>
                                         <span className="font-medium">Precio Unitario:</span> {formatCurrency(item.unit_price || 0)}
@@ -1589,7 +1589,7 @@ export default function Inventario() {
                                 <div>
                                   <span className="font-medium">Stock Mínimo:</span> {formatNumber(item.minimum_stock || 0)}
                                 </div>
-                                {permissions.isAdmin && (
+                                {permissions.canViewInventoryValue && (
                                   <div>
                                     <span className="font-medium">Precio Unitario:</span> {formatCurrency(item.unit_price || 0)}
                                   </div>
@@ -1704,8 +1704,8 @@ export default function Inventario() {
                     />
                   </div>
                 </div>
-                {/* Solo mostrar precio unitario para administradores */}
-                {permissions.isAdmin && (
+                {/* Solo mostrar precio unitario a quienes ven valores (administrador y asistente) */}
+                {permissions.canViewInventoryValue && (
                   <div>
                     <Label htmlFor="edit_unit_price">Precio Unitario (COP)</Label>
                     <Input

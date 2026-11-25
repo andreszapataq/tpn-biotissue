@@ -244,7 +244,7 @@ export default function DashboardGlobalPage() {
   )
 
   return (
-    <ProtectedRoute requiredRole={["administrador", "gerente"]}>
+    <ProtectedRoute requiredRole={["administrador", "asistente", "gerente"]}>
       <div className="min-h-screen bg-gradient-to-br from-background via-primary/3 to-background">
         <div className="page-container">
           {/* Header */}

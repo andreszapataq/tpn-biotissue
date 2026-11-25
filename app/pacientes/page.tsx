@@ -242,7 +242,7 @@ export default function Pacientes() {
       <div>
         <div className="flex items-center justify-between mb-2">
           <h4 className="font-semibold">Informacion Personal</h4>
-          {permissions.canEditMachines && (
+          {permissions.canEditPatients && (
             <Button variant="outline" size="sm" onClick={() => openEditDialog(selectedPatient)}>
               <Edit className="h-3 w-3 mr-1" />
               Editar
