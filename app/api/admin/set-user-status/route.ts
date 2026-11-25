@@ -14,6 +14,13 @@ const BAN_DURATION = "876000h"
  * Supabase Auth: no puede iniciar sesión ni renovar su token de acceso.
  */
 export async function POST(request: NextRequest) {
+  if (!supabaseServiceRoleKey) {
+    return NextResponse.json(
+      { error: "Falta configurar SUPABASE_SERVICE_ROLE_KEY en el servidor" },
+      { status: 500 },
+    )
+  }
+
   try {
     const authHeader = request.headers.get("Authorization")
     if (!authHeader?.startsWith("Bearer ")) {

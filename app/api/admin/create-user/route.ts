@@ -6,6 +6,13 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export async function POST(request: NextRequest) {
+  if (!supabaseServiceRoleKey) {
+    return NextResponse.json(
+      { error: "Falta configurar SUPABASE_SERVICE_ROLE_KEY en el servidor" },
+      { status: 500 },
+    )
+  }
+
   try {
     // 1. Verify caller is an authenticated admin
     const authHeader = request.headers.get("Authorization")
@@ -24,14 +31,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Token inválido" }, { status: 401 })
     }
 
-    // Check caller role in users table
-    const { data: callerUser, error: callerError } = await anonClient
+    const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    })
+
+    // Check caller role in users table (service role: el cliente anon no tiene sesión y RLS ocultaría la fila)
+    const { data: callerUser, error: callerError } = await adminClient
       .from("users")
-      .select("role")
+      .select("role, is_active")
       .eq("auth_id", callerAuth.id)
       .single()
 
-    if (callerError || callerUser?.role !== "administrador") {
+    if (callerError || callerUser?.role !== "administrador" || callerUser?.is_active === false) {
       return NextResponse.json({ error: "Solo administradores pueden crear usuarios" }, { status: 403 })
     }
 
@@ -59,10 +70,6 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Create auth user with service role key
-    const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    })
-
     const { data: newAuthUser, error: createError } = await adminClient.auth.admin.createUser({
       email: email.trim(),
       password,
